@@ -98,6 +98,9 @@ The initial phase of the project has focused on establishing a robust foundation
 With the project foundation in place, the immediate next steps will involve:
 
 *   **Data Collection Services**: Implementing modules to fetch financial data from external APIs (starting with Alpha Vantage).
+    - Basic function to fetch `TIME_SERIES_INTRADAY` data from Alpha Vantage has been implemented in `src/services/dataService.ts`.
+    - Added logging and unit tests for this service.
+    - The service is exported via `src/services/index.ts`.
 *   **Algorithm Implementation**: Developing the core trading strategies (Moving Average Crossover, RSI, etc.).
 *   **Backtesting Engine**: Building the functionality to test strategies against historical data.
 
