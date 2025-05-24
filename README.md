@@ -98,10 +98,42 @@ The initial phase of the project has focused on establishing a robust foundation
 With the project foundation in place, the immediate next steps will involve:
 
 *   **Data Collection Services**: Implementing modules to fetch financial data from external APIs (starting with Alpha Vantage).
-    - Basic function to fetch `TIME_SERIES_INTRADAY` data from Alpha Vantage has been implemented in `src/services/dataService.ts`.
-    - Added logging and unit tests for this service.
-    - The service is exported via `src/services/index.ts`.
+    - [DONE] Basic function to fetch `TIME_SERIES_INTRADAY` data from Alpha Vantage has been implemented in `src/services/dataService.ts`.
+    - [DONE] Added logging and unit tests for this service.
+    - [DONE] The service is exported via `src/services/index.ts`.
+    - Implement data fetching from Yahoo Finance API.
+    - Implement data fetching from Binance API (for cryptocurrency data).
+    - Develop a fallback mechanism to use historical data from CSV files if APIs are unavailable or for specific backtesting scenarios.
 *   **Algorithm Implementation**: Developing the core trading strategies (Moving Average Crossover, RSI, etc.).
+    - Develop Moving Average Crossover strategy (e.g., SMA 20/50 for buy/sell signals).
+    - Implement Relative Strength Index (RSI 14) for overbought/oversold detection.
+    - Integrate Markowitz minimal variance model for portfolio optimization (e.g., for a basket of low-fee ETFs).
+    - Create dynamic stop loss mechanism based on Average True Range (ATR × 2).
+    - Implement position sizing using the truncated Kelly Criterion (e.g., max 10% of capital per trade).
 *   **Backtesting Engine**: Building the functionality to test strategies against historical data.
+    - Ensure the engine can process at least 5 years of historical data.
+    - Implement calculation and reporting of key performance indicators: CAGR, Sharpe ratio, maximum drawdown, and percentage of winning trades.
+*   **Paper Trading**: Setting up simulated trading environments.
+    - Integrate with Alpaca Sandbox or Binance Testnet for simulated order execution.
+    - Implement comprehensive journaling of all paper trades (e.g., entry/exit points, order types, P&L per trade).
+*   **Real-time Dashboard**: Developing the user interface for monitoring and insights.
+    - Set up frontend with Next.js 13, React, TypeScript, Tailwind CSS, and Recharts.
+    - Implement visualization for portfolio value curve (historical and real-time).
+    - Develop a heat map for current positions (gain/loss).
+    - Overlay prediction lines (ARIMA/Prophet) on charts.
+    - Display key KPIs in card components (e.g., Portfolio Value, ROI %, CAGR, Sharpe Ratio, Max Drawdown, 30d Volatility).
+    - Create an 'Insights' module for dynamic recommendations (allocation, profit-taking).
+    - Implement toast and email notifications (e.g., via SendGrid) for significant events (stop loss, new opportunity, ROI threshold).
+*   **Forecasting**: Implementing predictive models.
+    - Implement time series forecasting models (e.g., ARIMA or Prophet).
+    - Set up daily retraining of forecasting models based on latest closing prices.
+    - Display 7-day and 30-day forecasts with 50% and 95% confidence intervals on the dashboard.
+*   **API & WebSocket**: Enabling data exposure and real-time communication.
+    - Develop a `/metrics` API endpoint to expose key indicators in JSON format.
+    - Implement WebSocket communication for real-time updates to the dashboard (sub-500ms latency target).
+*   **Security & Compliance**: Ensuring safe and responsible operation.
+    - Reinforce security by ensuring all API keys and sensitive configurations are strictly managed through `.env` files and never hardcoded.
+    - Add a clear 'Not financial advice' disclaimer visible to users.
+    - Review and implement necessary measures for RGPD compliance regarding any user data collected.
 
 Further development will proceed according to the features outlined in the initial project objective.
