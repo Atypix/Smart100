@@ -32,7 +32,8 @@
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "uuid": "^11.1.0",
-    "winston": "^3.17.0"
+    "winston": "^3.17.0",
+    "yahoo-finance2": "^2.13.3"
   },
   "devDependencies": {
     "@types/body-parser": "^1.19.5",
