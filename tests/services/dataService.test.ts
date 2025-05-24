@@ -1,8 +1,9 @@
-import { fetchAlphaVantageData } from '../../src/services/dataService';
+import { fetchAlphaVantageData, fetchYahooFinanceData, YahooFinanceData } from '../../src/services/dataService';
 import axios from 'axios';
 import { logger } from '../../src/utils/logger';
+import yahooFinance from 'yahoo-finance2';
 
-// Mock axios and logger
+// Mock axios, logger, and yahoo-finance2
 jest.mock('axios');
 jest.mock('../../src/utils/logger', () => ({
   logger: {
@@ -12,6 +13,7 @@ jest.mock('../../src/utils/logger', () => ({
     debug: jest.fn(), // Add debug if it's used
   },
 }));
+jest.mock('yahoo-finance2');
 
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 // If you need to access the mocked logger, you can cast it similarly, though often direct mocking of its methods as above is sufficient.
@@ -113,6 +115,69 @@ describe('fetchAlphaVantageData', () => {
     expect(logger.error).toHaveBeenCalledWith(
       'Time series data not found in Alpha Vantage response.',
       { responseData: mockDataNoTimeSeries }
+    );
+  });
+});
+
+describe('fetchYahooFinanceData', () => {
+  const mockYahooFinance = yahooFinance as jest.Mocked<typeof yahooFinance>;
+  // Assuming 'logger' is imported from '../../src/utils/logger' and mocked globally for the test file.
+  // If not, the logger mock clearing in beforeEach needs to be adjusted or logger needs to be imported.
+
+  beforeEach(() => {
+    mockYahooFinance.historical.mockClear();
+    // Clear logger mocks. This assumes 'logger' is imported and its methods are jest.fn().
+    // If logger is mocked like: jest.mock('../../src/utils/logger', () => ({ logger: { info: jest.fn(), ... } }));
+    // then you might need to import logger and then clear its methods.
+    // For example, after importing: import { logger } from '../../src/utils/logger';
+    if (typeof logger !== 'undefined' && (logger.info as jest.Mock).mockClear) {
+        (logger.info as jest.Mock).mockClear();
+        (logger.error as jest.Mock).mockClear();
+        (logger.warn as jest.Mock).mockClear();
+    }
+  });
+
+  it('should fetch and return data for a valid symbol', async () => {
+    const mockData = [
+      { date: new Date('2023-01-01'), open: 100, high: 105, low: 99, close: 102, volume: 10000 },
+      { date: new Date('2023-01-02'), open: 102, high: 106, low: 101, close: 105, volume: 12000 },
+    ];
+    mockYahooFinance.historical.mockResolvedValue(mockData as any); // 'as any' for mock convenience
+
+    const data = await fetchYahooFinanceData('AAPL');
+    expect(data).toEqual(mockData);
+    expect(mockYahooFinance.historical).toHaveBeenCalledWith('AAPL', expect.any(Object));
+    expect(logger.info).toHaveBeenCalledWith('Fetching Yahoo Finance historical data for symbol: AAPL');
+    expect(logger.info).toHaveBeenCalledWith(`Successfully fetched ${mockData.length} historical data points for symbol: AAPL from Yahoo Finance.`);
+  });
+
+  it('should return an empty array if no data is returned for a symbol', async () => {
+    mockYahooFinance.historical.mockResolvedValue([]);
+
+    const data = await fetchYahooFinanceData('NODATA');
+    expect(data).toEqual([]);
+    expect(logger.warn).toHaveBeenCalledWith('No data returned from Yahoo Finance for symbol: NODATA');
+  });
+
+  it('should throw an error if the API call fails', async () => {
+    const apiError = new Error('Yahoo API Error');
+    mockYahooFinance.historical.mockRejectedValue(apiError);
+
+    await expect(fetchYahooFinanceData('ERROR')).rejects.toThrow('Error fetching data for symbol ERROR from Yahoo Finance. Details: Yahoo API Error');
+    expect(logger.error).toHaveBeenCalledWith(
+      'Error fetching data for symbol ERROR from Yahoo Finance. Details: Yahoo API Error',
+      { symbol: 'ERROR', error: apiError }
+    );
+  });
+
+  it('should handle errors when symbol is not found (simulated by API error)', async () => {
+    const notFoundError = new Error('Symbol not found');
+    mockYahooFinance.historical.mockRejectedValue(notFoundError);
+
+    await expect(fetchYahooFinanceData('INVALID')).rejects.toThrow('Error fetching data for symbol INVALID from Yahoo Finance. Details: Symbol not found');
+    expect(logger.error).toHaveBeenCalledWith(
+      'Error fetching data for symbol INVALID from Yahoo Finance. Details: Symbol not found',
+      { symbol: 'INVALID', error: notFoundError }
     );
   });
 });

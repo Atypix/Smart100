@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { logger } from '../../utils/logger';
+import yahooFinance from 'yahoo-finance2';
 
 interface TimeSeriesData {
   [timestamp: string]: {
@@ -31,9 +32,6 @@ export async function fetchAlphaVantageData(symbol: string, apiKey: string): Pro
   const url = `${baseUrl}?function=${functionName}&symbol=${symbol}&interval=${interval}&outputsize=${outputsize}&apikey=${apiKey}`;
 
   try {
-    const response = await axios.get(url);
-    const data = response.data;
-
     logger.info(`Fetching Alpha Vantage data for symbol: ${symbol}`);
     const response = await axios.get(url);
     const data = response.data;
@@ -86,5 +84,51 @@ export async function fetchAlphaVantageData(symbol: string, apiKey: string): Pro
     logger.error('Unknown error fetching Alpha Vantage data:', { error });
     // console.error('Unknown error fetching Alpha Vantage data:', error); // Replaced by logger
     throw new Error('An unknown error occurred while fetching Alpha Vantage data.');
+  }
+}
+
+// New Interface for Yahoo Finance Data
+interface YahooFinanceData {
+  date: Date;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  adjClose?: number; // adjClose is often available and useful
+}
+
+export async function fetchYahooFinanceData(symbol: string): Promise<YahooFinanceData[]> {
+  logger.info(`Fetching Yahoo Finance historical data for symbol: ${symbol}`);
+  try {
+    // Basic query options: last 7 days of data. This can be parameterized later.
+    const queryOptions = {
+      period1: new Date(new Date().setDate(new Date().getDate() - 7)), // 7 days ago
+      period2: new Date(), // today
+      interval: '1d', // daily
+    };
+    const results = await yahooFinance.historical(symbol, queryOptions);
+
+    if (!results || results.length === 0) {
+      const errorMessage = `No data returned from Yahoo Finance for symbol: ${symbol}`;
+      logger.warn(errorMessage);
+      return []; // Return empty array if no data
+    }
+
+    // Assuming the library returns data in a compatible format or requires minimal mapping.
+    // If the library's return type is already suitable and matches YahooFinanceData, direct assertion can be used.
+    // Otherwise, a mapping step would be needed here.
+    // For now, let's assume the structure is close enough.
+    logger.info(`Successfully fetched ${results.length} historical data points for symbol: ${symbol} from Yahoo Finance.`);
+    return results as YahooFinanceData[];
+  } catch (error) {
+    let errorMessage = `Error fetching data for symbol ${symbol} from Yahoo Finance.`;
+    if (error instanceof Error) {
+      errorMessage += ` Details: ${error.message}`;
+    }
+    // Check if it's a specific error type from yahoo-finance2, if available, for more detailed logging
+    // e.g., if (error.name === 'FailedYahooValidationError') logger.warn(...)
+    logger.error(errorMessage, { symbol, error });
+    throw new Error(errorMessage);
   }
 }
