@@ -102,7 +102,7 @@ With the project foundation in place, the immediate next steps will involve:
     - [DONE] Added logging and unit tests for this service.
     - [DONE] The service is exported via `src/services/index.ts`.
     - [DONE] Implement data fetching from Yahoo Finance API.
-    - Implement data fetching from Binance API (for cryptocurrency data).
+    - [DONE] Implement data fetching from Binance API (for cryptocurrency data).
     - Develop a fallback mechanism to use historical data from CSV files if APIs are unavailable or for specific backtesting scenarios.
 *   **Algorithm Implementation**: Developing the core trading strategies (Moving Average Crossover, RSI, etc.).
     - Develop Moving Average Crossover strategy (e.g., SMA 20/50 for buy/sell signals).

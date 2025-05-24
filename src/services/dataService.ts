@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { logger } from '../../utils/logger';
 import yahooFinance from 'yahoo-finance2';
+import Binance, { CandleChartResult } from 'binance-api-node';
 
 interface TimeSeriesData {
   [timestamp: string]: {
@@ -129,6 +130,39 @@ export async function fetchYahooFinanceData(symbol: string): Promise<YahooFinanc
     // Check if it's a specific error type from yahoo-finance2, if available, for more detailed logging
     // e.g., if (error.name === 'FailedYahooValidationError') logger.warn(...)
     logger.error(errorMessage, { symbol, error });
+    throw new Error(errorMessage);
+  }
+}
+
+export async function fetchBinanceData(symbol: string, interval: string): Promise<CandleChartResult[]> {
+  // Initialize Binance client. No API key/secret needed for public data like klines.
+  const client = Binance();
+  logger.info(`Fetching Binance K-line data for symbol: ${symbol}, interval: ${interval}`);
+
+  try {
+    const klines = await client.candles({ symbol, interval });
+
+    if (!klines || klines.length === 0) {
+      const errorMessage = `No K-line data returned from Binance for symbol: ${symbol}, interval: ${interval}`;
+      logger.warn(errorMessage);
+      return []; // Return empty array if no data
+    }
+
+    logger.info(`Successfully fetched ${klines.length} K-line entries for symbol: ${symbol}, interval: ${interval} from Binance.`);
+    // The 'binance-api-node' library's `candles` method already returns typed results (CandleChartResult[]).
+    // So, we can use that type directly if it matches our needs or adapt it.
+    // For now, we'll use CandleChartResult directly as the return type.
+    return klines;
+  } catch (error) {
+    let errorMessage = `Error fetching K-line data for symbol ${symbol}, interval ${interval} from Binance.`;
+    if (error instanceof Error) {
+      // binance-api-node might throw specific error types or include error codes
+      if ('code' in error) {
+        errorMessage += ` Binance Error Code: ${(error as any).code}.`; // Added type assertion for error.code
+      }
+      errorMessage += ` Details: ${error.message}`;
+    }
+    logger.error(errorMessage, { symbol, interval, error });
     throw new Error(errorMessage);
   }
 }
