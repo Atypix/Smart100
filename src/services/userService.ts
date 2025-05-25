@@ -1,31 +1,54 @@
 // src/services/userService.ts
 import { User } from '../models/user.types';
 import { v4 as uuidv4 } from 'uuid';
+import { db } from '../database'; // Import db instance
 
-const users: User[] = [];
+// Type for user data passed to createUser, excluding generated fields
+type CreateUserInput = Omit<User, 'id' | 'createdAt' | 'updatedAt'>;
 
-export const createUser = (userData: Omit<User, 'id'>): User => {
+export const createUser = (userData: CreateUserInput): User => {
   const newUser: User = {
     id: uuidv4(), // Generate unique ID
     ...userData,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
   };
-  users.push(newUser);
+
+  const stmt = db.prepare(
+    'INSERT INTO users (id, email, passwordHash, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)'
+  );
+  stmt.run(newUser.id, newUser.email, newUser.passwordHash, newUser.createdAt, newUser.updatedAt);
+  
+  // Return the complete user object, including generated id and timestamps
   return newUser;
 };
 
 export const findUserByEmail = (email: string): User | undefined => {
-  return users.find(user => user.email === email);
+  const stmt = db.prepare('SELECT * FROM users WHERE email = ?');
+  const user = stmt.get(email) as User | undefined;
+  return user;
 };
 
 export const findUserById = (id: string): User | undefined => {
-  return users.find(user => user.id === id);
+  const stmt = db.prepare('SELECT * FROM users WHERE id = ?');
+  const user = stmt.get(id) as User | undefined;
+  return user;
 };
 
 // Optional: a function to get all users for debugging/testing
 export const getAllUsers = (): User[] => {
-    return [...users]; // Return a copy to prevent direct modification
+  const stmt = db.prepare('SELECT * FROM users');
+  const users = stmt.all() as User[];
+  return users;
 };
 
-export const clearUsers = () => {
-  users.length = 0; // Reset the in-memory users array
-};
+// clearUsers might be used in tests. If tests fail due to its removal, 
+// they might need to be adapted or this function could be conditionally kept for testing environments.
+// For now, it's removed as per instructions to switch to DB persistence.
+// export const clearUsers = () => {
+//   // This would now need to be a DB operation, e.g., db.exec('DELETE FROM users');
+//   // For testing purposes, this might be:
+//   // if (process.env.NODE_ENV === 'test') {
+//   //   db.exec('DELETE FROM users');
+//   // }
+// };

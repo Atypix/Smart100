@@ -51,6 +51,8 @@ export interface BacktestResult {
   trades: Trade[];
   totalTrades: number;
   dataPointsProcessed: number; // Added for clarity
+  historicalDataUsed?: HistoricalDataPoint[];
+  portfolioHistory?: { timestamp: number; value: number }[]; // Added for equity curve
 }
 
 
@@ -181,8 +183,18 @@ export async function runBacktest(
   }
 
   logger.info(`Processing ${historicalData.length} data points for backtest using strategy: ${selectedStrategy.name}...`);
+  
+  const portfolioHistoryTimeline: { timestamp: number; value: number }[] = []; // For equity curve
 
   for (let i = 0; i < historicalData.length; i++) {
+    // Record portfolio value at the START of the period (before current data point is processed)
+    // or after, depending on when you want to reflect the value.
+    // Let's record it *before* processing the current day's signal and potential trade,
+    // but after the previous day's trades have settled and price updated.
+    // So, at the beginning of the loop, using previous day's close for shares value if i > 0
+    // or initial value if i === 0.
+    // Simpler: record after current day's processing.
+    
     const context: StrategyContext = {
       historicalData: historicalData,
       currentIndex: i,
@@ -238,6 +250,7 @@ export async function runBacktest(
 
     // Update current portfolio value after any potential trade
     portfolio.currentValue = portfolio.cash + portfolio.shares * currentPrice;
+    portfolioHistoryTimeline.push({ timestamp: historicalData[i].timestamp, value: portfolio.currentValue });
   }
 
   const finalPortfolioValue = portfolio.currentValue;
@@ -257,6 +270,8 @@ export async function runBacktest(
     trades: tradeHistory,
     totalTrades: tradeHistory.length,
     dataPointsProcessed: historicalData.length,
+    historicalDataUsed: historicalData, // Include the historical data
+    portfolioHistory: portfolioHistoryTimeline, // Include portfolio history
   };
 
   logger.info(`Backtest completed for ${symbol} using strategy ${selectedStrategy.name}`, {
