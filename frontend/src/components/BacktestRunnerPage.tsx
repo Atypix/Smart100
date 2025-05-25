@@ -12,7 +12,10 @@ import StrategySelector from './StrategySelector';
 import StrategyParameterForm from './StrategyParameterForm';
 import BacktestSettingsForm from './BacktestSettingsForm';
 import ResultsDisplay from './ResultsDisplay';
+import EquityChart from './EquityChart'; // Import EquityChart
+import TradesOnPriceChart from './TradesOnPriceChart'; // Import TradesOnPriceChart
 import { logger } from '../utils/logger';
+import { HistoricalDataPoint as FrontendHistoricalDataPoint, Trade as FrontendTrade } from '../types'; // For chart props
 
 const BacktestRunnerPage: React.FC = () => {
   // Note: availableStrategies is fetched by StrategySelector itself.
@@ -136,6 +139,31 @@ const BacktestRunnerPage: React.FC = () => {
       
       <div className="results-section"> {/* No backtest-section class for results unless desired */}
         <ResultsDisplay results={backtestResult} error={error} loading={isLoading} />
+        
+        {/* Render charts if results are available */}
+        {backtestResult && !error && (
+          <div className="charts-section" style={{ marginTop: '20px' }}>
+            {/* Equity Chart */}
+            {backtestResult.portfolioHistory && backtestResult.portfolioHistory.length > 0 && (
+              <EquityChart 
+                data={backtestResult.portfolioHistory} 
+              />
+            )}
+
+            {/* Trades on Price Chart */}
+            {backtestResult.historicalDataUsed && backtestResult.historicalDataUsed.length > 0 && backtestResult.trades && (
+              <TradesOnPriceChart 
+                priceData={backtestResult.historicalDataUsed as ReadonlyArray<FrontendHistoricalDataPoint>} // Cast if necessary, ensure types align
+                tradesData={backtestResult.trades.map(trade => ({ // Map to TradesOnPriceChart's expected prop structure
+                  entryTimestamp: trade.timestamp,
+                  entryPrice: trade.price,
+                  type: trade.action.toLowerCase() as 'buy' | 'sell', // Ensure type compatibility
+                  amount: trade.sharesTraded,
+                }))}
+              />
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
