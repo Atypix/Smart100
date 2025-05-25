@@ -92,48 +92,138 @@ The initial phase of the project has focused on establishing a robust foundation
     *   Added an initial sample utility function (`src/utils/math.ts`) and a corresponding test (`tests/utils/math.test.ts`).
 *   **Version Control**:
     *   The project has been initialized as a Git repository, and the foundational setup described above has been committed to the `main` branch.
+    *   **Recent Additions (Phase 2):** The application now includes local data caching/archiving via SQLite and a foundational backtesting engine.
 
-## 3. Next Steps
+## 3. Core Features
 
-With the project foundation in place, the immediate next steps will involve:
+*   **Data Collection Services (`src/services/dataService.ts`)**:
+    *   Fetches financial data from external APIs: Alpha Vantage (intraday time series) and Yahoo Finance (historical daily data).
+    *   **Financial Data Caching:** Data fetched from these APIs is cached in a local SQLite database (`trading_data.db`). This significantly reduces API calls, helps avoid rate-limiting, and can provide data if an API is temporarily unavailable.
+    *   **Historical Data Archive:** All fetched data is stored in the SQLite database, gradually building a local historical archive over time.
+    *   **Fallback Mechanism:** If an API call fails, the system attempts to return the most recent relevant data from the local SQLite archive.
+*   **Database Integration (`src/database/index.ts`)**:
+    *   Uses SQLite (`better-sqlite3` library) for local data storage.
+    *   The database file (`trading_data.db`) is automatically created in the project root, and its schema is initialized on application startup if it doesn't exist. No manual database setup is typically required.
+*   **Backtesting Engine (`src/backtest/index.ts`)**:
+    *   Provides a `runBacktest` function to test trading strategies against historical data.
+    *   Strategies (e.g., `simpleThresholdStrategy`) are defined as functions that receive market data and portfolio status, then decide on actions (BUY, SELL, HOLD).
+    *   Historical data for backtesting is fetched exclusively from the local SQLite database via `fetchHistoricalDataFromDB` in `dataService.ts`, ensuring consistent and fast backtests.
+*   **Logging**:
+    *   Comprehensive logging using Winston (`src/utils/logger.ts`) for console output with timestamps and log levels.
+*   **Environment Management**:
+    *   Uses `dotenv` for managing environment variables (API keys, etc.). See `.env.example`.
+*   **Testing Framework**:
+    *   Jest is configured for unit and integration testing (`jest.config.js`), with `ts-jest` for TypeScript support.
+    *   Tests cover database interactions, data service logic (including caching/fallback), and the backtesting engine.
 
-*   **Data Collection Services**: Implementing modules to fetch financial data from external APIs (starting with Alpha Vantage).
-    - [DONE] Basic function to fetch `TIME_SERIES_INTRADAY` data from Alpha Vantage has been implemented in `src/services/dataService.ts`.
-    - [DONE] Added logging and unit tests for this service.
-    - [DONE] The service is exported via `src/services/index.ts`.
-    - [DONE] Implement data fetching from Yahoo Finance API.
-    - Implement data fetching from Binance API (for cryptocurrency data).
-    - Develop a fallback mechanism to use historical data from CSV files if APIs are unavailable or for specific backtesting scenarios.
-*   **Algorithm Implementation**: Developing the core trading strategies (Moving Average Crossover, RSI, etc.).
-    - Develop Moving Average Crossover strategy (e.g., SMA 20/50 for buy/sell signals).
-    - Implement Relative Strength Index (RSI 14) for overbought/oversold detection.
-    - Integrate Markowitz minimal variance model for portfolio optimization (e.g., for a basket of low-fee ETFs).
-    - Create dynamic stop loss mechanism based on Average True Range (ATR × 2).
-    - Implement position sizing using the truncated Kelly Criterion (e.g., max 10% of capital per trade).
-*   **Backtesting Engine**: Building the functionality to test strategies against historical data.
-    - Ensure the engine can process at least 5 years of historical data.
-    - Implement calculation and reporting of key performance indicators: CAGR, Sharpe ratio, maximum drawdown, and percentage of winning trades.
-*   **Paper Trading**: Setting up simulated trading environments.
-    - Integrate with Alpaca Sandbox or Binance Testnet for simulated order execution.
-    - Implement comprehensive journaling of all paper trades (e.g., entry/exit points, order types, P&L per trade).
-*   **Real-time Dashboard**: Developing the user interface for monitoring and insights.
-    - Set up frontend with Next.js 13, React, TypeScript, Tailwind CSS, and Recharts.
-    - Implement visualization for portfolio value curve (historical and real-time).
-    - Develop a heat map for current positions (gain/loss).
-    - Overlay prediction lines (ARIMA/Prophet) on charts.
-    - Display key KPIs in card components (e.g., Portfolio Value, ROI %, CAGR, Sharpe Ratio, Max Drawdown, 30d Volatility).
-    - Create an 'Insights' module for dynamic recommendations (allocation, profit-taking).
-    - Implement toast and email notifications (e.g., via SendGrid) for significant events (stop loss, new opportunity, ROI threshold).
-*   **Forecasting**: Implementing predictive models.
-    - Implement time series forecasting models (e.g., ARIMA or Prophet).
-    - Set up daily retraining of forecasting models based on latest closing prices.
-    - Display 7-day and 30-day forecasts with 50% and 95% confidence intervals on the dashboard.
-*   **API & WebSocket**: Enabling data exposure and real-time communication.
-    - Develop a `/metrics` API endpoint to expose key indicators in JSON format.
-    - Implement WebSocket communication for real-time updates to the dashboard (sub-500ms latency target).
-*   **Security & Compliance**: Ensuring safe and responsible operation.
-    - Reinforce security by ensuring all API keys and sensitive configurations are strictly managed through `.env` files and never hardcoded.
-    - Add a clear 'Not financial advice' disclaimer visible to users.
-    - Review and implement necessary measures for RGPD compliance regarding any user data collected.
+## 4. Project Structure Highlights
 
-Further development will proceed according to the features outlined in the initial project objective.
+Key directories and files, including recent additions:
+
+*   `src/`: Main application code.
+    *   `database/index.ts`: Manages SQLite database connection, schema, and data access functions.
+    *   `services/dataService.ts`: Handles fetching data from external APIs and interacts with the database for caching and archiving.
+    *   `backtest/index.ts`: Contains the backtesting engine, strategy definitions, and related interfaces.
+    *   `utils/logger.ts`: Logging utility.
+    *   `utils/math.ts`: Sample utility (can be expanded).
+*   `tests/`: Unit and integration tests.
+    *   `database/database.test.ts`: Tests for database logic.
+    *   `services/dataService.test.ts`: Tests for data fetching, caching, and fallback.
+    *   `backtest/backtest.test.ts`: Tests for the backtesting engine.
+*   `.env.example`: Template for environment variables (Alpha Vantage and Yahoo Finance API keys).
+*   `trading_data.db`: SQLite database file (automatically created).
+*   `PROJECT_TRACKING.md`: Document tracking project progress and future direction.
+
+## 5. Setup and Usage
+
+1.  **Prerequisites**:
+    *   Node.js (>= 20 recommended)
+    *   npm (usually comes with Node.js)
+
+2.  **Installation**:
+    ```bash
+    git clone <repository-url>
+    cd <repository-name>
+    npm install
+    ```
+
+3.  **Environment Variables**:
+    *   Copy `.env.example` to a new file named `.env`.
+    *   Fill in your API keys for Alpha Vantage (and any other services you intend to use, though currently only Alpha Vantage requires one for basic operation of `fetchAlphaVantageData`).
+    ```
+    ALPHA_VANTAGE_API_KEY=YOUR_ALPHA_VANTAGE_KEY
+    # YAHOO_FINANCE_API_KEY=YOUR_YAHOO_FINANCE_KEY (Note: Yahoo Finance via yahoo-finance2 library does not typically require an API key)
+    ```
+
+4.  **Running the Application (Example Usage/Development)**:
+    *   The application is primarily a collection of services and a backtesting engine at this stage. You can interact with its components programmatically.
+    *   To build the TypeScript code:
+        ```bash
+        npm run build
+        ```
+    *   Example: To test fetching data (ensure your `.env` is set up):
+        ```typescript
+        // Create a test script, e.g., test-fetch.ts in the root or scripts/
+        import { fetchAlphaVantageData } from './dist/services/dataService'; // Adjust path after build
+
+        async function main() {
+          const data = await fetchAlphaVantageData('IBM', process.env.ALPHA_VANTAGE_API_KEY || 'YOUR_KEY');
+          console.log(JSON.stringify(data, null, 2));
+        }
+        main().catch(console.error);
+        ```
+        Then run: `node test-fetch.js` (after building and ensuring paths are correct).
+
+5.  **Running Tests**:
+    ```bash
+    npm test
+    ```
+    This will execute all tests located in the `tests/` directory.
+
+## 6. Deployment Considerations
+
+### General Node.js Deployment:
+*   **Server Setup:** Ensure Node.js and npm are installed on the target server.
+*   **Code Deployment:** Clone the repository.
+*   **Dependencies:** Install production dependencies: `npm ci` or `npm install --production`.
+*   **Build:** Compile TypeScript: `npm run build`.
+*   **Environment Variables:** Set up environment variables (API keys, etc.) securely on the server.
+*   **Process Management:** Use a process manager like PM2 to run the application (e.g., `pm2 start dist/index.js` if you have a main entry point, or for specific services/tasks).
+
+### SQLite Database (`trading_data.db`):
+*   **Persistence:** The `trading_data.db` file will be created in the application's working directory (project root by default). Ensure this location is persistent across deployments and has necessary write permissions.
+*   **Stateless Environments:** For stateless deployment models (e.g., some container orchestrators, serverless functions), a file-based SQLite database requires a persistent volume to be mounted. Without this, data will be lost when the instance/container restarts.
+*   **Scalability:** For applications requiring high concurrency or distributed access, consider migrating to a client-server database (e.g., PostgreSQL, MySQL) or a managed cloud database service. This is beyond the current project's scope but important for future scaling.
+
+### AWS Deployment Notes (General):
+*   **EC2 Instance:**
+    *   Deploy as a standard Node.js application. Install Node.js, clone the repo, build, and run using PM2.
+    *   The SQLite database file would reside on the EC2 instance's EBS volume, which is persistent.
+    *   Configure Security Groups to allow necessary inbound/outbound traffic (e.g., HTTPS for API calls).
+*   **Docker:**
+    *   Containerize the application using a `Dockerfile`. The image should include Node.js, application code, and dependencies.
+    *   To persist `trading_data.db`, map a Docker volume to the path where the database file is stored. This keeps the data separate from the container lifecycle.
+*   **Elastic Beanstalk:**
+    *   Simplifies deployment. Zip your application (including `package.json`, compiled code in `dist/`, and potentially `.npmrc`, `.ebextensions` for custom setup) and upload it.
+    *   SQLite persistence needs careful consideration; you might need to configure an EBS volume or consider alternatives if high availability or scaling is needed.
+*   **Serverless (Lambda/API Gateway):**
+    *   Using a file-based SQLite with AWS Lambda is challenging due to its stateless nature and ephemeral filesystem.
+    *   For persistence, AWS EFS (Elastic File System) can be integrated with Lambda, but this adds complexity and cost.
+    *   For significant database usage in a serverless architecture, a managed database like AWS RDS (for relational data) or DynamoDB (NoSQL) is generally preferred over file-based SQLite. This is an advanced consideration if the application evolves towards a serverless model.
+*   **API Keys & Credentials:**
+    *   **Never hardcode credentials.**
+    *   Use AWS Secrets Manager for storing API keys and other secrets securely.
+    *   Alternatively, provide them as environment variables during the deployment process (e.g., through EC2 user data, Elastic Beanstalk environment properties, Lambda environment variables).
+
+## 7. Future Development
+
+For a detailed list of potential future enhancements and the project roadmap, please refer to `PROJECT_TRACKING.md`. This includes ideas like:
+
+*   Implementing more sophisticated trading strategies.
+*   Adding more data sources (e.g., Binance).
+*   Developing data visualization and a user interface.
+*   Enhancing configuration and deployment options.
+
+---
+
+*Initial project objectives related to specific algorithms (Moving Averages, RSI, Markowitz, Kelly Criterion, etc.), paper trading, and a real-time dashboard are part of the broader vision and will be tracked in `PROJECT_TRACKING.md`.*

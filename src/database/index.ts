@@ -1,0 +1,179 @@
+import Database from 'better-sqlite3';
+
+// Initialize database connection
+let db: Database.Database;
+
+try {
+  db = new Database('trading_data.db');
+  console.log('Connected to the SQLite database.');
+} catch (error) {
+  console.error('Error connecting to the database:', error);
+  // Depending on the application's needs, you might want to exit the process
+  // or handle this error in a way that allows the application to continue
+  // in a degraded state.
+  process.exit(1); // Exiting if DB connection is critical
+}
+
+// Function to initialize the database schema
+function initializeSchema(): void {
+  try {
+    // Create the financial_data table if it doesn't exist
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS financial_data (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        symbol TEXT NOT NULL,
+        timestamp INTEGER NOT NULL,
+        open REAL NOT NULL,
+        high REAL NOT NULL,
+        low REAL NOT NULL,
+        close REAL NOT NULL,
+        volume REAL NOT NULL,
+        source_api TEXT NOT NULL,
+        fetched_at INTEGER NOT NULL,
+        interval TEXT
+      );
+    `);
+
+    // Create indexes
+    db.exec('CREATE INDEX IF NOT EXISTS idx_symbol ON financial_data (symbol);');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_timestamp ON financial_data (timestamp);');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_source_api ON financial_data (source_api);');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_symbol_timestamp_source_interval ON financial_data (symbol, timestamp, source_api, interval);');
+
+    console.log('Database schema initialized successfully.');
+  } catch (error) {
+    console.error('Error initializing database schema:', error);
+    // Depending on the application's needs, you might want to exit the process
+    // or handle this error in a way that allows the application to continue
+    // in a degraded state.
+    process.exit(1); // Exiting if schema initialization is critical
+  }
+}
+
+// Call initializeSchema after the database connection is established
+initializeSchema();
+
+// Interface for financial data records
+export interface FinancialData {
+  id?: number;
+  symbol: string;
+  timestamp: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  source_api: string;
+  fetched_at: number;
+  interval: string;
+}
+
+// Function to insert multiple financial data records
+function insertData(records: FinancialData[]): void {
+  const insert = db.prepare(`
+    INSERT INTO financial_data (symbol, timestamp, open, high, low, close, volume, source_api, fetched_at, interval)
+    VALUES (@symbol, @timestamp, @open, @high, @low, @close, @volume, @source_api, @fetched_at, @interval)
+  `);
+
+  try {
+    db.transaction((recs: FinancialData[]) => {
+      for (const record of recs) {
+        insert.run(record);
+      }
+    })(records);
+    console.log(`Inserted ${records.length} records into financial_data.`);
+  } catch (error) {
+    console.error('Error inserting data into financial_data:', error);
+  }
+}
+
+// Function to get recent financial data
+function getRecentData(symbol: string, source_api: string, interval: string, threshold_seconds: number): FinancialData[] {
+  const stmt = db.prepare(`
+    SELECT * FROM financial_data
+    WHERE symbol = @symbol
+      AND source_api = @source_api
+      AND interval = @interval
+      AND fetched_at >= @threshold_seconds
+    ORDER BY timestamp DESC
+  `);
+
+  try {
+    return stmt.all({ symbol, source_api, interval, threshold_seconds });
+  } catch (error) {
+    console.error('Error fetching recent data from financial_data:', error);
+    return [];
+  }
+}
+
+// Function to get the most recent fallback data
+function getFallbackData(symbol: string, source_api: string, interval: string): FinancialData[] {
+  const stmt = db.prepare(`
+    SELECT * FROM financial_data
+    WHERE symbol = @symbol
+      AND source_api = @source_api
+      AND interval = @interval
+    ORDER BY fetched_at DESC, timestamp DESC 
+    LIMIT 100;  -- Limit to a reasonable number of records for fallback
+  `); // Assuming we want the most recent set of data, so order by fetched_at first.
+
+  try {
+    // This might return data from different fetched_at if the latest fetch didn't get all timestamps
+    // A more sophisticated approach might be needed if strict consistency of a single fetch batch is required.
+    const results = stmt.all({ symbol, source_api, interval });
+    if (results.length > 0) {
+        // If we have results, we want all records from the MOST RECENT `fetched_at` timestamp available
+        const mostRecentFetchedAt = results[0].fetched_at;
+        const finalResults = db.prepare(`
+            SELECT * FROM financial_data
+            WHERE symbol = @symbol
+              AND source_api = @source_api
+              AND interval = @interval
+              AND fetched_at = @mostRecentFetchedAt
+            ORDER BY timestamp DESC
+        `).all({symbol, source_api, interval, mostRecentFetchedAt});
+        return finalResults;
+    }
+    return [];
+  } catch (error) {
+    console.error('Error fetching fallback data from financial_data:', error);
+    return [];
+  }
+}
+
+
+// Function to query historical data
+function queryHistoricalData(
+  symbol: string,
+  startTimestamp: number,
+  endTimestamp: number,
+  source_api?: string,
+  interval?: string
+): FinancialData[] {
+  let sql = 'SELECT * FROM financial_data WHERE symbol = @symbol AND timestamp >= @startTimestamp AND timestamp <= @endTimestamp';
+  const params: any = { symbol, startTimestamp, endTimestamp };
+
+  if (source_api) {
+    sql += ' AND source_api = @source_api';
+    params.source_api = source_api;
+  }
+
+  if (interval) {
+    sql += ' AND interval = @interval';
+    params.interval = interval;
+  }
+
+  sql += ' ORDER BY timestamp ASC;'; // Order by timestamp ascending
+
+  try {
+    const stmt = db.prepare(sql);
+    return stmt.all(params);
+  } catch (error) {
+    console.error('Error querying historical data from financial_data:', error);
+    // In a real application, you might want to throw a custom error or handle it differently
+    throw error; 
+  }
+}
+
+// Export the database instance, schema creation function, and new helper functions
+export { db, initializeSchema, insertData, getRecentData, getFallbackData, queryHistoricalData };
