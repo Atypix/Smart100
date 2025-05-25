@@ -1,0 +1,63 @@
+/* frontend/src/App.css */
+
+/* Basic App Layout */
+.App {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  max-width: 1200px; /* Limit max width for very wide screens */
+  margin: 0 auto;    /* Center the app content */
+  padding: 0 1rem;   /* Add some horizontal padding */
+}
+
+.App-header {
+  background-color: #282c34; /* Darker header */
+  padding: 20px;
+  color: white;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.App-header h1 {
+  margin: 0;
+  font-size: 2em; /* Adjust as needed */
+}
+
+.App main {
+  flex-grow: 1;
+  padding-bottom: 20px; /* Space for footer */
+}
+
+.App-footer {
+  background-color: #333; /* Dark footer */
+  padding: 10px;
+  color: #ccc;
+  text-align: center;
+  font-size: 0.9em;
+}
+
+/* Component specific styles can be added here or in their own files if they grow complex */
+/* For now, keeping it simple */
+
+/* Example: Style for sections within BacktestRunnerPage */
+.backtest-section {
+  background-color: var(--section-bg-color, #2f2f2f); /* Use CSS var for theme compatibility */
+  padding: 15px;
+  margin-bottom: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Subtle shadow */
+}
+
+/* Override default Vite dark mode for inputs if needed for better visibility */
+@media (prefers-color-scheme: dark) {
+  .backtest-section {
+     background-color: #2f2f2f; /* Ensure dark sections in dark mode */
+     border: 1px solid #444;
+  }
+}
+@media (prefers-color-scheme: light) {
+  .backtest-section {
+     background-color: #f9f9f9; /* Lighter sections in light mode */
+     border: 1px solid #ddd;
+  }
+}

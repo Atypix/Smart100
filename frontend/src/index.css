@@ -1,0 +1,281 @@
+/* frontend/src/index.css */
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark; /* Allow browser to handle light/dark based on user preference */
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Default to light mode styles, dark mode styles are below */
+body {
+  margin: 0;
+  background-color: #f4f7f6; /* Light gray background */
+  color: #333; /* Darker text for readability */
+  display: flex; /* Keep this if you want overall centering for the app like Vite default */
+  justify-content: center; /* Center .App if it has a max-width */
+  min-height: 100vh;
+}
+
+.App { /* This class is on the main div in App.tsx */
+  width: 100%;
+  max-width: 1200px; /* Max width for the content area */
+  padding: 1rem;
+  box-sizing: border-box; /* Include padding and border in the element's total width and height */
+}
+
+
+h1, h2, h3, h4, h5, h6 {
+  margin-top: 0;
+  color: #1a535c; /* A teal/dark cyan for headings in light mode */
+}
+
+a {
+  font-weight: 500;
+  color: #1a535c;
+  text-decoration: inherit;
+}
+a:hover {
+  color: #4ecdc4; /* Lighter teal for hover */
+}
+
+/* Form Elements Styling */
+label {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-weight: 600;
+  color: #495057; /* Dark gray for labels */
+}
+
+input[type="text"],
+input[type="number"],
+input[type="date"],
+select {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: #495057;
+  background-color: #fff;
+  background-clip: padding-box;
+  border: 1px solid #ced4da;
+  border-radius: 0.25rem;
+  box-sizing: border-box; /* Ensure padding doesn't expand width */
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+input[type="checkbox"] {
+  margin-right: 0.5rem;
+  vertical-align: middle;
+}
+
+input:focus,
+select:focus {
+  border-color: #4ecdc4;
+  outline: 0;
+  box-shadow: 0 0 0 0.2rem rgba(78, 205, 196, 0.25);
+}
+
+button {
+  display: inline-block;
+  font-weight: 600;
+  color: #fff;
+  text-align: center;
+  vertical-align: middle;
+  cursor: pointer;
+  background-color: #1a535c; /* Teal button */
+  border: 1px solid #1a535c;
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  line-height: 1.5;
+  border-radius: 0.25rem;
+  transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+button:hover {
+  background-color: #16454b;
+  border-color: #133c40;
+}
+
+button:disabled {
+  background-color: #6c757d;
+  border-color: #6c757d;
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+/* Table Styling */
+table {
+  width: 100%;
+  margin-bottom: 1rem;
+  color: #333;
+  border-collapse: collapse; /* Remove double borders */
+}
+
+th, td {
+  padding: 0.75rem;
+  vertical-align: top;
+  border-top: 1px solid #dee2e6; /* Light gray border for rows */
+}
+
+thead th {
+  vertical-align: bottom;
+  border-bottom: 2px solid #dee2e6; /* Heavier border for header bottom */
+  background-color: #e9ecef; /* Light gray background for header */
+  color: #495057;
+  text-align: left;
+}
+
+tbody tr:nth-of-type(odd) {
+  /* background-color: rgba(0, 0, 0, 0.02); */ /* Very subtle striping for light mode */
+}
+
+/* Utility Classes */
+.error-message {
+  color: #d9534f; /* Bootstrap danger red */
+  background-color: #f8d7da;
+  border: 1px solid #f5c6cb;
+  padding: 0.75rem 1.25rem;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  border-radius: 0.25rem;
+}
+
+.loading-message {
+  color: #004085; /* Bootstrap info blue */
+  background-color: #cce5ff;
+  border: 1px solid #b8daff;
+  padding: 0.75rem 1.25rem;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  border-radius: 0.25rem;
+}
+
+/* Dark Mode Styles */
+@media (prefers-color-scheme: dark) {
+  body {
+    background-color: #1e1e1e; /* Darker background */
+    color: #e0e0e0; /* Lighter text */
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    color: #66fcf1; /* Bright cyan for headings in dark mode */
+  }
+
+  a {
+    color: #66fcf1;
+  }
+  a:hover {
+    color: #45a29e; /* Darker cyan for hover */
+  }
+
+  input[type="text"],
+  input[type="number"],
+  input[type="date"],
+  select {
+    color: #e0e0e0;
+    background-color: #2a2a2a; /* Dark input background */
+    border: 1px solid #444; /* Darker border */
+  }
+
+  input:focus,
+  select:focus {
+    border-color: #66fcf1;
+    box-shadow: 0 0 0 0.2rem rgba(102, 252, 241, 0.25);
+  }
+  
+  label {
+    color: #c5c6c7; /* Lighter gray for labels */
+  }
+
+  button {
+    background-color: #66fcf1;
+    border-color: #66fcf1;
+    color: #1e1e1e; /* Dark text on bright button */
+  }
+
+  button:hover {
+    background-color: #45a29e;
+    border-color: #3ba09a;
+  }
+
+  button:disabled {
+    background-color: #4a4a4a;
+    border-color: #4a4a4a;
+    color: #888;
+  }
+
+  table {
+    color: #e0e0e0;
+  }
+
+  th, td {
+    border-top: 1px solid #444;
+  }
+
+  thead th {
+    border-bottom: 2px solid #444;
+    background-color: #2a2a2a; /* Dark header background */
+    color: #c5c6c7;
+  }
+
+  tbody tr:nth-of-type(odd) {
+    /* background-color: rgba(255, 255, 255, 0.03); */ /* Subtle striping for dark mode */
+  }
+  
+  .error-message {
+    color: #f8d7da;
+    background-color: #721c24; /* Darker red background */
+    border-color: #f5c6cb;
+  }
+
+  .loading-message {
+    color: #cce5ff;
+    background-color: #004085; /* Darker blue background */
+    border-color: #b8daff;
+  }
+}
+
+/* Specific component structure helpers */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); /* Responsive grid */
+  gap: 1rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 1rem; /* For items not in a grid */
+}
+
+.form-group label {
+  margin-bottom: 0.3rem;
+}
+
+/* Ensure App.css styles for .backtest-section use these theme variables too */
+:root {
+  --section-bg-color-light: #f9f9f9;
+  --section-border-color-light: #ddd;
+  --section-bg-color-dark: #2f2f2f;
+  --section-border-color-dark: #444;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --section-bg-color: var(--section-bg-color-light);
+    --section-border-color: var(--section-border-color-light);
+  }
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --section-bg-color: var(--section-bg-color-dark);
+    --section-border-color: var(--section-border-color-dark);
+  }
+}
