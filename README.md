@@ -150,10 +150,14 @@ Key directories and files, including recent additions:
 
 3.  **Environment Variables**:
     *   Copy `.env.example` to a new file named `.env`.
-    *   Fill in your API keys for Alpha Vantage (and any other services you intend to use, though currently only Alpha Vantage requires one for basic operation of `fetchAlphaVantageData`).
+    *   Open the `.env` file and fill in your API keys. 
+        *   `ALPHA_VANTAGE_API_KEY` is required for `fetchAlphaVantageData`.
+        *   For other services like Yahoo Finance and Binance, refer to the comments within `.env.example` (copied to your `.env`) for details on API key requirements. For instance, Binance K-line data (used by `fetchBinanceData`) does not strictly require an API key for public data access, but keys can be configured for other functionalities.
     ```
+    # Example structure in your .env file (refer to .env.example for the full list):
     ALPHA_VANTAGE_API_KEY=YOUR_ALPHA_VANTAGE_KEY
-    # YAHOO_FINANCE_API_KEY=YOUR_YAHOO_FINANCE_KEY (Note: Yahoo Finance via yahoo-finance2 library does not typically require an API key)
+    # BINANCE_API_KEY=YOUR_BINANCE_KEY_IF_NEEDED
+    # BINANCE_API_SECRET=YOUR_BINANCE_SECRET_IF_NEEDED
     ```
 
 4.  **Running the Application (Example Usage/Development)**:

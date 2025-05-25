@@ -34,6 +34,15 @@ This document tracks the progress and future direction of the project to impleme
         *   Database interaction functions (`src/database/database.test.ts`).
         *   Data service functionalities including caching and fallback (`src/services/dataService.test.ts`).
         *   Backtesting engine logic (`src/backtest/backtest.test.ts`).
+    *   **Implement Binance API Integration for K-line Data:**
+        *   Developed `fetchBinanceData` in `src/services/dataService.ts` to fetch historical K-line/candlestick data from the Binance API.
+        *   Integrated this function with the existing SQLite caching and archiving system:
+            *   Fetched data is stored in the `financial_data` table.
+            *   The local cache is checked before making an API call (for requests without specific time ranges).
+            *   The system falls back to using data from the database if an API call fails.
+        *   Added comprehensive unit tests for `fetchBinanceData`, covering API interaction, data transformation, caching, archiving, and fallback mechanisms.
+        *   Updated `README.md` to include Binance as a data source and explain its usage.
+        *   Updated `.env.example` with placeholders and comments for Binance API keys (noting their optional nature for public K-line data).
 
 ## II. Documentation (Current)
 
@@ -43,7 +52,6 @@ This document tracks the progress and future direction of the project to impleme
 
 ## III. Future Development Ideas
 
-*   **Binance API Integration:** Implement `fetchBinanceData` and integrate with caching/archiving.
 *   **Advanced Strategies:** Develop and integrate more sophisticated trading strategies.
 *   **Configuration:** Make parameters like cache TTL, API keys (beyond .env), and strategy settings more configurable.
 *   **Data Visualization:** Integrate a charting library to visualize backtest results or historical data.
