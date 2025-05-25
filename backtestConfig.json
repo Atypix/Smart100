@@ -1,0 +1,33 @@
+[
+  {
+    "symbol": "BTCUSDT",
+    "startDate": "2023-01-01",
+    "endDate": "2023-03-31",
+    "initialCash": 10000,
+    "strategyId": "ichimoku-cloud",
+    "strategyParams": {
+      "tenkanPeriod": 9,
+      "kijunPeriod": 26,
+      "senkouSpanBPeriod": 52,
+      "chikouLaggingPeriod": 26,
+      "senkouCloudDisplacement": 26,
+      "tradeAmount": 0.1
+    },
+    "sourceApi": "Binance",
+    "interval": "1d"
+  },
+  {
+    "symbol": "ETHUSD",
+    "startDate": "2023-01-01",
+    "endDate": "2023-03-31",
+    "initialCash": 5000,
+    "strategyId": "simple-threshold",
+    "strategyParams": {
+      "upperThreshold": 2000,
+      "lowerThreshold": 1800,
+      "tradeAmount": 0.5
+    },
+    "sourceApi": "Binance", 
+    "interval": "1d"
+  }
+]

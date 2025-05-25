@@ -107,8 +107,20 @@ The initial phase of the project has focused on establishing a robust foundation
     *   The database file (`trading_data.db`) is automatically created in the project root, and its schema is initialized on application startup if it doesn't exist. No manual database setup is typically required.
 *   **Backtesting Engine (`src/backtest/index.ts`)**:
     *   Provides a `runBacktest` function to test trading strategies against historical data.
-    *   Strategies (e.g., `simpleThresholdStrategy`) are defined as functions that receive market data and portfolio status, then decide on actions (BUY, SELL, HOLD).
-    *   Historical data for backtesting is fetched exclusively from the local SQLite database via `fetchHistoricalDataFromDB` in `dataService.ts`, ensuring consistent and fast backtests.
+    *   Uses a dynamic strategy loading mechanism via the `StrategyManager`.
+    *   Historical data for backtesting is fetched exclusively from the local SQLite database via `fetchHistoricalDataFromDB` in `dataService.ts`.
+*   **Trading Strategy Framework (`src/strategies/`)**:
+    *   **Core Concept**: The application supports defining and running multiple, distinct trading strategies. Each strategy encapsulates its own logic and parameters.
+    *   **`TradingStrategy` Interface (`src/strategies/strategy.types.ts`)**: This is the cornerstone for all strategies. It defines a contract including:
+        *   `id`: A unique string identifier (e.g., `'simple-threshold'`, `'ichimoku-cloud'`).
+        *   `name`: A user-friendly name (e.g., "Simple Threshold Strategy").
+        *   `description`: An optional explanation of the strategy.
+        *   `parameters`: An array of `StrategyParameterDefinition` objects, each detailing a configurable parameter (name, label, type, default value, description, min/max/step for numbers).
+        *   `execute`: A function `(context: StrategyContext) => StrategySignal` that contains the core logic. It receives market data and portfolio status via `StrategyContext` and returns a `StrategySignal` (BUY, SELL, or HOLD with an optional amount).
+    *   **`StrategyManager` (`src/strategies/strategyManager.ts`)**:
+        *   Manages the registration and retrieval of all available trading strategies.
+        *   Strategies are typically imported into the manager and registered upon application startup.
+        *   Provides functions like `getStrategy(id)` to fetch a strategy by its ID and `getAvailableStrategies()` to list all registered strategies.
 *   **Logging**:
     *   Comprehensive logging using Winston (`src/utils/logger.ts`) for console output with timestamps and log levels.
 *   **Environment Management**:
@@ -124,15 +136,21 @@ Key directories and files, including recent additions:
 *   `src/`: Main application code.
     *   `database/index.ts`: Manages SQLite database connection, schema, and data access functions.
     *   `services/dataService.ts`: Handles fetching data from external APIs and interacts with the database for caching and archiving.
-    *   `backtest/index.ts`: Contains the backtesting engine, strategy definitions, and related interfaces.
+    *   `backtest/index.ts`: Contains the backtesting engine.
+    *   `strategies/`: Directory for strategy-related code.
+        *   `strategy.types.ts`: Defines core strategy interfaces.
+        *   `strategyManager.ts`: Manages registration and retrieval of strategies.
+        *   `implementations/`: Contains actual strategy logic files (e.g., `simpleThresholdStrategy.ts`, `ichimokuStrategy.ts`).
     *   `utils/logger.ts`: Logging utility.
-    *   `utils/math.ts`: Sample utility (can be expanded).
 *   `tests/`: Unit and integration tests.
     *   `database/database.test.ts`: Tests for database logic.
     *   `services/dataService.test.ts`: Tests for data fetching, caching, and fallback.
-    *   `backtest/backtest.test.ts`: Tests for the backtesting engine.
-*   `.env.example`: Template for environment variables (Alpha Vantage and Yahoo Finance API keys).
+    *   `backtest/backtest.test.ts`: Tests for the backtesting engine and its integration with the strategy manager.
+    *   `strategies/strategyManager.test.ts`: Tests for the strategy registration and retrieval logic.
+    *   `strategies/ichimokuStrategy.test.ts`: Unit tests for the Ichimoku Cloud strategy logic.
+*   `.env.example`: Template for environment variables.
 *   `trading_data.db`: SQLite database file (automatically created).
+*   `backtestConfig.json`: Example JSON file for configuring and running multiple backtests.
 *   `PROJECT_TRACKING.md`: Document tracking project progress and future direction.
 
 ## 5. Setup and Usage
@@ -179,13 +197,97 @@ Key directories and files, including recent additions:
         ```
         Then run: `node test-fetch.js` (after building and ensuring paths are correct).
 
-5.  **Running Tests**:
+5.  **Running Backtests via JSON Configuration**:
+    *   The primary way to run backtests is by defining configurations in the `backtestConfig.json` file located in the project root.
+    *   **Structure of `backtestConfig.json`**: This file should contain a JSON array, where each object represents a single backtest configuration. Each object can have the following properties:
+        *   `symbol` (string, required): The trading symbol (e.g., "BTCUSDT", "AAPL").
+        *   `startDate` (string, required): Start date for the backtest (YYYY-MM-DD format).
+        *   `endDate` (string, required): End date for the backtest (YYYY-MM-DD format).
+        *   `initialCash` (number, required): The initial amount of cash for the backtest.
+        *   `strategyId` (string, required): The ID of the strategy to use (must match an ID registered in `StrategyManager`).
+        *   `strategyParams` (object, required): An object containing parameters specific to the chosen strategy (e.g., `{ "upperThreshold": 150, "lowerThreshold": 140 }`).
+        *   `sourceApi` (string, optional): The API source to fetch data from (e.g., "Binance", "AlphaVantage", "YahooFinance"). Defaults may apply if not provided.
+        *   `interval` (string, optional): The data interval (e.g., "1d", "1h", "5min"). Defaults may apply if not provided.
+    *   **Example `backtestConfig.json` Snippet**:
+        ```json
+        [
+          {
+            "symbol": "BTCUSDT",
+            "startDate": "2023-01-01",
+            "endDate": "2023-03-31",
+            "initialCash": 10000,
+            "strategyId": "ichimoku-cloud",
+            "strategyParams": {
+              "tenkanPeriod": 9,
+              "kijunPeriod": 26,
+              "tradeAmount": 0.1
+            },
+            "sourceApi": "Binance",
+            "interval": "1d"
+          }
+        ]
+        ```
+    *   **Execution**: To run the backtests defined in this file, use the npm script:
+        ```bash
+        npm run backtest:json
+        ```
+        This will execute `src/executeBacktestFromJson.ts`, which reads the config, runs each backtest, and logs the results.
+
+6.  **Running Unit Tests**:
     ```bash
     npm test
     ```
     This will execute all tests located in the `tests/` directory.
 
-## 6. Deployment Considerations
+## 7. Available Trading Strategies
+
+The following strategies are currently implemented and can be used in `backtestConfig.json`:
+
+*   **Simple Threshold Strategy (`simple-threshold`)**:
+    *   **Description**: A basic strategy that buys when the price exceeds an upper threshold and sells when it falls below a lower threshold.
+    *   **Parameters**:
+        *   `upperThreshold` (number): Price level above which to generate a BUY signal. (Default: 150)
+        *   `lowerThreshold` (number): Price level below which to generate a SELL signal. (Default: 140)
+        *   `tradeAmount` (number): Number of shares/units to trade per signal. (Default: 1)
+
+*   **Ichimoku Cloud Strategy (`ichimoku-cloud`)**:
+    *   **Description**: A comprehensive trend-following indicator that uses multiple lines and a "cloud" (Kumo) to define support/resistance levels and generate trading signals. It considers Tenkan-sen/Kijun-sen crosses, price position relative to the Kumo, Chikou Span confirmation, and future Kumo direction.
+    *   **Parameters**:
+        *   `tenkanPeriod` (number): Lookback period for Tenkan-sen (Conversion Line). (Default: 9)
+        *   `kijunPeriod` (number): Lookback period for Kijun-sen (Base Line). (Default: 26)
+        *   `senkouSpanBPeriod` (number): Lookback period for Senkou Span B (the slowest component of the Kumo). (Default: 52)
+        *   `chikouLaggingPeriod` (number): The number of periods the Chikou Span (Lagging Span) is displaced backward. (Default: 26)
+        *   `senkouCloudDisplacement` (number): The number of periods the Senkou Spans (Kumo cloud) are displaced forward. (Default: 26)
+        *   `tradeAmount` (number): Number of shares/units to trade per signal. (Default: 1)
+
+## 8. Adding a New Strategy
+
+To add a new custom trading strategy:
+
+1.  **Create Strategy File**:
+    *   Create a new TypeScript file in the `src/strategies/implementations/` directory (e.g., `myAwesomeStrategy.ts`).
+2.  **Implement `TradingStrategy` Interface**:
+    *   Import `TradingStrategy`, `StrategyContext`, `StrategySignal`, and `StrategyParameterDefinition` from `../strategy.types`.
+    *   Define your strategy object, ensuring it conforms to the `TradingStrategy` interface.
+    *   **Metadata**: Provide `id` (unique string), `name` (user-friendly), and optionally `description`.
+    *   **Parameters (`StrategyParameterDefinition[]`)**: Define all configurable parameters your strategy will use. For each parameter, specify its `name`, `label`, `type` ('number', 'string', 'boolean'), `defaultValue`, and optionally `description`, `min`, `max`, `step`.
+    *   **`execute` Method**: Implement the core logic: `execute: (context: StrategyContext): StrategySignal => { ... }`.
+        *   Access historical data via `context.historicalData` and the current point via `context.currentIndex`.
+        *   Use `context.parameters` to get the configured values for your strategy.
+        *   Return a `StrategySignal` object: `{ action: 'BUY' | 'SELL' | 'HOLD', amount?: number }`.
+3.  **Register the Strategy**:
+    *   Open `src/strategies/strategyManager.ts`.
+    *   Import your new strategy object (e.g., `import { myAwesomeStrategy } from './implementations/myAwesomeStrategy';`).
+    *   In the auto-registration section at the bottom of the file, add a call to `registerStrategy(myAwesomeStrategy);`.
+4.  **Update Exports (Optional but Good Practice)**:
+    *   Open `src/strategies/index.ts` and export your new strategy implementation: `export * from './implementations/myAwesomeStrategy';`. This makes it available for direct import if ever needed, though the `StrategyManager` is the primary way to access it.
+5.  **Add Unit Tests**:
+    *   Create a corresponding test file in `tests/strategies/` (e.g., `myAwesomeStrategy.test.ts`).
+    *   Write tests for your strategy's `execute` method, covering different scenarios (buy, sell, hold, edge cases, parameter variations).
+
+Once registered, your new strategy can be used in `backtestConfig.json` by referencing its `id`.
+
+## 9. Deployment Considerations
 
 ### General Node.js Deployment:
 *   **Server Setup:** Ensure Node.js and npm are installed on the target server.
@@ -224,10 +326,12 @@ Key directories and files, including recent additions:
 
 For a detailed list of potential future enhancements and the project roadmap, please refer to `PROJECT_TRACKING.md`. This includes ideas like:
 
-*   Implementing more sophisticated trading strategies.
-    *   Adding more data sources.
-*   Developing data visualization and a user interface.
-*   Enhancing configuration and deployment options.
+*   Implementing more sophisticated trading strategies (e.g., based on RSI, Bollinger Bands, MACD, or combinations).
+*   Adding more data sources and ensuring robust handling for different data formats.
+*   Developing data visualization for backtest results (e.g., equity curves, trade markers on charts).
+*   Building a web UI for strategy selection, parameter configuration, and backtest initiation/monitoring.
+*   Storing strategy configurations and backtest results in the database.
+*   Enhancing configuration options (e.g., risk management parameters per strategy).
 
 ---
 
