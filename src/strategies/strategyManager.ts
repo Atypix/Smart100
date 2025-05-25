@@ -7,6 +7,7 @@ import { adaptedSimpleThresholdStrategy } from './implementations/simpleThreshol
 import { ichimokuCloudStrategy } from './implementations/ichimokuStrategy'; // Import Ichimoku strategy
 import { rsiBollingerStrategy } from './implementations/rsiBollingerStrategy';
 import { macdStrategy } from './implementations/macdStrategy';
+import { aiPricePredictionStrategy } from './implementations/aiPricePredictionStrategy';
 // ... import other strategies here as they are created
 
 const strategyRegistry = new Map<string, TradingStrategy>();
@@ -24,7 +25,12 @@ export function registerStrategy(strategy: TradingStrategy): void {
 }
 
 export function getStrategy(id: string): TradingStrategy | undefined {
-  return strategyRegistry.get(id);
+  const strategy = strategyRegistry.get(id);
+  if (strategy && typeof (strategy as any).reset === 'function') {
+    logger.info(`[StrategyManager] Resetting state for strategy ID: ${id}`);
+    (strategy as any).reset();
+  }
+  return strategy;
 }
 
 export function getAvailableStrategies(): TradingStrategy[] {
@@ -57,6 +63,12 @@ if (macdStrategy) {
   registerStrategy(macdStrategy);
 } else {
   logger.error('StrategyManager: macdStrategy is undefined and cannot be registered.');
+}
+
+if (aiPricePredictionStrategy) {
+  registerStrategy(aiPricePredictionStrategy);
+} else {
+  logger.error('StrategyManager: aiPricePredictionStrategy is undefined and cannot be registered.');
 }
 
 // Example: Register more strategies if they were imported

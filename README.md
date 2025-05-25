@@ -339,6 +339,22 @@ The following strategies are currently implemented and can be used in `backtestC
         *   `signalPeriod` (number): Lookback period for the EMA of the MACD line (Signal line). (Default: 9)
         *   `tradeAmount` (number): Number of shares/units to trade per signal. (Default: 1)
 
+*   **AI Price Prediction Strategy (`ai-price-prediction`) (Experimental)**:
+    *   **Name**: AI Price Prediction Strategy (Experimental)
+    *   **ID**: `ai-price-prediction`
+    *   **Description**: Uses a simple neural network (LSTM-based) to predict future price movements. The model trains once at the beginning of each backtest run on a specified portion of the historical data. Due to the nature of in-app training, performance and stability may vary. Use with caution and consider computational cost for large datasets/epochs.
+    *   **Parameters**:
+        *   `lookbackPeriod` (number): Number of past data points for prediction input. (Default: 10)
+        *   `predictionHorizon` (number): How many periods ahead to predict the target. (Default: 1)
+        *   `trainingDataSplit` (number): Percentage of historical data used for training (0.1 to 0.9). (Default: 0.7)
+        *   `epochs` (number): Number of training iterations over the training data. (Default: 10)
+        *   `learningRate` (number): Step size for optimizer during training. (Default: 0.01)
+        *   `lstmUnits` (number): Number of units in the LSTM layer. (Default: 32)
+        *   `denseUnits` (number): Number of units in the Dense layer after LSTM (0 for none). (Default: 16)
+        *   `buyThreshold` (number): Prediction score above which a BUY signal is considered (0.5 to 1.0). (Default: 0.6)
+        *   `sellThreshold` (number): Prediction score below which a SELL signal is considered (0.0 to 0.5). (Default: 0.4)
+        *   `tradeAmount` (number): Number of shares/units to trade per signal. (Default: 1)
+
 ## 9. Adding a New Strategy
 
 To add a new custom trading strategy:
