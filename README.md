@@ -105,6 +105,17 @@ The initial phase of the project has focused on establishing a robust foundation
 *   **Database Integration (`src/database/index.ts`)**:
     *   Uses SQLite (`better-sqlite3` library) for local data storage.
     *   The database file (`trading_data.db`) is automatically created in the project root, and its schema is initialized on application startup if it doesn't exist. No manual database setup is typically required.
+    *   Includes tables for `financial_data`, `users`, and `api_keys`.
+*   **User Authentication**:
+    *   The application features a persistent user account system using email and password.
+    *   Registration and login are handled via JWT (JSON Web Tokens) for secure sessions.
+    *   Backend components include `src/services/userService.ts` (interacting with the `users` database table) and `src/api/authRoutes.ts` (providing `/api/auth/register` and `/api/auth/login` endpoints).
+    *   Frontend components include `frontend/src/components/LoginPage.tsx` and `frontend/src/components/RegisterPage.tsx` for user interaction, with API calls managed in `frontend/src/services/api.ts`.
+*   **API Key Management**:
+    *   Authenticated users can securely store and manage API keys for external exchanges.
+    *   API keys and secrets are encrypted using AES-256-GCM (via `API_ENCRYPTION_KEY` environment variable) before being stored in the `api_keys` database table, which is linked to the `users` table.
+    *   Backend services (`src/services/apiKeyService.ts`) and authenticated API routes (`/api/keys`) handle the CRUD operations and encryption/decryption.
+    *   The frontend provides an `ApiKeyManager.tsx` component for users to manage their keys.
 *   **Backtesting Engine (`src/backtest/index.ts`)**:
     *   Provides a `runBacktest` function to test trading strategies against historical data.
     *   Uses a dynamic strategy loading mechanism via the `StrategyManager`.
@@ -250,6 +261,7 @@ Key directories and files, including recent additions:
     *   **Running Full Stack (Backend API + Frontend UI)**:
         *   From the project root directory: `npm run dev:fullstack`
         *   This command uses `concurrently` to start both the backend API server (via `npm run dev`) and the frontend development server.
+        *   The application now features user registration and login. On first visit, you'll be directed to the login page. If you don't have an account, you can navigate to the registration page.
         *   **Note**: If you encounter issues with `concurrently` in your specific environment (e.g., "command not found" errors for `ts-node` or `concurrently` itself), you can run the backend and frontend in separate terminals:
             *   Terminal 1 (Root Directory): `npm run dev` (for backend)
             *   Terminal 2 (Root Directory): `npm run frontend:dev` (for frontend)
@@ -305,7 +317,23 @@ The backend provides the following API endpoints to support the frontend UI and 
         *   **500 Internal Server Error:** If an unexpected error occurs during backtest execution. Response includes `message` and optionally `error` fields.
 
 *   **User Authentication Endpoints (`/api/auth`)**
-    *   Refer to `src/api/authRoutes.ts` for details on `/register` and `/login`. These endpoints are used to obtain a JWT token required for authenticated routes.
+    *   **`POST /api/auth/register`**
+        *   **Description:** Registers a new user.
+        *   **Request Body (JSON):** `{ "email": "string", "password": "string" }`
+            *   `email`: User's email address.
+            *   `password`: User's chosen password (min 6 characters).
+        *   **Response (Success: 201 Created):** `{ "id": "string", "email": "string", "message": "User registered successfully" }` (actual user object without password hash).
+        *   **Response (Error):**
+            *   `400 Bad Request`: Invalid input (e.g., missing fields, invalid email, short password).
+            *   `409 Conflict`: If the email already exists.
+            *   `500 Internal Server Error`: Server-side error.
+    *   **`POST /api/auth/login`**
+        *   **Description:** Logs in an existing user.
+        *   **Request Body (JSON):** `{ "email": "string", "password": "string" }`
+        *   **Response (Success: 200 OK):** `{ "token": "string" }` (JWT token for authenticating subsequent requests).
+        *   **Response (Error):**
+            *   `401 Unauthorized`: Invalid credentials (user not found or password mismatch).
+            *   `500 Internal Server Error`: Server-side error.
 
 *   **API Key Management Endpoints (`/api/keys`)**
     *   All these endpoints require authentication using a JWT token passed in the `Authorization: Bearer <JWT_TOKEN>` header.

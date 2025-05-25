@@ -59,9 +59,51 @@ This document tracks the progress and future direction of the project to impleme
         *   Added basic CSS styling and UX improvements for the frontend.
         *   Included unit/integration tests for the new API endpoints and key frontend components.
 
+    *   **Implement JSON-based Backtest Configuration:**
+        *   Created `backtestConfig.json` in the project root to define multiple backtest scenarios.
+        *   Developed `src/executeBacktestFromJson.ts` script to read the JSON config, execute backtests, and log results.
+        *   Added an `npm run backtest:json` script to `package.json`.
+    *   **Develop Web UI for Strategy Configuration & Backtesting (React, Vite):**
+        *   Set up a new React + TypeScript frontend application in the `/frontend` directory using Vite.
+        *   Implemented core UI components (`StrategySelector`, `StrategyParameterForm`, `BacktestSettingsForm`, `ResultsDisplay`, `BacktestRunnerPage`).
+        *   Developed backend API endpoints (`GET /api/strategies`, `POST /api/backtest`) to support the UI.
+        *   Added basic CSS styling and UX improvements for the frontend.
+        *   Included unit/integration tests for the new API endpoints and key frontend components.
+
+8.  **User Authentication System (Completed):**
+    *   **Backend:**
+        *   Created `users` table in SQLite for persistent user storage (schema in `src/database/index.ts`).
+        *   Updated `src/services/userService.ts` to interact with the `users` table for CRUD operations.
+        *   Enhanced `src/api/authRoutes.ts` (`/api/auth/register`, `/api/auth/login`) to use the persistent user service, providing JWT-based authentication.
+    *   **Frontend:**
+        *   Developed `frontend/src/components/LoginPage.tsx` and `frontend/src/components/RegisterPage.tsx` for user interaction.
+        *   Implemented `loginUser`, `registerUser`, and `logoutUser` functions in `frontend/src/services/api.ts` to communicate with backend auth endpoints.
+        *   Added authentication state management (`isAuthenticated`, `currentView`) and conditional rendering in `frontend/src/App.tsx`.
+        *   Protected application routes/views (`ApiKeyManager`, `BacktestRunnerPage`) to be accessible only after login.
+    *   **Testing:**
+        *   Added backend unit tests for `userService.ts` (`tests/services/userService.test.ts`).
+        *   Added backend integration tests for `authRoutes.ts` (`tests/api/auth.test.ts`).
+        *   Added frontend unit tests for `LoginPage.tsx`, `RegisterPage.tsx`, and authentication functions in `frontend/src/services/api.test.ts`.
+
+9.  **API Key Management (Completed):**
+    *   **Backend:**
+        *   Created `api_keys` table in SQLite, linked to the `users` table with a foreign key, and designed to store encrypted API credentials.
+        *   Developed `src/services/apiKeyService.ts` providing CRUD operations for API keys, featuring AES-256-GCM encryption for `api_key` and `api_secret` fields using an `API_ENCRYPTION_KEY` environment variable.
+        *   Added secure API routes in `src/api/apiKeyRoutes.ts` (mounted under `/api/keys`) for managing API keys, protected by JWT authentication.
+    *   **Frontend:**
+        *   Developed `frontend/src/components/ApiKeyManager.tsx` component allowing users to view, add, edit (name only, key/secret re-entry for changes), and delete their API keys.
+        *   Integrated API calls for these operations into `frontend/src/services/api.ts`.
+    *   **Testing:**
+        *   Added backend unit tests for `apiKeyService.ts` (`tests/services/apiKeyService.test.ts`).
+        *   Added backend integration tests for `apiKeyRoutes.ts` (`tests/api/apiKeyRoutes.test.ts`).
+        *   Added frontend unit tests for `ApiKeyManager.tsx` (`frontend/src/components/ApiKeyManager.test.tsx`).
+    *   **Documentation & Setup:**
+        *   Updated `.env.example` to include `API_ENCRYPTION_KEY` and `JWT_SECRET`.
+        *   Documented new API endpoints in `README.md`.
+
 ## II. Documentation (Completed)
 
-*   Updated `README.md` with details on new features (Strategy Framework, Ichimoku, JSON backtest execution, Frontend UI, Backend APIs), setup, and usage.
+*   Updated `README.md` with details on new features (Strategy Framework, Ichimoku, JSON backtest execution, Frontend UI, Backend APIs, User Authentication, API Key Management), setup, and usage.
 *   Updated this `PROJECT_TRACKING.md` file to reflect completed items and new future ideas.
 *   Added general guidance on deployment (including considerations for AWS) to `README.md`.
 
