@@ -40,6 +40,38 @@ function initializeSchema(): void {
     db.exec('CREATE INDEX IF NOT EXISTS idx_source_api ON financial_data (source_api);');
     db.exec('CREATE INDEX IF NOT EXISTS idx_symbol_timestamp_source_interval ON financial_data (symbol, timestamp, source_api, interval);');
 
+    // Create users table
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        email TEXT UNIQUE NOT NULL,
+        passwordHash TEXT NOT NULL,
+        createdAt INTEGER,
+        updatedAt INTEGER
+      );
+    `);
+
+    // Create index on users.email
+    db.exec('CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);');
+
+    // Create api_keys table
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS api_keys (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        exchange_name TEXT NOT NULL,
+        api_key_encrypted TEXT NOT NULL,
+        api_secret_encrypted TEXT NOT NULL,
+        created_at INTEGER,
+        updated_at INTEGER,
+        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+    `);
+
+    // Create indexes on api_keys
+    db.exec('CREATE INDEX IF NOT EXISTS idx_api_keys_user_id ON api_keys (user_id);');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_api_keys_user_id_exchange_name ON api_keys (user_id, exchange_name);');
+
     console.log('Database schema initialized successfully.');
   } catch (error) {
     console.error('Error initializing database schema:', error);

@@ -60,3 +60,20 @@ export interface ApiError {
   message: string;
   error?: string; // Specific error details from backend
 }
+
+// --- API Key Management Types ---
+export interface ApiKey {
+  id: string;
+  user_id: string; // Usually not displayed but good to have
+  exchange_name: string;
+  api_key: string; // The actual key - be careful with displaying this
+  api_secret: string; // The actual secret - DO NOT DISPLAY, for edit re-entry only
+  created_at: number; // Timestamp
+  updated_at: number; // Timestamp
+}
+
+export interface ApiKeyFormData {
+  exchange_name: string;
+  api_key: string;
+  api_secret: string;
+}

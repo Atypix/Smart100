@@ -168,11 +168,15 @@ Key directories and files, including recent additions:
 
 3.  **Environment Variables**:
     *   Copy `.env.example` to a new file named `.env`.
-    *   Open the `.env` file and fill in your API keys. 
-        *   `ALPHA_VANTAGE_API_KEY` is required for `fetchAlphaVantageData`.
-        *   For other services like Yahoo Finance and Binance, refer to the comments within `.env.example` (copied to your `.env`) for details on API key requirements. For instance, Binance K-line data (used by `fetchBinanceData`) does not strictly require an API key for public data access, but keys can be configured for other functionalities.
+    *   Open the `.env` file and fill in all required values. Refer to `.env.example` for the full list of variables.
+    *   **Critical variables to set include:**
+        *   `API_ENCRYPTION_KEY`: A secure 64-character hexadecimal string used for encrypting sensitive API key data stored by users. Generate a cryptographically secure random string for this.
+        *   `JWT_SECRET`: A long, random, and secret string used for signing authentication tokens.
+        *   API keys for external financial data providers (e.g., `ALPHA_VANTAGE_API_KEY`, `BINANCE_API_KEY`, etc.), as needed for the data sources you intend to use.
     ```
     # Example structure in your .env file (refer to .env.example for the full list):
+    API_ENCRYPTION_KEY=YOUR_GENERATED_64_HEX_CHAR_ENCRYPTION_KEY
+    JWT_SECRET=YOUR_SUPER_LONG_AND_RANDOM_JWT_SECRET
     ALPHA_VANTAGE_API_KEY=YOUR_ALPHA_VANTAGE_KEY
     # BINANCE_API_KEY=YOUR_BINANCE_KEY_IF_NEEDED
     # BINANCE_API_SECRET=YOUR_BINANCE_SECRET_IF_NEEDED
@@ -299,6 +303,45 @@ The backend provides the following API endpoints to support the frontend UI and 
         *   **400 Bad Request:** If input validation fails (e.g., missing fields, invalid date format, `endDate` not after `startDate`). Response includes a `message` field detailing the error.
         *   **404 Not Found:** If the specified `strategyId` is not found. Response includes a `message` field.
         *   **500 Internal Server Error:** If an unexpected error occurs during backtest execution. Response includes `message` and optionally `error` fields.
+
+*   **User Authentication Endpoints (`/api/auth`)**
+    *   Refer to `src/api/authRoutes.ts` for details on `/register` and `/login`. These endpoints are used to obtain a JWT token required for authenticated routes.
+
+*   **API Key Management Endpoints (`/api/keys`)**
+    *   All these endpoints require authentication using a JWT token passed in the `Authorization: Bearer <JWT_TOKEN>` header.
+    *   **`POST /api/keys`**
+        *   **Description:** Create a new API key for the authenticated user.
+        *   **Request Body (JSON):** `{ "exchange_name": "string", "api_key": "string", "api_secret": "string" }`
+            *   `exchange_name`: Name of the exchange (e.g., "Binance", "Coinbase Pro").
+            *   `api_key`: The API key string.
+            *   `api_secret`: The API secret string.
+        *   **Response (Success: 201 Created):** The newly created API key object, including its `id`, `user_id`, `exchange_name`, `api_key` (decrypted), `api_secret` (decrypted), `created_at`, and `updated_at`.
+        *   **Response (Error):**
+            *   `400 Bad Request`: If input validation fails (e.g., missing fields, invalid format).
+            *   `401 Unauthorized`: If the user is not authenticated.
+            *   `500 Internal Server Error`: If there's an issue creating the key.
+    *   **`GET /api/keys`**
+        *   **Description:** Get all API keys for the authenticated user.
+        *   **Response (Success: 200 OK):** An array of API key objects belonging to the user. API keys and secrets are decrypted.
+        *   **Response (Error):**
+            *   `401 Unauthorized`: If the user is not authenticated.
+            *   `500 Internal Server Error`: If there's an issue fetching the keys.
+    *   **`PUT /api/keys/:id`**
+        *   **Description:** Update an existing API key by its ID. Only the fields provided in the request body will be updated.
+        *   **Request Body (JSON):** `{ "exchange_name": "string", "api_key": "string", "api_secret": "string" }` (all fields optional)
+        *   **Response (Success: 200 OK):** The updated API key object (with decrypted key/secret).
+        *   **Response (Error):**
+            *   `400 Bad Request`: If input validation fails.
+            *   `401 Unauthorized`: If the user is not authenticated.
+            *   `404 Not Found`: If the API key with the given ID is not found or does not belong to the user.
+            *   `500 Internal Server Error`: If there's an issue updating the key.
+    *   **`DELETE /api/keys/:id`**
+        *   **Description:** Delete an API key by its ID.
+        *   **Response (Success: 204 No Content):** No content is returned on successful deletion.
+        *   **Response (Error):**
+            *   `401 Unauthorized`: If the user is not authenticated.
+            *   `404 Not Found`: If the API key with the given ID is not found or does not belong to the user.
+            *   `500 Internal Server Error`: If there's an issue deleting the key.
 
 ## 8. Available Trading Strategies
 
