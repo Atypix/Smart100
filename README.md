@@ -233,13 +233,74 @@ Key directories and files, including recent additions:
         ```
         This will execute `src/executeBacktestFromJson.ts`, which reads the config, runs each backtest, and logs the results.
 
-6.  **Running Unit Tests**:
+6.  **Running the Frontend Application (Development)**:
+    *   The project includes a React frontend built with Vite for interactively configuring and running backtests.
+    *   **Prerequisites**: Ensure Node.js and npm are installed.
+    *   **Setup**:
+        1.  Navigate to the frontend directory: `cd frontend`
+        2.  Install dependencies: `npm install`
+    *   **Running Frontend Only**:
+        *   From the `frontend` directory: `npm run dev`
+        *   Or, from the project root directory: `npm run frontend:dev`
+        *   The frontend development server typically starts on `http://localhost:5173`.
+    *   **Running Full Stack (Backend API + Frontend UI)**:
+        *   From the project root directory: `npm run dev:fullstack`
+        *   This command uses `concurrently` to start both the backend API server (via `npm run dev`) and the frontend development server.
+        *   **Note**: If you encounter issues with `concurrently` in your specific environment (e.g., "command not found" errors for `ts-node` or `concurrently` itself), you can run the backend and frontend in separate terminals:
+            *   Terminal 1 (Root Directory): `npm run dev` (for backend)
+            *   Terminal 2 (Root Directory): `npm run frontend:dev` (for frontend)
+    *   **Building the Frontend for Production**:
+        *   From the project root directory: `npm run frontend:build`
+        *   Or, from the `frontend` directory: `npm run build`
+        *   This creates a `dist` folder within the `frontend` directory containing optimized static assets.
+
+7.  **Running Unit Tests**:
     ```bash
     npm test
     ```
-    This will execute all tests located in the `tests/` directory.
+    This will execute all tests located in the `tests/` directory, including backend API tests and frontend component tests.
 
-## 7. Available Trading Strategies
+## 8. Backend API Endpoints
+
+The backend provides the following API endpoints to support the frontend UI and potentially other clients:
+
+*   **`GET /api/strategies`**
+    *   **Description:** Retrieves a list of all available trading strategies that can be used for backtesting.
+    *   **Response Body (Success: 200 OK):** An array of `TradingStrategy` objects. Each object includes:
+        *   `id` (string): Unique identifier for the strategy.
+        *   `name` (string): User-friendly name of the strategy.
+        *   `description` (string, optional): A brief explanation of the strategy.
+        *   `parameters` (Array of `StrategyParameterDefinition`): An array describing the parameters the strategy accepts, including their `name`, `label`, `type` (`number`, `string`, `boolean`), `defaultValue`, and `description`.
+    *   **Response Body (Error: 500 Internal Server Error):**
+        ```json
+        {
+          "message": "Error fetching strategies",
+          "error": "<error_details>"
+        }
+        ```
+
+*   **`POST /api/backtest`**
+    *   **Description:** Runs a backtest for a given strategy with specified parameters and market conditions.
+    *   **Request Body (JSON):**
+        ```json
+        {
+          "strategyId": "string", // ID of the strategy (e.g., "ichimoku-cloud")
+          "strategyParams": { "paramName": "value", ... }, // Object with strategy-specific parameters
+          "symbol": "string", // Trading symbol (e.g., "BTCUSDT")
+          "startDate": "YYYY-MM-DD", // Start date for historical data
+          "endDate": "YYYY-MM-DD",   // End date for historical data
+          "initialCash": "number",   // Initial cash for the backtest
+          "sourceApi": "string",     // Optional: Data source (e.g., "Binance")
+          "interval": "string"       // Optional: Data interval (e.g., "1d")
+        }
+        ```
+    *   **Response Body (Success: 200 OK):** A `BacktestResult` object containing detailed results of the backtest (e.g., `finalPortfolioValue`, `totalProfitOrLoss`, `trades` array, etc.).
+    *   **Response Body (Error):**
+        *   **400 Bad Request:** If input validation fails (e.g., missing fields, invalid date format, `endDate` not after `startDate`). Response includes a `message` field detailing the error.
+        *   **404 Not Found:** If the specified `strategyId` is not found. Response includes a `message` field.
+        *   **500 Internal Server Error:** If an unexpected error occurs during backtest execution. Response includes `message` and optionally `error` fields.
+
+## 9. Available Trading Strategies
 
 The following strategies are currently implemented and can be used in `backtestConfig.json`:
 
@@ -287,7 +348,34 @@ To add a new custom trading strategy:
 
 Once registered, your new strategy can be used in `backtestConfig.json` by referencing its `id`.
 
-## 9. Deployment Considerations
+## 10. Adding a New Strategy
+
+To add a new custom trading strategy:
+
+1.  **Create Strategy File**:
+    *   Create a new TypeScript file in the `src/strategies/implementations/` directory (e.g., `myAwesomeStrategy.ts`).
+2.  **Implement `TradingStrategy` Interface**:
+    *   Import `TradingStrategy`, `StrategyContext`, `StrategySignal`, and `StrategyParameterDefinition` from `../strategy.types`.
+    *   Define your strategy object, ensuring it conforms to the `TradingStrategy` interface.
+    *   **Metadata**: Provide `id` (unique string), `name` (user-friendly), and optionally `description`.
+    *   **Parameters (`StrategyParameterDefinition[]`)**: Define all configurable parameters your strategy will use. For each parameter, specify its `name`, `label`, `type` ('number', 'string', 'boolean'), `defaultValue`, and optionally `description`, `min`, `max`, `step`.
+    *   **`execute` Method**: Implement the core logic: `execute: (context: StrategyContext): StrategySignal => { ... }`.
+        *   Access historical data via `context.historicalData` and the current point via `context.currentIndex`.
+        *   Use `context.parameters` to get the configured values for your strategy.
+        *   Return a `StrategySignal` object: `{ action: 'BUY' | 'SELL' | 'HOLD', amount?: number }`.
+3.  **Register the Strategy**:
+    *   Open `src/strategies/strategyManager.ts`.
+    *   Import your new strategy object (e.g., `import { myAwesomeStrategy } from './implementations/myAwesomeStrategy';`).
+    *   In the auto-registration section at the bottom of the file, add a call to `registerStrategy(myAwesomeStrategy);`.
+4.  **Update Exports (Optional but Good Practice)**:
+    *   Open `src/strategies/index.ts` and export your new strategy implementation: `export * from './implementations/myAwesomeStrategy';`. This makes it available for direct import if ever needed, though the `StrategyManager` is the primary way to access it.
+5.  **Add Unit Tests**:
+    *   Create a corresponding test file in `tests/strategies/` (e.g., `myAwesomeStrategy.test.ts`).
+    *   Write tests for your strategy's `execute` method, covering different scenarios (buy, sell, hold, edge cases, parameter variations).
+
+Once registered, your new strategy can be used in `backtestConfig.json` by referencing its `id`.
+
+## 11. Deployment Considerations
 
 ### General Node.js Deployment:
 *   **Server Setup:** Ensure Node.js and npm are installed on the target server.
@@ -328,8 +416,9 @@ For a detailed list of potential future enhancements and the project roadmap, pl
 
 *   Implementing more sophisticated trading strategies (e.g., based on RSI, Bollinger Bands, MACD, or combinations).
 *   Adding more data sources and ensuring robust handling for different data formats.
-*   Developing data visualization for backtest results (e.g., equity curves, trade markers on charts).
-*   Building a web UI for strategy selection, parameter configuration, and backtest initiation/monitoring.
+*   **UI Enhancements:**
+    *   Developing advanced data visualization for backtest results (e.g., equity curves, trade markers on charts) within the React UI.
+    *   Improving the web UI for strategy selection, parameter configuration, and backtest initiation/monitoring (e.g., saving configurations, comparing results).
 *   Storing strategy configurations and backtest results in the database.
 *   Enhancing configuration options (e.g., risk management parameters per strategy).
 

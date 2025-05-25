@@ -52,10 +52,16 @@ This document tracks the progress and future direction of the project to impleme
         *   Created `backtestConfig.json` in the project root to define multiple backtest scenarios.
         *   Developed `src/executeBacktestFromJson.ts` script to read the JSON config, execute backtests, and log results.
         *   Added an `npm run backtest:json` script to `package.json`.
+    *   **Develop Web UI for Strategy Configuration & Backtesting (React, Vite):**
+        *   Set up a new React + TypeScript frontend application in the `/frontend` directory using Vite.
+        *   Implemented core UI components (`StrategySelector`, `StrategyParameterForm`, `BacktestSettingsForm`, `ResultsDisplay`, `BacktestRunnerPage`).
+        *   Developed backend API endpoints (`GET /api/strategies`, `POST /api/backtest`) to support the UI.
+        *   Added basic CSS styling and UX improvements for the frontend.
+        *   Included unit/integration tests for the new API endpoints and key frontend components.
 
 ## II. Documentation (Current)
 
-*   Update `README.md` with details on new features (Strategy Framework, Ichimoku, JSON backtest execution), setup, and usage.
+*   Update `README.md` with details on new features (Strategy Framework, Ichimoku, JSON backtest execution, Frontend UI, Backend APIs), setup, and usage.
 *   Update this `PROJECT_TRACKING.md` file to reflect completed items and new future ideas.
 *   Add general guidance on deployment (including considerations for AWS).
 
@@ -64,19 +70,16 @@ This document tracks the progress and future direction of the project to impleme
 *   **Advanced Strategies:** Develop and integrate more sophisticated trading strategies (e.g., RSI + Bollinger Bands, MACD-based).
 *   **Configuration Enhancements:**
     *   Make parameters like cache TTL, API keys (beyond .env) more configurable, potentially via a central config file or UI.
-    *   Store strategy configurations and parameters in the database.
-*   **Data Visualization:**
-    *   Integrate a charting library to visualize backtest results (e.g., equity curves, trade markers on price charts).
-    *   Visualize strategy-specific indicators on charts.
-*   **User Interface (Web Application):**
-    *   Develop a web UI (e.g., using Next.js) for:
-        *   Strategy selection and parameter configuration ("page dédiée").
-        *   Backtest initiation and monitoring.
-        *   Viewing backtest results and performance metrics.
-        *   Managing data sources and viewing cached data.
+    *   Store strategy configurations and parameters in the database (e.g., for saved user preferences).
+*   **UI/UX Enhancements (Frontend):**
+    *   **Data Visualization:** Integrate a charting library (e.g., Recharts, Chart.js) to visualize backtest results (equity curves, trade markers on price charts).
+    *   **Advanced Parameter Inputs:** More sophisticated input controls for strategy parameters (e.g., sliders for numbers, specific format validations).
+    *   **State Management:** Implement more robust state management (e.g., Context API, Zustand, Redux Toolkit) if the frontend complexity grows.
+    *   **Component Library:** Consider using a component library (e.g., Material-UI, Chakra UI) for a more polished look and feel.
+    *   **User Accounts:** Allow users to save and manage their backtest configurations and results.
 *   **Real-time Data & Paper Trading:** Explore integration with real-time data streams for paper trading or live alerts.
 *   **Portfolio Management Enhancements:** More detailed tracking of portfolio performance, risk metrics (Sharpe, Sortino, Max Drawdown), and position sizing.
 *   **Task Scheduling:** Implement automated tasks for regular data fetching and archiving.
 *   **Enhanced Deployment Scripts:** Provide Dockerfiles or more specific deployment scripts for platforms like AWS.
-*   **API for Backtester:** Expose the backtesting and strategy management functionality via a RESTful or GraphQL API.
+*   **API for Backtester:** Further develop the API, potentially adding features like saving/loading configurations, retrieving past results, etc.
 *   **Indicator Library Integration:** Re-evaluate or explore more comprehensive TA libraries that might include Ichimoku and other complex indicators directly, or contribute to existing ones.
