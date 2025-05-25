@@ -35,6 +35,13 @@ This document tracks the progress and future direction of the project to impleme
         *   Data service functionalities including caching and fallback (`src/services/dataService.test.ts`).
         *   Backtesting engine logic (`src/backtest/backtest.test.ts`).
 
+8.  **Binance API Integration:**
+    *   Researched and integrated `binance-api-node` library.
+    *   Implemented `fetchBinanceData` in `dataService.ts` with caching, archiving, and fallback logic.
+    *   Extended database schema and data services to include `quote_asset_volume` and `number_of_trades` from Binance.
+    *   Ensured backtester can utilize Binance data.
+    *   Added comprehensive unit tests for the integration.
+
 ## II. Documentation (Current)
 
 *   Update `README.md` with details on new features, setup, and usage.
@@ -43,7 +50,6 @@ This document tracks the progress and future direction of the project to impleme
 
 ## III. Future Development Ideas
 
-*   **Binance API Integration:** Implement `fetchBinanceData` and integrate with caching/archiving.
 *   **Advanced Strategies:** Develop and integrate more sophisticated trading strategies.
 *   **Configuration:** Make parameters like cache TTL, API keys (beyond .env), and strategy settings more configurable.
 *   **Data Visualization:** Integrate a charting library to visualize backtest results or historical data.

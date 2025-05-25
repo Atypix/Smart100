@@ -123,6 +123,8 @@ export async function fetchAlphaVantageData(symbol: string, apiKey: string): Pro
         source_api: source_api,
         fetched_at: fetched_at,
         interval: interval,
+        quote_asset_volume: undefined, // Alpha Vantage doesn't provide this
+        number_of_trades: undefined,   // Alpha Vantage doesn't provide this
       };
       recordsToStore.push(record);
       timeSeriesOutput.push({
@@ -282,6 +284,8 @@ export async function fetchYahooFinanceData(symbol: string): Promise<YahooFinanc
       source_api: YAHOO_SOURCE_API,
       fetched_at: fetched_at,
       interval: YAHOO_INTERVAL,
+      quote_asset_volume: undefined, // Yahoo Finance doesn't provide this
+      number_of_trades: undefined,   // Yahoo Finance doesn't provide this
     }));
 
     if (recordsToStore.length > 0) {
@@ -342,6 +346,8 @@ export interface HistoricalDataPoint {
   interval: string;
   source_api: string;
   symbol: string;
+  quote_asset_volume?: number;
+  number_of_trades?: number;
 }
 
 export async function fetchHistoricalDataFromDB(
@@ -386,6 +392,8 @@ export async function fetchHistoricalDataFromDB(
       interval: record.interval,
       source_api: record.source_api,
       symbol: record.symbol,
+      quote_asset_volume: record.quote_asset_volume,
+      number_of_trades: record.number_of_trades,
     }));
 
     logger.info(`Successfully fetched ${historicalData.length} historical data points from DB for ${symbol}.`);
@@ -395,5 +403,171 @@ export async function fetchHistoricalDataFromDB(
     logger.error(`Error fetching historical data from DB for ${symbol}:`, { error, symbol, startDate, endDate });
     // Depending on requirements, you might want to throw the error or return an empty array
     throw error; 
+  }
+}
+
+// --- Binance Data Fetching ---
+
+import Binance, { CandleChartResult, CandleChartInterval_LT } from 'binance-api-node';
+// FinancialData is already imported at the top of the file by previous changes
+// import { insertData, getRecentData, getFallbackData, FinancialData } from '../database';
+// logger is already imported at the top of the file by previous changes
+
+// Define the structure for the transformed data we want to return
+export interface TransformedBinanceData {
+  timestamp: number; // Unix epoch seconds, derived from candle.openTime
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;    // Base asset volume
+}
+
+const BINANCE_SOURCE_API = 'Binance';
+const BINANCE_CACHE_RECENCY_THRESHOLD_SECONDS = 15 * 60; // 15 minutes
+
+// Helper function to transform FinancialData to TransformedBinanceData
+function transformFinancialToBinance(data: FinancialData[]): TransformedBinanceData[] {
+  return data.map(record => ({
+    timestamp: record.timestamp, // Already in seconds
+    open: record.open,
+    high: record.high,
+    low: record.low,
+    close: record.close,
+    volume: record.volume,
+  })).sort((a, b) => b.timestamp - a.timestamp); // Sort descending by timestamp
+}
+
+
+export async function fetchBinanceData(
+  symbol: string, // e.g., BTCUSDT
+  interval: CandleChartInterval_LT, // Use the interval type from the library e.g. '1m', '5m', '1h', '1d'
+  startTime?: number, // Optional, Unix epoch milliseconds for API call
+  endTime?: number,   // Optional, Unix epoch milliseconds for API call
+  limit?: number      // Optional, default 500, max 1000 for API call
+): Promise<TransformedBinanceData[]> {
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const thresholdTimestamp = nowSeconds - BINANCE_CACHE_RECENCY_THRESHOLD_SECONDS;
+
+  logger.info(`Fetching Binance data for ${symbol} interval ${interval}. Cache threshold: ${new Date(thresholdTimestamp * 1000).toISOString()}`, { symbol, interval });
+
+  // 1. Caching Logic
+  try {
+    const cachedDataRecords = getRecentData(symbol, BINANCE_SOURCE_API, interval, thresholdTimestamp);
+    if (cachedDataRecords.length > 0) {
+      logger.info(`Using ${cachedDataRecords.length} cached data records for ${symbol} from ${BINANCE_SOURCE_API} for interval ${interval}.`);
+      return transformFinancialToBinance(cachedDataRecords);
+    }
+    logger.info(`No recent cached data for ${symbol} (${BINANCE_SOURCE_API}, ${interval}). Fetching from API.`);
+  } catch (dbError) {
+    logger.error('Error querying cache for Binance data:', { symbol, source_api: BINANCE_SOURCE_API, interval, error: dbError });
+    // Proceed to API fetch if cache query fails
+  }
+
+  // 2. API Fetch
+  const client = Binance(); // No API key needed for public kline/candlestick data
+  try {
+    logger.info(`Fetching Binance kline data from API for symbol: ${symbol}`, { interval, startTime, endTime, limit });
+    const candles: CandleChartResult[] = await client.candles({
+      symbol: symbol.toUpperCase(),
+      interval,
+      startTime,
+      endTime,
+      limit: limit || 500,
+    });
+
+    if (!candles || candles.length === 0) {
+      logger.warn(`No candle data returned from Binance API for symbol ${symbol} with the given parameters. Attempting fallback.`);
+      // Even if API returns empty, try fallback as it might contain older data not meeting "recent" criteria but still useful.
+      return await handleBinanceApiErrorAndFetchFallback(symbol, interval, 'No data returned from API');
+    }
+
+    const transformedApiDataArray: TransformedBinanceData[] = candles.map((candle: CandleChartResult) => ({
+      timestamp: Math.floor(candle.openTime / 1000),
+      open: parseFloat(candle.open),
+      high: parseFloat(candle.high),
+      low: parseFloat(candle.low),
+      close: parseFloat(candle.close),
+      volume: parseFloat(candle.volume),
+    }));
+    
+    logger.info(`Successfully fetched ${transformedApiDataArray.length} data points for ${symbol} from Binance API.`);
+
+    // 3. Store Fetched Data
+    // 3. Store Fetched Data
+    // The transformedApiDataArray is for returning, financialDataToStore is for DB
+    const financialDataToStore: FinancialData[] = []; 
+
+    for (const candle of candles) {
+        const timestampSeconds = Math.floor(candle.openTime / 1000);
+        financialDataToStore.push({
+            symbol: symbol,
+            timestamp: timestampSeconds,
+            open: parseFloat(candle.open),
+            high: parseFloat(candle.high),
+            low: parseFloat(candle.low),
+            close: parseFloat(candle.close),
+            volume: parseFloat(candle.volume),
+            quote_asset_volume: parseFloat(candle.quoteAssetVolume), // New field
+            number_of_trades: candle.trades,                         // New field
+            source_api: BINANCE_SOURCE_API,
+            fetched_at: nowSeconds,
+            interval: interval,
+        });
+    }
+    
+    // The transformedApiDataArray for returning should not include these new fields
+    // as per TransformedBinanceData interface. It's built correctly from candles.
+    const transformedApiDataArrayForReturn: TransformedBinanceData[] = candles.map((candle: CandleChartResult) => ({
+      timestamp: Math.floor(candle.openTime / 1000),
+      open: parseFloat(candle.open),
+      high: parseFloat(candle.high),
+      low: parseFloat(candle.low),
+      close: parseFloat(candle.close),
+      volume: parseFloat(candle.volume),
+    }));
+
+
+    logger.info(`Successfully fetched ${candles.length} data points for ${symbol} from Binance API.`);
+    
+    if (financialDataToStore.length > 0) {
+      try {
+        logger.info(`Attempting to store ${financialDataToStore.length} records for ${symbol} from ${BINANCE_SOURCE_API}.`);
+        insertData(financialDataToStore);
+        logger.info(`Successfully stored ${financialDataToStore.length} records for ${symbol} from ${BINANCE_SOURCE_API}.`);
+      } catch (dbError) {
+        logger.error('Error storing fetched Binance data:', { symbol, source_api: BINANCE_SOURCE_API, error: dbError });
+        // Continue to return data even if storage fails, as API call was successful
+      }
+    }
+    return transformedApiDataArrayForReturn.sort((a, b) => b.timestamp - a.timestamp); // Sort descending
+
+  } catch (error: any) {
+    const errorMessage = error && typeof error === 'object' && error.message ? error.message : 'Unknown API error';
+    logger.error(`Error fetching data from Binance API for ${symbol}: ${errorMessage}`, { originalError: error, symbol, interval });
+    // 4. Fallback Logic
+    return await handleBinanceApiErrorAndFetchFallback(symbol, interval, `API Error: ${errorMessage}`);
+  }
+}
+
+async function handleBinanceApiErrorAndFetchFallback(
+  symbol: string,
+  interval: CandleChartInterval_LT,
+  apiErrorMsg: string
+): Promise<TransformedBinanceData[]> {
+  logger.warn(`Binance API call failed for ${symbol} (${interval}): ${apiErrorMsg}. Attempting to use fallback data.`);
+  try {
+    const fallbackRecords = getFallbackData(symbol, BINANCE_SOURCE_API, interval);
+    if (fallbackRecords.length > 0) {
+      logger.info(`Using ${fallbackRecords.length} fallback data records for ${symbol} from ${BINANCE_SOURCE_API} for interval ${interval}.`);
+      return transformFinancialToBinance(fallbackRecords);
+    }
+    const finalErrorMessage = `Binance API fetch failed for ${symbol} (${apiErrorMsg}) and no fallback data available.`;
+    logger.error(finalErrorMessage);
+    throw new Error(finalErrorMessage);
+  } catch (dbError) {
+    const finalErrorMessage = `Binance API fetch failed for ${symbol} (${apiErrorMsg}), and an error occurred while querying fallback data.`;
+    logger.error(finalErrorMessage, { originalDbError: dbError });
+    throw new Error(finalErrorMessage);
   }
 }

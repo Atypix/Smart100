@@ -1,3 +1,15 @@
 // Services module
-export { fetchAlphaVantageData } from './dataService';
-export { fetchYahooFinanceData } from './dataService'; // Add this line
+export { 
+    fetchAlphaVantageData, 
+    fetchYahooFinanceData, 
+    fetchHistoricalDataFromDB, 
+    fetchBinanceData 
+} from './dataService';
+
+export type { 
+    TimeSeriesData, 
+    CandlestickData, 
+    YahooFinanceData, 
+    HistoricalDataPoint, 
+    TransformedBinanceData 
+} from './dataService';

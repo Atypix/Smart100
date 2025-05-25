@@ -97,13 +97,14 @@ The initial phase of the project has focused on establishing a robust foundation
 ## 3. Core Features
 
 *   **Data Collection Services (`src/services/dataService.ts`)**:
-    *   Fetches financial data from external APIs: Alpha Vantage (intraday time series) and Yahoo Finance (historical daily data).
+    *   Fetches financial data from external APIs: Alpha Vantage (intraday time series), Yahoo Finance (historical daily data), and **Binance (kline/candlestick data using `binance-api-node` library)**.
     *   **Financial Data Caching:** Data fetched from these APIs is cached in a local SQLite database (`trading_data.db`). This significantly reduces API calls, helps avoid rate-limiting, and can provide data if an API is temporarily unavailable.
     *   **Historical Data Archive:** All fetched data is stored in the SQLite database, gradually building a local historical archive over time.
     *   **Fallback Mechanism:** If an API call fails, the system attempts to return the most recent relevant data from the local SQLite archive.
 *   **Database Integration (`src/database/index.ts`)**:
     *   Uses SQLite (`better-sqlite3` library) for local data storage.
-    *   The database file (`trading_data.db`) is automatically created in the project root, and its schema is initialized on application startup if it doesn't exist. No manual database setup is typically required.
+    *   The database file (`trading_data.db`) is automatically created in the project root, and its schema is initialized on application startup if it doesn't exist.
+    *   The `financial_data` table now includes two new optional fields: `quote_asset_volume` (REAL) and `number_of_trades` (INTEGER). These fields are primarily populated with data from the Binance API, providing richer candlestick information. For other data sources like AlphaVantage and YahooFinance, these fields will typically be `NULL`.
 *   **Backtesting Engine (`src/backtest/index.ts`)**:
     *   Provides a `runBacktest` function to test trading strategies against historical data.
     *   Strategies (e.g., `simpleThresholdStrategy`) are defined as functions that receive market data and portfolio status, then decide on actions (BUY, SELL, HOLD).
@@ -121,8 +122,8 @@ The initial phase of the project has focused on establishing a robust foundation
 Key directories and files, including recent additions:
 
 *   `src/`: Main application code.
-    *   `database/index.ts`: Manages SQLite database connection, schema, and data access functions.
-    *   `services/dataService.ts`: Handles fetching data from external APIs and interacts with the database for caching and archiving.
+    *   `database/index.ts`: Manages SQLite database connection, schema (including new fields `quote_asset_volume` and `number_of_trades`), and data access functions.
+    *   `services/dataService.ts`: Handles fetching data from external APIs (Alpha Vantage, Yahoo Finance, Binance via `fetchAlphaVantageData`, `fetchYahooFinanceData`, `fetchBinanceData`) and interacts with the database for caching and archiving.
     *   `backtest/index.ts`: Contains the backtesting engine, strategy definitions, and related interfaces.
     *   `utils/logger.ts`: Logging utility.
     *   `utils/math.ts`: Sample utility (can be expanded).
@@ -149,10 +150,12 @@ Key directories and files, including recent additions:
 
 3.  **Environment Variables**:
     *   Copy `.env.example` to a new file named `.env`.
-    *   Fill in your API keys for Alpha Vantage (and any other services you intend to use, though currently only Alpha Vantage requires one for basic operation of `fetchAlphaVantageData`).
+    *   Fill in your API keys for Alpha Vantage. Public K-line data from Binance (via `binance-api-node`) and Yahoo Finance (via `yahoo-finance2`) typically do not require API keys.
     ```
     ALPHA_VANTAGE_API_KEY=YOUR_ALPHA_VANTAGE_KEY
-    # YAHOO_FINANCE_API_KEY=YOUR_YAHOO_FINANCE_KEY (Note: Yahoo Finance via yahoo-finance2 library does not typically require an API key)
+    # YAHOO_FINANCE_API_KEY= (Not usually required by yahoo-finance2)
+    # BINANCE_API_KEY= (Not required for public kline data)
+    # BINANCE_API_SECRET= (Not required for public kline data)
     ```
 
 4.  **Running the Application (Example Usage/Development)**:
@@ -220,7 +223,6 @@ Key directories and files, including recent additions:
 For a detailed list of potential future enhancements and the project roadmap, please refer to `PROJECT_TRACKING.md`. This includes ideas like:
 
 *   Implementing more sophisticated trading strategies.
-*   Adding more data sources (e.g., Binance).
 *   Developing data visualization and a user interface.
 *   Enhancing configuration and deployment options.
 

@@ -66,13 +66,22 @@ export interface FinancialData {
   source_api: string;
   fetched_at: number;
   interval: string;
+  quote_asset_volume?: number; // New field
+  number_of_trades?: number;   // New field
 }
 
 // Function to insert multiple financial data records
 function insertData(records: FinancialData[]): void {
   const insert = db.prepare(`
-    INSERT INTO financial_data (symbol, timestamp, open, high, low, close, volume, source_api, fetched_at, interval)
-    VALUES (@symbol, @timestamp, @open, @high, @low, @close, @volume, @source_api, @fetched_at, @interval)
+    INSERT INTO financial_data (
+      symbol, timestamp, open, high, low, close, volume, 
+      source_api, fetched_at, interval,
+      quote_asset_volume, number_of_trades
+    ) VALUES (
+      @symbol, @timestamp, @open, @high, @low, @close, @volume,
+      @source_api, @fetched_at, @interval,
+      @quote_asset_volume, @number_of_trades
+    )
   `);
 
   try {
