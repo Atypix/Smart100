@@ -97,7 +97,8 @@ The initial phase of the project has focused on establishing a robust foundation
 ## 3. Core Features
 
 *   **Data Collection Services (`src/services/dataService.ts`)**:
-    *   Fetches financial data from external APIs: Alpha Vantage (intraday time series) and Yahoo Finance (historical daily data).
+    *   Fetches financial data from external APIs: Alpha Vantage (intraday time series), Yahoo Finance (historical daily data), and Binance (cryptocurrency K-line/candlestick data).
+    *   The `fetchBinanceData` function specifically fetches historical K-line/candlestick data from Binance. Currently, this uses Binance's public API endpoint for K-lines, which does not strictly require an API key. However, API keys can be configured and might be utilized for other Binance API functionalities or future private endpoint access.
     *   **Financial Data Caching:** Data fetched from these APIs is cached in a local SQLite database (`trading_data.db`). This significantly reduces API calls, helps avoid rate-limiting, and can provide data if an API is temporarily unavailable.
     *   **Historical Data Archive:** All fetched data is stored in the SQLite database, gradually building a local historical archive over time.
     *   **Fallback Mechanism:** If an API call fails, the system attempts to return the most recent relevant data from the local SQLite archive.
@@ -220,7 +221,7 @@ Key directories and files, including recent additions:
 For a detailed list of potential future enhancements and the project roadmap, please refer to `PROJECT_TRACKING.md`. This includes ideas like:
 
 *   Implementing more sophisticated trading strategies.
-*   Adding more data sources (e.g., Binance).
+    *   Adding more data sources.
 *   Developing data visualization and a user interface.
 *   Enhancing configuration and deployment options.
 
