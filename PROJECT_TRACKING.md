@@ -59,11 +59,11 @@ This document tracks the progress and future direction of the project to impleme
         *   Added basic CSS styling and UX improvements for the frontend.
         *   Included unit/integration tests for the new API endpoints and key frontend components.
 
-## II. Documentation (Current)
+## II. Documentation (Completed)
 
-*   Update `README.md` with details on new features (Strategy Framework, Ichimoku, JSON backtest execution, Frontend UI, Backend APIs), setup, and usage.
-*   Update this `PROJECT_TRACKING.md` file to reflect completed items and new future ideas.
-*   Add general guidance on deployment (including considerations for AWS).
+*   Updated `README.md` with details on new features (Strategy Framework, Ichimoku, JSON backtest execution, Frontend UI, Backend APIs), setup, and usage.
+*   Updated this `PROJECT_TRACKING.md` file to reflect completed items and new future ideas.
+*   Added general guidance on deployment (including considerations for AWS) to `README.md`.
 
 ## III. Future Development Ideas
 

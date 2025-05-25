@@ -260,7 +260,7 @@ Key directories and files, including recent additions:
     ```
     This will execute all tests located in the `tests/` directory, including backend API tests and frontend component tests.
 
-## 8. Backend API Endpoints
+## 7. Backend API Endpoints
 
 The backend provides the following API endpoints to support the frontend UI and potentially other clients:
 
@@ -300,7 +300,7 @@ The backend provides the following API endpoints to support the frontend UI and 
         *   **404 Not Found:** If the specified `strategyId` is not found. Response includes a `message` field.
         *   **500 Internal Server Error:** If an unexpected error occurs during backtest execution. Response includes `message` and optionally `error` fields.
 
-## 9. Available Trading Strategies
+## 8. Available Trading Strategies
 
 The following strategies are currently implemented and can be used in `backtestConfig.json`:
 
@@ -321,7 +321,7 @@ The following strategies are currently implemented and can be used in `backtestC
         *   `senkouCloudDisplacement` (number): The number of periods the Senkou Spans (Kumo cloud) are displaced forward. (Default: 26)
         *   `tradeAmount` (number): Number of shares/units to trade per signal. (Default: 1)
 
-## 8. Adding a New Strategy
+## 9. Adding a New Strategy
 
 To add a new custom trading strategy:
 
@@ -348,34 +348,7 @@ To add a new custom trading strategy:
 
 Once registered, your new strategy can be used in `backtestConfig.json` by referencing its `id`.
 
-## 10. Adding a New Strategy
-
-To add a new custom trading strategy:
-
-1.  **Create Strategy File**:
-    *   Create a new TypeScript file in the `src/strategies/implementations/` directory (e.g., `myAwesomeStrategy.ts`).
-2.  **Implement `TradingStrategy` Interface**:
-    *   Import `TradingStrategy`, `StrategyContext`, `StrategySignal`, and `StrategyParameterDefinition` from `../strategy.types`.
-    *   Define your strategy object, ensuring it conforms to the `TradingStrategy` interface.
-    *   **Metadata**: Provide `id` (unique string), `name` (user-friendly), and optionally `description`.
-    *   **Parameters (`StrategyParameterDefinition[]`)**: Define all configurable parameters your strategy will use. For each parameter, specify its `name`, `label`, `type` ('number', 'string', 'boolean'), `defaultValue`, and optionally `description`, `min`, `max`, `step`.
-    *   **`execute` Method**: Implement the core logic: `execute: (context: StrategyContext): StrategySignal => { ... }`.
-        *   Access historical data via `context.historicalData` and the current point via `context.currentIndex`.
-        *   Use `context.parameters` to get the configured values for your strategy.
-        *   Return a `StrategySignal` object: `{ action: 'BUY' | 'SELL' | 'HOLD', amount?: number }`.
-3.  **Register the Strategy**:
-    *   Open `src/strategies/strategyManager.ts`.
-    *   Import your new strategy object (e.g., `import { myAwesomeStrategy } from './implementations/myAwesomeStrategy';`).
-    *   In the auto-registration section at the bottom of the file, add a call to `registerStrategy(myAwesomeStrategy);`.
-4.  **Update Exports (Optional but Good Practice)**:
-    *   Open `src/strategies/index.ts` and export your new strategy implementation: `export * from './implementations/myAwesomeStrategy';`. This makes it available for direct import if ever needed, though the `StrategyManager` is the primary way to access it.
-5.  **Add Unit Tests**:
-    *   Create a corresponding test file in `tests/strategies/` (e.g., `myAwesomeStrategy.test.ts`).
-    *   Write tests for your strategy's `execute` method, covering different scenarios (buy, sell, hold, edge cases, parameter variations).
-
-Once registered, your new strategy can be used in `backtestConfig.json` by referencing its `id`.
-
-## 11. Deployment Considerations
+## 10. Deployment Considerations
 
 ### General Node.js Deployment:
 *   **Server Setup:** Ensure Node.js and npm are installed on the target server.
@@ -410,7 +383,7 @@ Once registered, your new strategy can be used in `backtestConfig.json` by refer
     *   Use AWS Secrets Manager for storing API keys and other secrets securely.
     *   Alternatively, provide them as environment variables during the deployment process (e.g., through EC2 user data, Elastic Beanstalk environment properties, Lambda environment variables).
 
-## 7. Future Development
+## 11. Future Development
 
 For a detailed list of potential future enhancements and the project roadmap, please refer to `PROJECT_TRACKING.md`. This includes ideas like:
 
