@@ -321,6 +321,16 @@ The following strategies are currently implemented and can be used in `backtestC
         *   `senkouCloudDisplacement` (number): The number of periods the Senkou Spans (Kumo cloud) are displaced forward. (Default: 26)
         *   `tradeAmount` (number): Number of shares/units to trade per signal. (Default: 1)
 
+*   **RSI + Bollinger Bands Strategy (`rsi-bollinger`)**:
+    *   **Description**: Generates BUY signals when RSI is oversold and price is at/below lower Bollinger Band. Generates SELL signals when RSI is overbought and price is at/above upper Bollinger Band.
+    *   **Parameters**:
+        *   `rsiPeriod` (number): Lookback period for RSI. (Default: 14)
+        *   `rsiOverbought` (number): RSI level above which to consider overbought. (Default: 70)
+        *   `rsiOversold` (number): RSI level below which to consider oversold. (Default: 30)
+        *   `bollingerPeriod` (number): Lookback period for Bollinger Bands. (Default: 20)
+        *   `bollingerStdDev` (number): Number of standard deviations for upper/lower Bollinger Bands. (Default: 2)
+        *   `tradeAmount` (number): Number of shares/units to trade per signal. (Default: 1)
+
 ## 9. Adding a New Strategy
 
 To add a new custom trading strategy:

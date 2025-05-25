@@ -5,6 +5,7 @@ import { logger } from '../utils/logger'; // Optional: for logging registration 
 // Import strategies to be registered
 import { adaptedSimpleThresholdStrategy } from './implementations/simpleThresholdStrategy';
 import { ichimokuCloudStrategy } from './implementations/ichimokuStrategy'; // Import Ichimoku strategy
+import { rsiBollingerStrategy } from './implementations/rsiBollingerStrategy';
 // ... import other strategies here as they are created
 
 const strategyRegistry = new Map<string, TradingStrategy>();
@@ -43,6 +44,12 @@ if (ichimokuCloudStrategy) {
   registerStrategy(ichimokuCloudStrategy);
 } else {
   logger.error('StrategyManager: ichimokuCloudStrategy is undefined and cannot be registered.');
+}
+
+if (rsiBollingerStrategy) {
+  registerStrategy(rsiBollingerStrategy);
+} else {
+  logger.error('StrategyManager: rsiBollingerStrategy is undefined and cannot be registered.');
 }
 
 // Example: Register more strategies if they were imported
