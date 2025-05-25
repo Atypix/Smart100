@@ -10,7 +10,8 @@
     "dev": "ts-node src/index.ts",
     "lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" \"tests/**/*.ts\" --fix",
-    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\" \"*.json\" \"*.js\""
+    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\" \"*.json\" \"*.js\"",
+    "backtest:json": "ts-node src/executeBacktestFromJson.ts"
   },
   "repository": {
     "type": "git",
