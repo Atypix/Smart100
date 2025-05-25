@@ -141,3 +141,99 @@ export function calculateRSI(prices: number[], period: number): number[] {
 
   return rsiValues;
 }
+
+/**
+ * Calculates the Exponential Moving Average (EMA) for a given set of prices and period.
+ * @param prices - An array of numbers representing the prices.
+ * @param period - The period over which to calculate the EMA.
+ * @returns An array of EMA values, padded with NaN at the beginning.
+ */
+export function calculateEMA(prices: number[], period: number): number[] {
+  if (period <= 0) {
+    return Array(prices.length).fill(NaN);
+  }
+
+  const emaValues: number[] = Array(prices.length).fill(NaN);
+  const multiplier = 2 / (period + 1);
+
+  let firstValidIndex = -1;
+  for (let i = 0; i < prices.length; i++) {
+    if (!isNaN(prices[i])) {
+      firstValidIndex = i;
+      break;
+    }
+  }
+
+  if (firstValidIndex === -1 || (prices.length - firstValidIndex) < period) {
+    // Not enough data points or not enough valid data points
+    return Array(prices.length).fill(NaN);
+  }
+
+  // Calculate the initial SMA on the first 'period' valid data points
+  const initialPricesForSma = prices.slice(firstValidIndex, firstValidIndex + period);
+  const sma = calculateSMA(initialPricesForSma, period); // calculateSMA returns array of period length
+
+  if (sma.length === period && !isNaN(sma[period - 1])) {
+    emaValues[firstValidIndex + period - 1] = sma[period - 1];
+  } else {
+    // This should not happen if previous checks are correct, but as a safeguard:
+    return Array(prices.length).fill(NaN);
+  }
+
+  // Calculate subsequent EMA values
+  for (let i = firstValidIndex + period; i < prices.length; i++) {
+    if (isNaN(prices[i])) {
+      emaValues[i] = NaN; // Propagate NaN if current price is NaN
+    } else if (isNaN(emaValues[i - 1])) {
+      // If previous EMA is NaN (due to a break in data or end of initial NaNs),
+      // we cannot calculate current EMA based on it. Propagate NaN.
+      // A more advanced EMA might try to re-initialize, but that's not standard.
+      emaValues[i] = NaN;
+    } else {
+      emaValues[i] = (prices[i] * multiplier) + (emaValues[i - 1] * (1 - multiplier));
+    }
+  }
+  return emaValues;
+}
+
+/**
+ * Calculates the Moving Average Convergence Divergence (MACD) for a given set of prices.
+ * @param prices - An array of numbers representing the prices.
+ * @param shortPeriod - The period for the shorter EMA (typically 12).
+ * @param longPeriod - The period for the longer EMA (typically 26).
+ * @param signalPeriod - The period for the EMA of the MACD line (typically 9).
+ * @returns An object containing arrays for the MACD line, signal line, and histogram.
+ */
+export function calculateMACD(
+  prices: number[],
+  shortPeriod: number,
+  longPeriod: number,
+  signalPeriod: number
+): { macdLine: number[]; signalLine: number[]; histogram: number[] } {
+  if (shortPeriod <= 0 || longPeriod <= 0 || signalPeriod <= 0 || shortPeriod >= longPeriod) {
+    const nanArray = Array(prices.length).fill(NaN);
+    return { macdLine: [...nanArray], signalLine: [...nanArray], histogram: [...nanArray] };
+  }
+
+  const emaShort = calculateEMA(prices, shortPeriod);
+  const emaLong = calculateEMA(prices, longPeriod);
+
+  const macdLine: number[] = Array(prices.length).fill(NaN);
+  for (let i = 0; i < prices.length; i++) {
+    if (!isNaN(emaShort[i]) && !isNaN(emaLong[i])) {
+      macdLine[i] = emaShort[i] - emaLong[i];
+    }
+  }
+
+  // The MACD line can have NaNs at the beginning. We need to pass a "clean" array (NaNs are fine) to EMA for signal line.
+  const signalLine = calculateEMA(macdLine, signalPeriod); 
+
+  const histogram: number[] = Array(prices.length).fill(NaN);
+  for (let i = 0; i < prices.length; i++) {
+    if (!isNaN(macdLine[i]) && !isNaN(signalLine[i])) {
+      histogram[i] = macdLine[i] - signalLine[i];
+    }
+  }
+
+  return { macdLine, signalLine, histogram };
+}

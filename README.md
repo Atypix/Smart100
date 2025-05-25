@@ -331,6 +331,14 @@ The following strategies are currently implemented and can be used in `backtestC
         *   `bollingerStdDev` (number): Number of standard deviations for upper/lower Bollinger Bands. (Default: 2)
         *   `tradeAmount` (number): Number of shares/units to trade per signal. (Default: 1)
 
+*   **MACD Crossover Strategy (`macd-crossover`)**:
+    *   **Description**: Generates BUY signals when the MACD line crosses above the Signal line, and SELL signals when it crosses below.
+    *   **Parameters**:
+        *   `shortPeriod` (number): Lookback period for the shorter EMA in MACD calculation. (Default: 12)
+        *   `longPeriod` (number): Lookback period for the longer EMA in MACD calculation. (Default: 26)
+        *   `signalPeriod` (number): Lookback period for the EMA of the MACD line (Signal line). (Default: 9)
+        *   `tradeAmount` (number): Number of shares/units to trade per signal. (Default: 1)
+
 ## 9. Adding a New Strategy
 
 To add a new custom trading strategy:
