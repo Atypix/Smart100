@@ -39,6 +39,8 @@ import {
   // CandlestickData, // Part of TimeSeriesData
   YahooFinanceData, // For YahooFinance output
   HistoricalDataPoint, // For DB output
+  KlineData, // For Binance output
+  fetchBinanceData,
 } from '../../src/services/dataService';
 import {
   insertData as mockInsertData,
@@ -293,6 +295,177 @@ describe('Data Service Tests', () => {
       (mockQueryHistoricalData as jest.Mock).mockImplementation(() => { throw error; });
       await expect(fetchHistoricalDataFromDB(symbol, startDate, endDate)).rejects.toThrow(error);
       expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('Error fetching historical data from DB'), expect.objectContaining({ error }));
+    });
+  });
+
+  // --- fetchBinanceData Tests ---
+  describe('fetchBinanceData', () => {
+    const symbol = 'BTCUSDT';
+    const interval = '1h';
+    const source_api_binance = 'Binance';
+    const nowEpochSeconds = Math.floor(Date.now() / 1000);
+    const nowMilliseconds = nowEpochSeconds * 1000;
+
+    // Raw API data: [openTime, open, high, low, close, volume, ...]
+    const mockApiKlines: any[][] = [
+      [nowMilliseconds - 3600000, "60000.0", "60500.0", "59800.0", "60200.0", "1000"], // 1 hour ago
+      [nowMilliseconds - 7200000, "59500.0", "60000.0", "59300.0", "59800.0", "1200"], // 2 hours ago
+    ];
+
+    const expectedKlineDataOutput: KlineData[] = mockApiKlines.map(k => ({
+      timestamp: Number(k[0]),
+      open: parseFloat(k[1]),
+      high: parseFloat(k[2]),
+      low: parseFloat(k[3]),
+      close: parseFloat(k[4]),
+      volume: parseFloat(k[5]),
+    })).sort((a,b) => a.timestamp - b.timestamp); // Ensure ascending order as per implementation
+
+    const correspondingFinancialData: FinancialData[] = expectedKlineDataOutput.map(kline => ({
+      id: expect.any(Number), // Or remove if not comparing id
+      symbol: symbol.toUpperCase(),
+      timestamp: Math.floor(kline.timestamp / 1000), // DB stores in seconds
+      open: kline.open,
+      high: kline.high,
+      low: kline.low,
+      close: kline.close,
+      volume: kline.volume,
+      source_api: source_api_binance,
+      fetched_at: nowEpochSeconds, // Should be close to this
+      interval: interval,
+    }));
+
+    test('Successful Fetch & Transform: should fetch, transform, and return data without time params', async () => {
+      (mockGetRecentData as jest.Mock).mockReturnValue([]); // No cache
+      mockedAxios.get.mockResolvedValue({ data: mockApiKlines });
+
+      const result = await fetchBinanceData(symbol, interval);
+
+      expect(mockedAxios.get).toHaveBeenCalledWith(
+        'https://api.binance.com/api/v3/klines',
+        { params: { symbol: symbol.toUpperCase(), interval: interval } }
+      );
+      expect(result).toEqual(expectedKlineDataOutput);
+      expect(logger.info).toHaveBeenCalledWith(expect.stringContaining(`Successfully fetched and transformed ${expectedKlineDataOutput.length} K-line data points`));
+    });
+
+    test('Successful Fetch & Transform: should fetch with startTime and endTime', async () => {
+      const startTime = nowMilliseconds - 86400000; // 1 day ago
+      const endTime = nowMilliseconds;
+      (mockGetRecentData as jest.Mock).mockReturnValue([]); // Cache check won't run
+      mockedAxios.get.mockResolvedValue({ data: mockApiKlines });
+
+      await fetchBinanceData(symbol, interval, startTime, endTime);
+
+      expect(mockedAxios.get).toHaveBeenCalledWith(
+        'https://api.binance.com/api/v3/klines',
+        { params: { symbol: symbol.toUpperCase(), interval: interval, startTime: startTime, endTime: endTime } }
+      );
+       expect(logger.info).toHaveBeenCalledWith(expect.stringContaining(`Specific time range provided for ${symbol.toUpperCase()}`));
+    });
+    
+    test('Caching Hit: should return cached data if getRecentData returns fresh data (no time params)', async () => {
+      // Timestamps in DB are seconds, transformDbRecordToKlineData converts to ms
+      const cachedDbData = correspondingFinancialData.map(fd => ({...fd, timestamp: fd.timestamp }));
+      (mockGetRecentData as jest.Mock).mockReturnValue(cachedDbData);
+      
+      const result = await fetchBinanceData(symbol, interval);
+      
+      expect(mockGetRecentData).toHaveBeenCalledWith(symbol.toUpperCase(), source_api_binance, interval, expect.any(Number));
+      // transformDbRecordToKlineData converts DB seconds to API milliseconds
+      expect(result).toEqual(expectedKlineDataOutput.map(k => ({...k, timestamp: k.timestamp})));
+      expect(mockedAxios.get).not.toHaveBeenCalled();
+      expect(logger.info).toHaveBeenCalledWith(expect.stringContaining(`Using ${cachedDbData.length} cached data records`));
+    });
+
+    test('Caching Miss & Archive: should call API if no recent cache, then archive data', async () => {
+      (mockGetRecentData as jest.Mock).mockReturnValue([]); // Cache miss
+      mockedAxios.get.mockResolvedValue({ data: mockApiKlines });
+
+      await fetchBinanceData(symbol, interval);
+
+      expect(mockGetRecentData).toHaveBeenCalledTimes(1);
+      expect(mockedAxios.get).toHaveBeenCalledTimes(1);
+      expect(mockInsertData).toHaveBeenCalledWith(
+        expect.arrayContaining(correspondingFinancialData.map(d => expect.objectContaining({ 
+          ...d, 
+          id: undefined, // id is not part of the data passed to insertData
+          fetched_at: expect.any(Number) // fetched_at is dynamic
+        })))
+      );
+      expect(logger.info).toHaveBeenCalledWith(expect.stringContaining(`Attempting to store ${correspondingFinancialData.length} records`));
+    });
+
+    test('Caching Bypass: should call API directly if startTime is provided, even if cache exists', async () => {
+      const startTime = nowMilliseconds - 3600000; // 1 hour ago
+      (mockGetRecentData as jest.Mock).mockReturnValue(correspondingFinancialData); // Cache exists
+      mockedAxios.get.mockResolvedValue({ data: mockApiKlines }); // API response
+
+      await fetchBinanceData(symbol, interval, startTime);
+      
+      // getRecentData should not be called in this path
+      expect(mockGetRecentData).not.toHaveBeenCalled();
+      expect(mockedAxios.get).toHaveBeenCalledTimes(1);
+      expect(logger.info).toHaveBeenCalledWith(expect.stringContaining(`Specific time range provided for ${symbol.toUpperCase()}`));
+    });
+
+    test('API Error & Fallback Hit: should use fallback if API fails and fallback exists', async () => {
+      (mockGetRecentData as jest.Mock).mockReturnValue([]); // No cache
+      mockedAxios.get.mockRejectedValue(new Error('Binance API Network Error'));
+      // Fallback data (DB format, timestamps in seconds)
+      const fallbackDbData = correspondingFinancialData.map(fd => ({...fd, timestamp: fd.timestamp }));
+      (mockGetFallbackData as jest.Mock).mockReturnValue(fallbackDbData);
+
+      const result = await fetchBinanceData(symbol, interval);
+      
+      expect(mockGetFallbackData).toHaveBeenCalledWith(symbol.toUpperCase(), source_api_binance, interval);
+      // transformDbRecordToKlineData converts DB seconds to API milliseconds
+      expect(result).toEqual(expectedKlineDataOutput.map(k => ({...k, timestamp: k.timestamp})));
+      expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('Binance API call failed'));
+      expect(logger.info).toHaveBeenCalledWith(expect.stringContaining(`Using ${fallbackDbData.length} fallback data records`));
+    });
+    
+    test('API Error & Fallback Hit (with time range): should filter fallback data', async () => {
+      const startTime = nowMilliseconds - 3600000 * 1.5; // 1.5 hours ago, should include first kline, exclude second
+      const endTime = nowMilliseconds - 3600000 * 0.5; // 0.5 hours ago
+      
+      (mockGetRecentData as jest.Mock).mockReturnValue([]); // No cache for this path with time params
+      mockedAxios.get.mockRejectedValue(new Error('Binance API Network Error'));
+      
+      // Fallback data contains both klines
+      const fallbackDbDataAll = correspondingFinancialData.map(fd => ({...fd, timestamp: fd.timestamp }));
+      (mockGetFallbackData as jest.Mock).mockReturnValue(fallbackDbDataAll);
+
+      const result = await fetchBinanceData(symbol, interval, startTime, endTime);
+      
+      expect(mockGetFallbackData).toHaveBeenCalledWith(symbol.toUpperCase(), source_api_binance, interval);
+      // Expected: only the first kline from expectedKlineDataOutput matches the time range
+      const expectedFilteredOutput = expectedKlineDataOutput.filter(k => k.timestamp >= startTime && k.timestamp <= endTime);
+      expect(result).toEqual(expectedFilteredOutput);
+      expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('Binance API call failed'));
+      expect(logger.info).toHaveBeenCalledWith(expect.stringContaining(`Using ${fallbackDbDataAll.length} fallback data records`)); // Logs total before filter
+    });
+
+    test('API Error & Fallback Miss: should throw if API fails and no fallback', async () => {
+      (mockGetRecentData as jest.Mock).mockReturnValue([]);
+      mockedAxios.get.mockRejectedValue(new Error('Binance API Network Error'));
+      (mockGetFallbackData as jest.Mock).mockReturnValue([]); // No fallback
+
+      await expect(fetchBinanceData(symbol, interval)).rejects.toThrow(
+        expect.stringContaining('Binance API fetch failed for BTCUSDT (Axios error fetching Binance data for BTCUSDT: Binance API Network Error) and no fallback data available.')
+      );
+      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('and no fallback data available.'));
+    });
+
+    test('API Malformed Response: should attempt fallback if API returns non-array', async () => {
+      (mockGetRecentData as jest.Mock).mockReturnValue([]);
+      mockedAxios.get.mockResolvedValue({ data: { message: "Not an array" } }); // Malformed
+      (mockGetFallbackData as jest.Mock).mockReturnValue(correspondingFinancialData); // Has fallback
+
+      const result = await fetchBinanceData(symbol, interval);
+      expect(logger.error).toHaveBeenCalledWith('Binance API did not return an array for klines', expect.anything());
+      expect(mockGetFallbackData).toHaveBeenCalledTimes(1);
+      expect(result).toEqual(expectedKlineDataOutput);
     });
   });
 });
