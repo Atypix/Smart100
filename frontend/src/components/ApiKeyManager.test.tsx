@@ -1,10 +1,11 @@
 // frontend/src/components/ApiKeyManager.test.tsx
-import React from 'react';
+/// <reference types="@testing-library/jest-dom" />
+// import React from 'react'; // React is not directly used in this test file
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import '@testing-library/jest-dom';
+// import '@testing-library/jest-dom'; // Referenced via triple-slash directive
 import ApiKeyManager from './ApiKeyManager';
 import * as api from '../services/api'; // To be mocked
-import { ApiKey, ApiKeyFormData } from '../types';
+import type { ApiKey, ApiKeyFormData } from '../types';
 
 // Mock the api service
 jest.mock('../services/api');
@@ -221,7 +222,7 @@ describe('ApiKeyManager Component', () => {
     expect(window.confirm).toHaveBeenCalledWith('Are you sure you want to delete this API key?');
 
     await waitFor(() => {
-      expect(mockedApi.deleteApiKey).toHaveBeenCalledWith(keyToEdit.id);
+      expect(mockedApi.deleteApiKey).toHaveBeenCalledWith(keyToDelete.id); // Use keyToDelete.id
       expect(screen.queryByText('Binance')).not.toBeInTheDocument();
       expect(screen.getByText('Coinbase')).toBeInTheDocument(); // Other key still there
     });

@@ -11,11 +11,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { formatDateForChart, formatCurrency } from '../utils/formatters'; // Import centralized formatters
-
-interface EquityDataPoint {
-  timestamp: number; // Unix timestamp in seconds
-  value: number;     // Portfolio value
-}
+import type { EquityDataPoint } from '../types'; // Import from centralized types
 
 interface EquityChartProps {
   data: ReadonlyArray<EquityDataPoint>;

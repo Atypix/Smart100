@@ -44,10 +44,16 @@ describe('MACD Crossover Strategy', () => {
 
     baseContext = {
       historicalData: createMockHistoricalData(50, 100), // Default price 100
-      currentIndex: 49, 
-      portfolio: { cash: 1000, shares: 10, initialCash: 1000, trades: [] },
+      currentIndex: 49,
+      portfolio: { 
+        cash: 1000, 
+        shares: 10, 
+        initialValue: 1000, // Changed initialCash to initialValue
+        currentValue: 1000 + 10 * 100 // Assuming current price is 100 for initial setup
+        // trades: [] was removed as it's not part of Portfolio type
+      },
       parameters: { ...defaultParams },
-      tradeHistory: [], // Added missing property
+      tradeHistory: [], 
       // Removed getAvailableStrategies and getStrategy as they are not part of StrategyContext
     };
   });

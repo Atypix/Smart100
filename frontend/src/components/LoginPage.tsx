@@ -1,5 +1,6 @@
 // frontend/src/components/LoginPage.tsx
-import React, { useState, FormEvent } from 'react';
+import React, { useState } from 'react';
+import type { FormEvent } from 'react';
 import { loginUser } from '../services/api'; // Import actual API function
 
 interface LoginPageProps {

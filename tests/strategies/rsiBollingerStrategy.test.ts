@@ -50,9 +50,15 @@ describe('RSI Bollinger Strategy', () => {
     baseContext = {
       historicalData: createMockHistoricalData(50, 100), // Sufficient data for most tests
       currentIndex: 49, // Default to the last point
-      portfolio: { cash: 1000, shares: 10, initialCash: 1000, trades: [] },
+      portfolio: { 
+        cash: 1000, 
+        shares: 10, 
+        initialValue: 1000, // Changed initialCash to initialValue
+        currentValue: 1000 + 10 * 100 // Assuming current price is 100
+        // trades: [] was removed as it's not part of Portfolio type
+      },
       parameters: { ...defaultParams },
-      tradeHistory: [], // Added missing property
+      tradeHistory: [], 
       // Removed getAvailableStrategies and getStrategy as they are not part of StrategyContext
     };
   });

@@ -5,7 +5,8 @@ import logger from '../../src/utils/logger'; // Corrected import
 
 // Mock the logger
 jest.mock('../../src/utils/logger', () => ({
-  default: { // Corrected mock for default export
+  __esModule: true, // Indicate it's an ES Module for Jest
+  default: { 
     info: jest.fn(),
     warn: jest.fn(),
     error: jest.fn(),

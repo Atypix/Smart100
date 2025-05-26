@@ -2,8 +2,8 @@
 import request from 'supertest';
 import { app } from '../../src/index'; // Assuming app is exported from src/index.ts
 import { getAvailableStrategies } from '../../src/strategies/strategyManager';
-import { runBacktest } from '../../src/backtest';
-import { TradingStrategy, BacktestResult, StrategyParameterDefinition } from '../../src/strategies/strategy.types'; // For typing mocks
+import { runBacktest, BacktestResult } from '../../src/backtest'; // Import BacktestResult from here
+import { TradingStrategy, StrategyParameterDefinition } from '../../src/strategies/strategy.types'; // For typing mocks
 
 // Mock the strategyManager and backtest functions
 jest.mock('../../src/strategies/strategyManager', () => ({

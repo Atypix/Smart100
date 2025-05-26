@@ -1,13 +1,17 @@
 // jest.config.js
 module.exports = {
+  rootDir: '.', // Explicitly set rootDir
   preset: 'ts-jest',
   testEnvironment: 'node',
-  roots: ['<rootDir>/tests'],
   testMatch: [
-    '**/__tests__/**/*.+(ts|tsx|js)',
-    '**/?(*.)+(spec|test).+(ts|tsx|js)'
+    '<rootDir>/tests/**/*.test.ts',
+    '<rootDir>/tests/**/*.spec.ts',
   ],
   transform: {
-    '^.+\\.(ts|tsx)$': 'ts-jest'
+    '^.+\\.(ts|tsx)$': 'ts-jest',
   },
+  modulePathIgnorePatterns: ['<rootDir>/frontend/'],
+  testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/frontend/'],
+  watchman: false,
+  clearMocks: true,
 };

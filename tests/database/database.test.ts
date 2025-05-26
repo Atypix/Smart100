@@ -45,7 +45,7 @@ const resetMocks = () => {
   
   // Default mock implementations that can be overridden in specific tests
   mockDbInstance.prepare.mockImplementation(jest.fn().mockReturnThis());
-  mockDbInstance.transaction.mockImplementation((fn) => (...args) => fn(...args)); // Ensure transaction executes the passed function
+  mockDbInstance.transaction.mockImplementation((fn) => (...args: any[]) => fn(...args)); // Ensure transaction executes the passed function
 };
 
 

@@ -9,9 +9,10 @@ import { ApiKey, CreateApiKeyInput } from '../../src/models/apiKey.types';
 import logger from '../../src/utils/logger';
 
 // Suppress console logs from the application during tests
-jest.spyOn(logger, 'info').mockImplementation(() => {});
-jest.spyOn(logger, 'warn').mockImplementation(() => {});
-jest.spyOn(logger, 'error').mockImplementation(() => {});
+// Ensure the mock implementation returns the logger instance for chaining if needed by the original type.
+jest.spyOn(logger, 'info').mockImplementation(() => logger);
+jest.spyOn(logger, 'warn').mockImplementation(() => logger);
+jest.spyOn(logger, 'error').mockImplementation(() => logger);
 
 const TEST_USER_EMAIL = 'apikeytestuser@example.com';
 const TEST_USER_PASSWORD = 'Password123!';

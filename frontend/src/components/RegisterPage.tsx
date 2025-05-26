@@ -1,5 +1,6 @@
 // frontend/src/components/RegisterPage.tsx
-import React, { useState, FormEvent } from 'react';
+import React, { useState } from 'react';
+import type { FormEvent } from 'react';
 import { registerUser } from '../services/api'; // Import actual API function
 
 interface RegisterPageProps {

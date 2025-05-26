@@ -1,7 +1,8 @@
 // frontend/src/components/LoginPage.test.tsx
-import React from 'react';
+/// <reference types="@testing-library/jest-dom" />
+// import React from 'react'; // Removed as unused
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import '@testing-library/jest-dom';
+// import '@testing-library/jest-dom'; // Referenced via triple-slash directive
 import LoginPage from './LoginPage';
 import * as api from '../services/api'; // To be mocked
 
