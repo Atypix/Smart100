@@ -1,6 +1,6 @@
 import axios from 'axios';
-import { logger } from '../../utils/logger';
-import yahooFinance from 'yahoo-finance2';
+import logger from '../utils/logger'; // Corrected path and changed to default import
+import yahooFinance, { type HistoricalOptions } from 'yahoo-finance2'; // Import HistoricalOptions type
 import { insertData, getRecentData, getFallbackData, FinancialData, queryHistoricalData as queryHistoricalDataFromDB } from '../database'; // Import database functions
 
 // Define the structure for Alpha Vantage Time Series Data
@@ -158,7 +158,7 @@ export async function fetchAlphaVantageData(symbol: string, apiKey: string): Pro
       timeSeries: timeSeriesOutput,
     };
 
-  } catch (error) {
+  } catch (error: unknown) { // Typed catch variable
     let errorMessage = `Error fetching data from Alpha Vantage for ${symbol}`;
     if (axios.isAxiosError(error)) {
       errorMessage = `Axios error fetching Alpha Vantage data for ${symbol}: ${error.message}`;
@@ -254,10 +254,10 @@ export async function fetchYahooFinanceData(symbol: string): Promise<YahooFinanc
   // 2. API Fetch
   try {
     logger.info(`Fetching Yahoo Finance historical data for symbol: ${symbol}`);
-    const queryOptions = {
+    const queryOptions: HistoricalOptions = { // Explicitly type queryOptions
       period1: new Date(new Date().setDate(new Date().getDate() - 7)), // 7 days ago, can be parameterized
       period2: new Date(), // today
-      interval: YAHOO_INTERVAL,
+      interval: YAHOO_INTERVAL, // YAHOO_INTERVAL is '1d', which is a valid HistoricalOptionInterval
     };
     const results = await yahooFinance.historical(symbol, queryOptions);
 
@@ -271,7 +271,7 @@ export async function fetchYahooFinanceData(symbol: string): Promise<YahooFinanc
 
     // 3. Store Fetched Data
     const fetched_at = Math.floor(Date.now() / 1000);
-    const recordsToStore: FinancialData[] = results.map(item => ({
+    const recordsToStore: FinancialData[] = results.map((item: YahooFinanceData) => ({ // Typed item
       symbol: symbol,
       timestamp: Math.floor(item.date.getTime() / 1000), // Convert Date to Unix epoch seconds
       open: item.open,
@@ -294,8 +294,8 @@ export async function fetchYahooFinanceData(symbol: string): Promise<YahooFinanc
         // Continue to return data even if storage fails, as API call was successful
       }
     }
-    return results.sort((a, b) => b.date.getTime() - a.date.getTime()); // Sort descending by date
-  } catch (error) {
+    return results.sort((a: YahooFinanceData, b: YahooFinanceData) => b.date.getTime() - a.date.getTime()); // Typed a, b
+  } catch (error: unknown) { // Typed catch variable
     let errorMessage = `Error fetching data for symbol ${symbol} from Yahoo Finance API.`;
     if (error instanceof Error) {
       errorMessage += ` Details: ${error.message}`;
@@ -314,7 +314,7 @@ async function handleYahooApiErrorAndFetchFallback(symbol: string, apiErrorMsg: 
       logger.info(`Using ${fallbackRecords.length} fallback data records for ${symbol} from ${YAHOO_SOURCE_API} for interval ${YAHOO_INTERVAL}.`);
       return fallbackRecords
         .map(transformDbRecordToYahooFinanceData)
-        .sort((a, b) => b.date.getTime() - a.date.getTime()); // Sort descending by date
+        .sort((a: YahooFinanceData, b: YahooFinanceData) => b.date.getTime() - a.date.getTime()); // Typed a, b
     }
     const finalErrorMessage = `Yahoo API fetch failed for ${symbol} (${apiErrorMsg}) and no fallback data available.`;
     logger.error(finalErrorMessage);
@@ -415,7 +415,7 @@ export async function fetchHistoricalDataFromDB(
     // Assuming queryHistoricalData will be added to src/database/index.ts
     // and imported appropriately.
     // For now, this will cause a type error until that part is done.
-    const rawData: FinancialData[] = queryHistoricalDataFromDB( 
+    const rawData: FinancialData[] = queryHistoricalDataFromDB(
       symbol,
       startTimestamp,
       endTimestamp,
@@ -428,7 +428,7 @@ export async function fetchHistoricalDataFromDB(
       return [];
     }
 
-    const historicalData: HistoricalDataPoint[] = rawData.map(record => ({
+    const historicalData: HistoricalDataPoint[] = rawData.map((record: FinancialData) => ({ // Typed record
       timestamp: record.timestamp,
       date: new Date(record.timestamp * 1000),
       open: record.open,
@@ -444,10 +444,10 @@ export async function fetchHistoricalDataFromDB(
     logger.info(`Successfully fetched ${historicalData.length} historical data points from DB for ${symbol}.`);
     return historicalData; // Already ordered by timestamp ASC by the DB query (assumption)
 
-  } catch (error) {
+  } catch (error: unknown) { // Typed catch variable
     logger.error(`Error fetching historical data from DB for ${symbol}:`, { error, symbol, startDate, endDate });
     // Depending on requirements, you might want to throw the error or return an empty array
-    throw error; 
+    throw error;
   }
 }
 
@@ -505,7 +505,7 @@ export async function fetchBinanceData(
         logger.info(`Using ${cachedDataRecords.length} cached data records for ${upperSymbol} from ${BINANCE_SOURCE_API} for interval ${interval}.`);
         return cachedDataRecords
           .map(transformDbRecordToKlineData)
-          .sort((a, b) => a.timestamp - b.timestamp); // Sort ascending by timestamp (Kline open time)
+          .sort((a: KlineData, b: KlineData) => a.timestamp - b.timestamp); // Typed a, b
       }
       logger.info(`No recent cached data for ${upperSymbol} (${BINANCE_SOURCE_API}, ${interval}). Fetching from API.`);
     } catch (dbError) {
@@ -551,7 +551,7 @@ export async function fetchBinanceData(
     const recordsToStore: FinancialData[] = [];
     const transformedApiData: KlineData[] = [];
 
-    for (const kline of rawKlines) {
+    for (const kline of rawKlines) { // kline is any[] here, which is fine for iteration
       const apiTimestampMs = Number(kline[0]);
       const open = parseFloat(kline[1]);
       const high = parseFloat(kline[2]);
@@ -594,9 +594,9 @@ export async function fetchBinanceData(
       }
     }
     
-    return transformedApiData.sort((a, b) => a.timestamp - b.timestamp); // Sort ascending
+    return transformedApiData.sort((a: KlineData, b: KlineData) => a.timestamp - b.timestamp); // Typed a,b
 
-  } catch (error) {
+  } catch (error: unknown) { // Typed catch variable
     let errorMessage = `Error fetching data from Binance API for ${upperSymbol}`;
     if (axios.isAxiosError(error)) {
       errorMessage = `Axios error fetching Binance data for ${upperSymbol}: ${error.message}`;
@@ -638,12 +638,12 @@ async function handleBinanceApiErrorAndFetchFallback(
       logger.info(`Using ${fallbackRecords.length} fallback data records for ${symbol} from ${BINANCE_SOURCE_API} for interval ${interval}.`);
       const klineData = fallbackRecords
         .map(transformDbRecordToKlineData)
-        .sort((a, b) => a.timestamp - b.timestamp); // Sort ascending
+        .sort((a: KlineData, b: KlineData) => a.timestamp - b.timestamp); // Typed a, b
 
       // If startTime and endTime are provided, we should filter the fallback data to match the requested range.
       // This is a client-side filter on the fallback data.
       if (startTime !== undefined || endTime !== undefined) {
-        return klineData.filter(kline => {
+        return klineData.filter((kline: KlineData) => { // Typed kline
           const ts = kline.timestamp; // Already in ms
           const afterStartTime = startTime === undefined || ts >= startTime;
           const beforeEndTime = endTime === undefined || ts <= endTime;

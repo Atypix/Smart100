@@ -3,14 +3,17 @@
 jest.mock('../../src/services/dataService', () => ({
   fetchHistoricalDataFromDB: jest.fn(),
 }));
-jest.mock('../../src/utils/logger', () => ({
-  logger: {
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    debug: jest.fn(),
-  },
-}));
+jest.mock('../../src/utils/logger', () => {
+  // Mock the default export which is the logger instance
+  return {
+    default: {
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
+    }
+  };
+});
 // Mock strategyManager's getStrategy
 jest.mock('../../src/strategies/strategyManager', () => ({
   ...jest.requireActual('../../src/strategies/strategyManager'), // Import and retain default behavior
@@ -29,7 +32,7 @@ import {
 } from '../../src/backtest'; // Adjust path as necessary
 import { fetchHistoricalDataFromDB as mockFetchHistoricalDataFromDB } from '../../src/services/dataService'; // Mocked function
 import { HistoricalDataPoint } from '../../src/services/dataService'; // Actual type
-import { logger } from '../../src/utils/logger'; // Mocked logger
+import logger from '../../src/utils/logger'; // Mocked logger - now default import
 import { getStrategy as mockGetStrategy } from '../../src/strategies/strategyManager'; // Mocked getStrategy
 import { adaptedSimpleThresholdStrategy } from '../../src/strategies/implementations/simpleThresholdStrategy'; // Import actual strategy for mock return
 
@@ -73,20 +76,51 @@ describe('Backtesting Module Tests', () => {
     tradeAmount: 1,
   };
 
+  // Define test data at a scope accessible to all relevant describe blocks
+  const profitableData: HistoricalDataPoint[] = [
+    createDataPoint(new Date('2023-01-01'), 145), // Hold
+    createDataPoint(new Date('2023-01-02'), 151), // BUY @ 151 (cash: 10000 - 151 = 9849, shares: 1)
+    createDataPoint(new Date('2023-01-03'), 155), // Hold
+    createDataPoint(new Date('2023-01-04'), 160), // SELL @ 160 (cash: 9849 + 160 = 10009, shares: 0)
+    createDataPoint(new Date('2023-01-05'), 165), // Hold
+  ];
+
+  const lossData: HistoricalDataPoint[] = [
+    createDataPoint(new Date('2023-01-01'), 145),
+    createDataPoint(new Date('2023-01-02'), 151),
+    createDataPoint(new Date('2023-01-03'), 145),
+    createDataPoint(new Date('2023-01-04'), 139),
+  ];
+
+  const noTradesData: HistoricalDataPoint[] = [
+    createDataPoint(new Date('2023-01-01'), 145),
+    createDataPoint(new Date('2023-01-02'), 146),
+    createDataPoint(new Date('2023-01-03'), 144),
+  ];
+
+  const insufficientFundsData: HistoricalDataPoint[] = [
+    createDataPoint(new Date('2023-01-01'), 151),
+  ];
+
+  const insufficientSharesData: HistoricalDataPoint[] = [
+    createDataPoint(new Date('2023-01-01'), 139),
+  ];
+  
+  const multiShareData: HistoricalDataPoint[] = [
+    createDataPoint(new Date('2023-01-01'), 145), 
+    createDataPoint(new Date('2023-01-02'), 151), // BUY 2 @ 151
+    createDataPoint(new Date('2023-01-03'), 139), // SELL 2 @ 139
+  ];
+
+  const dataForDefaultAmount: HistoricalDataPoint[] = [createDataPoint(new Date('2023-01-02'), 151)];
+
+
   describe('runBacktest with simple-threshold strategy (via StrategyManager)', () => {
     // --- Basic Scenario (Profit) ---
     // Strategy: Buy if price > 150, Sell if price < 140 (using defaultStrategyParams)
     // Data: Price starts low, goes above 150 (buy), then drops below 140 (sell at loss), then goes high (buy), then higher (sell at profit)
     // For a clear profit: Buy at 151, Sell at 160
-    const profitableData: HistoricalDataPoint[] = [
-      createDataPoint(new Date('2023-01-01'), 145), // Hold
-      createDataPoint(new Date('2023-01-02'), 151), // BUY @ 151 (cash: 10000 - 151 = 9849, shares: 1)
-      createDataPoint(new Date('2023-01-03'), 155), // Hold
-      createDataPoint(new Date('2023-01-04'), 160), // SELL @ 160 (cash: 9849 + 160 = 10009, shares: 0)
-      createDataPoint(new Date('2023-01-05'), 165), // Hold (price > 150, but cash might be an issue if we only bought 1 share)
-                                                // If we consider buying multiple shares, this test becomes more complex.
-                                                // The simpleThresholdStrategy buys 1 share.
-    ];
+    // profitableData is defined above
 
     test('Basic Scenario (Profit): should execute trades and result in a profit', async () => {
       (mockFetchHistoricalDataFromDB as jest.Mock).mockResolvedValue(profitableData);
@@ -124,12 +158,7 @@ describe('Backtesting Module Tests', () => {
     // --- Basic Scenario (Loss) ---
     // Strategy: Buy if price > 150, Sell if price < 140
     // Data: Price goes above 150 (buy), then drops below 140 (sell at loss)
-    const lossData: HistoricalDataPoint[] = [
-      createDataPoint(new Date('2023-01-01'), 145), // Hold
-      createDataPoint(new Date('2023-01-02'), 151), // BUY @ 151 (cash: 9849, shares: 1)
-      createDataPoint(new Date('2023-01-03'), 145), // Hold
-      createDataPoint(new Date('2023-01-04'), 139), // SELL @ 139 (cash: 9849 + 139 = 9988, shares: 0)
-    ];
+    // lossData is defined above
 
     test('Basic Scenario (Loss): should execute trades and result in a loss', async () => {
       (mockFetchHistoricalDataFromDB as jest.Mock).mockResolvedValue(lossData);
@@ -152,11 +181,7 @@ describe('Backtesting Module Tests', () => {
 
     // --- No Trades Scenario ---
     // Data: Price stays between 140 and 150
-    const noTradesData: HistoricalDataPoint[] = [
-      createDataPoint(new Date('2023-01-01'), 145),
-      createDataPoint(new Date('2023-01-02'), 146),
-      createDataPoint(new Date('2023-01-03'), 144),
-    ];
+    // noTradesData is defined above
 
     test('No Trades Scenario: should result in zero trades and no profit/loss', async () => {
       (mockFetchHistoricalDataFromDB as jest.Mock).mockResolvedValue(noTradesData);
@@ -174,9 +199,7 @@ describe('Backtesting Module Tests', () => {
 
     // --- Insufficient Funds Scenario ---
     // Data: Price goes above 150, but initial cash is too low to buy.
-    const insufficientFundsData: HistoricalDataPoint[] = [
-      createDataPoint(new Date('2023-01-01'), 151), // BUY signal, but not enough cash
-    ];
+    // insufficientFundsData is defined above
 
     test('Insufficient Funds Scenario: should not execute BUY if cash is insufficient', async () => {
       (mockFetchHistoricalDataFromDB as jest.Mock).mockResolvedValue(insufficientFundsData);
@@ -196,9 +219,7 @@ describe('Backtesting Module Tests', () => {
 
     // --- Insufficient Shares Scenario ---
     // Data: Price drops below 140, but no shares to sell.
-    const insufficientSharesData: HistoricalDataPoint[] = [
-      createDataPoint(new Date('2023-01-01'), 139), // SELL signal, but no shares
-    ];
+    // insufficientSharesData is defined above
 
     test('Insufficient Shares Scenario: should not execute SELL if shares are zero', async () => {
       (mockFetchHistoricalDataFromDB as jest.Mock).mockResolvedValue(insufficientSharesData);
@@ -261,11 +282,7 @@ describe('Backtesting Module Tests', () => {
     // The adaptedSimpleThresholdStrategy uses context.parameters.tradeAmount
     // So we test by changing the tradeAmount parameter.
     const multiShareParams = { ...defaultStrategyParams, tradeAmount: 2 };
-    const multiShareData: HistoricalDataPoint[] = [
-      createDataPoint(new Date('2023-01-01'), 145), 
-      createDataPoint(new Date('2023-01-02'), 151), // BUY 2 @ 151
-      createDataPoint(new Date('2023-01-03'), 139), // SELL 2 @ 139
-    ];
+    // multiShareData is defined above
     
     test('Strategy Parameters: should trade specified number of shares based on strategyParams.tradeAmount', async () => {
         (mockFetchHistoricalDataFromDB as jest.Mock).mockResolvedValue(multiShareData);
@@ -289,7 +306,7 @@ describe('Backtesting Module Tests', () => {
     // `const sharesToTrade = (signal.amount && signal.amount > 0) ? signal.amount : 1;`
     // We can test this by providing a strategy parameter that leads to signal.amount = 0.
     const zeroAmountParams = { ...defaultStrategyParams, tradeAmount: 0 };
-     const dataForDefaultAmount: HistoricalDataPoint[] = [createDataPoint(new Date('2023-01-02'), 151)];
+    // dataForDefaultAmount is defined above
 
     test('Signal Amount: should default to 1 share if strategy parameters lead to signal.amount being 0', async () => {
         (mockFetchHistoricalDataFromDB as jest.Mock).mockResolvedValue(dataForDefaultAmount);

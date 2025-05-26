@@ -2,8 +2,8 @@
 import request from 'supertest';
 import { app } from '../../src/index'; // Assuming app is exported from src/index.ts
 import { getAvailableStrategies } from '../../src/strategies/strategyManager';
-import { runBacktest } from '../../src/backtest';
-import { TradingStrategy, BacktestResult, StrategyParameterDefinition } from '../../src/strategies/strategy.types'; // For typing mocks
+import { runBacktest, BacktestResult } from '../../src/backtest'; // Correctly import BacktestResult from here
+import { TradingStrategy, StrategyParameterDefinition } from '../../src/strategies/strategy.types'; // For typing mocks
 
 // Mock the strategyManager and backtest functions
 jest.mock('../../src/strategies/strategyManager', () => ({
@@ -72,8 +72,8 @@ describe('Strategy API Endpoints', () => {
 
     const mockSuccessResult: BacktestResult = {
       symbol: 'BTCUSDT',
-      startDate: new Date('2023-01-01').toISOString(),
-      endDate: new Date('2023-03-31').toISOString(),
+      startDate: new Date('2023-01-01T00:00:00Z'), // Changed to Date object
+      endDate: new Date('2023-03-31T00:00:00Z'),   // Changed to Date object
       initialPortfolioValue: 10000,
       finalPortfolioValue: 12000,
       totalProfitOrLoss: 2000,
@@ -91,7 +91,28 @@ describe('Strategy API Endpoints', () => {
         .send(validBacktestBody);
 
       expect(response.status).toBe(200);
-      expect(response.body).toEqual(mockSuccessResult); // Dates will be ISO strings
+      // Adjust expectation for date comparison if necessary, as direct object comparison might fail
+      // For now, we assume the API returns ISO strings, so the mock should match what the API is expected to return
+      // OR the API should return Date objects if that's the contract.
+      // The current issue is that mockRunBacktest is mocked to return BacktestResult with Date objects,
+      // but the API route stringifies them.
+      // The fix is for the mockSuccessResult that mockRunBacktest returns.
+      // The API response check might need adjustment if it serializes Date objects to strings.
+      // Let's assume mockRunBacktest should resolve with Date objects for type correctness.
+      // The API endpoint test (response.body) will naturally receive JSON (stringified dates).
+      // So, the toEqual comparison might need to compare `response.body.startDate` with `mockSuccessResult.startDate.toISOString()`.
+
+      // For now, the primary fix is for mockSuccessResult type compatibility.
+      // The test's `toEqual(mockSuccessResult)` might need adjustment later if dates are stringified by the API.
+      // For the purpose of this TS2322 fix, mockSuccessResult's types are now correct.
+      // The `response.body` check:
+      const expectedResponseBody = {
+        ...mockSuccessResult,
+        startDate: mockSuccessResult.startDate.toISOString(),
+        endDate: mockSuccessResult.endDate.toISOString(),
+      };
+      expect(response.body).toEqual(expectedResponseBody);
+
       expect(mockRunBacktest).toHaveBeenCalledWith(
         validBacktestBody.symbol,
         new Date(validBacktestBody.startDate), // runBacktest expects Date objects

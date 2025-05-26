@@ -1,5 +1,7 @@
 import { aiPricePredictionStrategy } from '../../src/strategies/implementations/aiPricePredictionStrategy';
-import { StrategyContext, StrategySignal, HistoricalDataPoint, Portfolio, StrategyParameters } from '../../src/strategies/strategy.types';
+import { StrategyContext, StrategySignal } from '../../src/strategies/strategy.types'; // Removed HistoricalDataPoint, Portfolio, StrategyParameters
+import { HistoricalDataPoint } from '../../src/services/dataService'; // Added import
+import { Portfolio } from '../../src/backtest'; // Added import
 import * as tf from '@tensorflow/tfjs-node';
 import { createPriceSequences, normalizeData } from '../../src/utils/aiDataUtils';
 import { createModel, compileModel } from '../../src/aiModels/simplePricePredictorModel';
@@ -28,7 +30,7 @@ const mockModelDispose = jest.fn();
 
 describe('AIPricePredictionStrategy', () => {
   let baseContext: StrategyContext;
-  const defaultParams = {
+  const defaultParams: Record<string, number | string | boolean> = { // Typed parameters
     lookbackPeriod: 10,
     predictionHorizon: 1,
     trainingDataSplit: 0.7,
@@ -42,18 +44,23 @@ describe('AIPricePredictionStrategy', () => {
   };
 
   const createMockHistoricalData = (length: number, startPrice: number = 100): HistoricalDataPoint[] => {
-    return Array(length).fill(null).map((_, i) => ({
-      timestamp: Date.now() + i * 3600000, // hourly data
-      open: startPrice + i * 0.1,
-      high: startPrice + i * 0.1 + 0.05,
-      low: startPrice + i * 0.1 - 0.05,
-      close: startPrice + i * 0.1,
-      volume: 100 + i * 10,
-      sourceApi: 'mock',
-      symbol: 'MOCK',
-      interval: '1h',
-      fetchedAt: Date.now(),
-    }));
+    const now = Date.now();
+    return Array(length).fill(null).map((_, i) => {
+      const timestampMillis = now + i * 3600000; // hourly data
+      return {
+        timestamp: Math.floor(timestampMillis / 1000), // Epoch seconds
+        date: new Date(timestampMillis), // Date object
+        open: startPrice + i * 0.1,
+        high: startPrice + i * 0.1 + 0.05,
+        low: startPrice + i * 0.1 - 0.05,
+        close: startPrice + i * 0.1,
+        volume: 100 + i * 10,
+        source_api: 'mock', // Corrected field name
+        symbol: 'MOCK',
+        interval: '1h',
+        // fetchedAt is not part of HistoricalDataPoint
+      };
+    });
   };
   
   const mockTensor = (shape: number[] = [1]) => {
@@ -84,18 +91,26 @@ describe('AIPricePredictionStrategy', () => {
     baseContext = {
       historicalData: createMockHistoricalData(100), // e.g., 100 data points
       currentIndex: 99, // Default to the last point for prediction tests after training
-      portfolio: { cash: 10000, shares: 10, initialCash: 10000, trades: [] },
+      portfolio: { cash: 10000, shares: 10, initialValue: 10000, currentValue: 10000 }, // Corrected initialCash
       parameters: { ...defaultParams },
-      getAvailableStrategies: jest.fn(() => []), // Not used by this strategy
-      getStrategy: jest.fn(() => undefined),   // Not used by this strategy
-    };
+      // These are not part of StrategyContext
+      // getAvailableStrategies: jest.fn(() => []), 
+      // getStrategy: jest.fn(() => undefined),   
+    } as StrategyContext;
   });
 
   it('should invoke training if not already trained', async () => {
     const context = { ...baseContext };
-    // currentIndex needs to be beyond training split for this test to be meaningful for a prediction later
-    // but for just testing training invocation, any currentIndex where data is sufficient is fine.
     // Training uses historicalData.length * trainingDataSplit
+    // Ensure currentIndex allows for sufficient data for training and subsequent lookback for prediction
+    context.currentIndex = Math.floor(context.historicalData.length * (defaultParams.trainingDataSplit as number)) + (defaultParams.lookbackPeriod as number) + 1;
+    if (context.currentIndex >= context.historicalData.length) {
+        context.currentIndex = context.historicalData.length - 1;
+    }
+    // Ensure historicalData is long enough for this currentIndex
+    if (context.historicalData.length <= context.currentIndex) {
+        context.historicalData = createMockHistoricalData(context.currentIndex + 50); // Add more data if needed
+    }
     
     mockedCreatePriceSequences.mockReturnValue({
       sequences: [[1,2,3],[4,5,6]],
@@ -117,105 +132,131 @@ describe('AIPricePredictionStrategy', () => {
 
   it('should make a BUY prediction after training', async () => {
     const strategy = aiPricePredictionStrategy as any;
-    strategy.isTrained = true;
-    strategy.model = mockedCreateModel(); // Get a fresh mock model instance
-    strategy.normalizationParams = { min: 90, max: 110 };
+    // We will not set strategy.isTrained or strategy.model here.
+    // The strategy should train itself if not trained.
+    // We need to ensure the context.currentIndex is such that after training,
+    // there's still data for the prediction part of execute.
     
-    const context = { ...baseContext, currentIndex: defaultParams.lookbackPeriod + 5 }; // Ensure enough data for lookback
-    context.historicalData = createMockHistoricalData(context.currentIndex + 1, 100);
-     context.portfolio.cash = context.historicalData[context.currentIndex].close * defaultParams.tradeAmount + 1000;
+    const context = { ...baseContext };
+    // Ensure currentIndex is far enough for training to occur and then a prediction to be made
+    const trainingDataEndIndex = Math.floor(context.historicalData.length * (defaultParams.trainingDataSplit as number));
+    context.currentIndex = trainingDataEndIndex + (defaultParams.lookbackPeriod as number) + 1;
+    // Ensure historicalData is long enough for this currentIndex
+    if (context.historicalData.length <= context.currentIndex) {
+      context.historicalData = createMockHistoricalData(context.currentIndex + 50); // Add more data if needed
+    }
+    context.portfolio.cash = context.historicalData[context.currentIndex].close * (defaultParams.tradeAmount as number) + 1000;
 
-
-    mockedNormalizeData.mockReturnValue({
-      normalizedSequences: [Array(defaultParams.lookbackPeriod).fill(0.5)], // Mocked normalized sequence
-      minMax: strategy.normalizationParams
+    // Mock for training part
+    mockedCreatePriceSequences.mockReturnValueOnce({ sequences: [[1,2,3]], targets: [1] });
+    mockedNormalizeData.mockReturnValueOnce({ normalizedSequences: [[0.1,0.2,0.3]], minMax: { min: 1, max: 3 } });
+    // Mock for prediction part
+    mockedNormalizeData.mockReturnValueOnce({
+      normalizedSequences: [Array(defaultParams.lookbackPeriod as number).fill(0.5)],
+      minMax: { min: 90, max: 110 } // This will be set by strategy.normalizationParams after training
     });
-    
-    // Mock prediction tensor - tf.tidy helps dispose of it
-    mockModelPredict.mockImplementation(() => tf.tidy(() => tf.tensor2d([[defaultParams.buyThreshold + 0.1]]))); // Prediction > buyThreshold
+    mockModelPredict.mockImplementation(() => tf.tidy(() => tf.tensor2d([[(defaultParams.buyThreshold as number) + 0.1]])));
 
-    const signal = await strategy.execute(context);
+    const signals = await strategy.execute(context); // Should trigger training then prediction
 
+    expect(strategy.isTrained).toBe(true); // Verify training happened
     expect(mockModelPredict).toHaveBeenCalled();
-    expect(signal.action).toBe('BUY');
-    expect(signal.amount).toBe(defaultParams.tradeAmount);
+    expect(signals[0].action).toBe('BUY'); // Access first signal in array
+    expect(signals[0].amount).toBe(defaultParams.tradeAmount); // Access first signal in array
   });
   
   it('should make a SELL prediction after training', async () => {
     const strategy = aiPricePredictionStrategy as any;
-    strategy.isTrained = true;
-    strategy.model = mockedCreateModel();
-    strategy.normalizationParams = { min: 90, max: 110 };
+    const context = { ...baseContext };
+    const trainingDataEndIndex = Math.floor(context.historicalData.length * (defaultParams.trainingDataSplit as number));
+    context.currentIndex = trainingDataEndIndex + (defaultParams.lookbackPeriod as number) + 1;
+    if (context.historicalData.length <= context.currentIndex) {
+      context.historicalData = createMockHistoricalData(context.currentIndex + 50);
+    }
+    context.portfolio.shares = (defaultParams.tradeAmount as number) + 1;
 
-    const context = { ...baseContext, currentIndex: defaultParams.lookbackPeriod + 5 };
-    context.historicalData = createMockHistoricalData(context.currentIndex + 1, 100);
-    context.portfolio.shares = defaultParams.tradeAmount + 1;
-
-
-    mockedNormalizeData.mockReturnValue({
-      normalizedSequences: [Array(defaultParams.lookbackPeriod).fill(0.5)],
-      minMax: strategy.normalizationParams
+    mockedCreatePriceSequences.mockReturnValueOnce({ sequences: [[1,2,3]], targets: [1] });
+    mockedNormalizeData.mockReturnValueOnce({ normalizedSequences: [[0.1,0.2,0.3]], minMax: { min: 1, max: 3 } });
+    mockedNormalizeData.mockReturnValueOnce({
+      normalizedSequences: [Array(defaultParams.lookbackPeriod as number).fill(0.5)],
+      minMax: { min: 90, max: 110 }
     });
-    mockModelPredict.mockImplementation(() => tf.tidy(() => tf.tensor2d([[defaultParams.sellThreshold - 0.1]]))); // Prediction < sellThreshold
+    mockModelPredict.mockImplementation(() => tf.tidy(() => tf.tensor2d([[(defaultParams.sellThreshold as number) - 0.1]])));
 
-    const signal = await strategy.execute(context);
+    const signals = await strategy.execute(context);
+    expect(strategy.isTrained).toBe(true);
     expect(mockModelPredict).toHaveBeenCalled();
-    expect(signal.action).toBe('SELL');
-    expect(signal.amount).toBe(defaultParams.tradeAmount);
+    expect(signals[0].action).toBe('SELL'); // Access first signal in array
+    expect(signals[0].amount).toBe(defaultParams.tradeAmount); // Access first signal in array
   });
 
   it('should make a HOLD prediction after training (between thresholds)', async () => {
     const strategy = aiPricePredictionStrategy as any;
-    strategy.isTrained = true;
-    strategy.model = mockedCreateModel();
-    strategy.normalizationParams = { min: 90, max: 110 };
+    const context = { ...baseContext };
+    const trainingDataEndIndex = Math.floor(context.historicalData.length * (defaultParams.trainingDataSplit as number));
+    context.currentIndex = trainingDataEndIndex + (defaultParams.lookbackPeriod as number) + 1;
+    if (context.historicalData.length <= context.currentIndex) {
+      context.historicalData = createMockHistoricalData(context.currentIndex + 50);
+    }
 
-    const context = { ...baseContext, currentIndex: defaultParams.lookbackPeriod + 5 };
-     context.historicalData = createMockHistoricalData(context.currentIndex + 1, 100);
-
-    mockedNormalizeData.mockReturnValue({
-      normalizedSequences: [Array(defaultParams.lookbackPeriod).fill(0.5)],
-      minMax: strategy.normalizationParams
+    mockedCreatePriceSequences.mockReturnValueOnce({ sequences: [[1,2,3]], targets: [1] });
+    mockedNormalizeData.mockReturnValueOnce({ normalizedSequences: [[0.1,0.2,0.3]], minMax: { min: 1, max: 3 } });
+    mockedNormalizeData.mockReturnValueOnce({
+      normalizedSequences: [Array(defaultParams.lookbackPeriod as number).fill(0.5)],
+      minMax: { min: 90, max: 110 }
     });
-    mockModelPredict.mockImplementation(() => tf.tidy(() => tf.tensor2d([[(defaultParams.buyThreshold + defaultParams.sellThreshold) / 2 ]]))); // Prediction between thresholds
+    mockModelPredict.mockImplementation(() => tf.tidy(() => tf.tensor2d([[((defaultParams.buyThreshold as number) + (defaultParams.sellThreshold as number)) / 2 ]])));
 
-    const signal = await strategy.execute(context);
+    const signals = await strategy.execute(context);
+    expect(strategy.isTrained).toBe(true);
     expect(mockModelPredict).toHaveBeenCalled();
-    expect(signal.action).toBe('HOLD');
+    expect(signals[0].action).toBe('HOLD'); // Access first signal in array
   });
 
   it('should HOLD if data is insufficient for training', async () => {
     const context = { ...baseContext };
     // Data length just enough for lookback + horizon, but not for split AND then lookback + horizon
-    context.historicalData = createMockHistoricalData(defaultParams.lookbackPeriod + defaultParams.predictionHorizon); 
+    context.historicalData = createMockHistoricalData(
+      (defaultParams.lookbackPeriod as number) + (defaultParams.predictionHorizon as number)
+    ); 
     
-    const signal = await aiPricePredictionStrategy.execute(context);
+    const signals = await aiPricePredictionStrategy.execute(context);
     expect((aiPricePredictionStrategy as any).isTrained).toBe(false);
     expect(mockedCreateModel).not.toHaveBeenCalled();
-    expect(signal.action).toBe('HOLD');
+    expect(signals[0].action).toBe('HOLD'); // Access first signal in array
   });
 
   it('should HOLD if data is insufficient for prediction after training', async () => {
     const strategy = aiPricePredictionStrategy as any;
-    strategy.isTrained = true;
-    strategy.model = mockedCreateModel();
+    // Manually set isTrained to true but provide insufficient data for prediction lookback
+    strategy.isTrained = true; 
+    strategy.model = mockedCreateModel( // Ensure model is created with expected params if accessed
+        defaultParams.lookbackPeriod as number, 
+        defaultParams.lstmUnits as number, 
+        defaultParams.denseUnits as number
+    );
     strategy.normalizationParams = { min: 90, max: 110 };
 
-    const context = { ...baseContext, currentIndex: defaultParams.lookbackPeriod - 2 }; // Not enough for lookback
-    context.historicalData = createMockHistoricalData(defaultParams.lookbackPeriod);
+    const context = { ...baseContext, currentIndex: (defaultParams.lookbackPeriod as number) - 2 }; 
+    context.historicalData = createMockHistoricalData(defaultParams.lookbackPeriod as number);
 
 
-    const signal = await strategy.execute(context);
-    expect(mockModelPredict).not.toHaveBeenCalled();
-    expect(signal.action).toBe('HOLD');
+    const signals = await strategy.execute(context);
+    expect(mockModelPredict).not.toHaveBeenCalled(); // Prediction shouldn't be attempted
+    expect(signals[0].action).toBe('HOLD'); // Access first signal in array
   });
   
   it('model dispose should be called on resetState', () => {
     const strategy = aiPricePredictionStrategy as any;
-    strategy.model = mockedCreateModel(); // Assign a mock model
+    // Ensure a model exists to be disposed
+    strategy.model = mockedCreateModel(
+        defaultParams.lookbackPeriod as number, 
+        defaultParams.lstmUnits as number, 
+        defaultParams.denseUnits as number
+    ); 
     
     strategy.resetState();
-    expect(mockModelDispose).toHaveBeenCalled();
+    expect(mockModelDispose).toHaveBeenCalled(); // Check if dispose was called on the model
   });
 
 });

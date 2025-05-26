@@ -10,9 +10,10 @@ import { v4 as uuidv4 } from 'uuid';
 const MOCK_ENCRYPTION_KEY = 'a0123456789b0123456789c0123456789d0123456789e0123456789f01234567'; // 32 bytes hex
 process.env.API_ENCRYPTION_KEY = MOCK_ENCRYPTION_KEY;
 
-// Mock uuidv4
-jest.mock('uuidv4', () => ({
-  v4: jest.fn(),
+// Mock uuid
+jest.mock('uuid', () => ({
+  ...jest.requireActual('uuid'), // Import and retain default behavior
+  v4: jest.fn(), // Mock only the v4 function
 }));
 
 let testUser: User;
@@ -165,7 +166,7 @@ describe('API Key Service (Database and Encryption)', () => {
       expect(updated!.api_secret).toBe('s_secret_new');
     });
 
-    it('should only update timestamps if no data is provided for update', () => {
+    it('should only update timestamps if no data is provided for update', async () => {
         const created = apiKeyService.createApiKey({ user_id: testUser.id, exchange_name: 'E_Timestamp', api_key: 'k_time', api_secret: 's_time' });
         const originalUpdatedAt = created.updated_at;
 

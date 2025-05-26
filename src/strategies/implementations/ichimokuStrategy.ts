@@ -1,7 +1,7 @@
 // In src/strategies/implementations/ichimokuStrategy.ts
 import { HistoricalDataPoint } from '../../services/dataService';
 import { TradingStrategy, StrategyContext, StrategySignal, StrategyParameterDefinition } from '../strategy.types';
-import { logger } from '../../utils/logger';
+import logger from '../../utils/logger'; // Changed to default import
 
 // --- Helper Functions for Ichimoku Calculations ---
 
@@ -148,7 +148,7 @@ export const ichimokuCloudStrategy: TradingStrategy = {
   description: 'A trend-following strategy based on the Ichimoku Kinko Hyo indicator. It uses multiple lines (Tenkan-sen, Kijun-sen), a projected cloud (Kumo), and a lagging span (Chikou) to identify trends and generate signals.',
   parameters: ichimokuStrategyParameters,
 
-  execute: (context: StrategyContext): StrategySignal => {
+  async execute(context: StrategyContext): Promise<StrategySignal[]> { // Changed signature
     const { historicalData, currentIndex, portfolio, parameters } = context;
     const { 
       tenkanPeriod, 
@@ -170,7 +170,7 @@ export const ichimokuCloudStrategy: TradingStrategy = {
     const minDataLength = Math.max(tenkanPeriod, kijunPeriod, senkouSpanBPeriod) + chikouLaggingPeriod + senkouCloudDisplacement;
     if (currentIndex < minDataLength) {
       // logger.debug(`Ichimoku: Not enough data at index ${currentIndex}. Need ${minDataLength} points.`);
-      return { action: 'HOLD', amount: 0 };
+      return Promise.resolve([{ action: 'HOLD', amount: 0 }]); // Wrapped return
     }
 
     const ichimoku = calculateIchimokuComponents(
@@ -196,7 +196,7 @@ export const ichimokuCloudStrategy: TradingStrategy = {
     if (!ichimoku.tenkanSen || !ichimoku.kijunSen || !ichimoku.senkouSpanA || !ichimoku.senkouSpanB || !ichimoku.chikouSpan ||
         !prevIchimoku.tenkanSen || !prevIchimoku.kijunSen || !ichimoku.futureSenkouSpanA || !ichimoku.futureSenkouSpanB) {
       // logger.debug(`Ichimoku: Null indicator values at index ${currentIndex}. Holding.`);
-      return { action: 'HOLD', amount: 0 };
+      return Promise.resolve([{ action: 'HOLD', amount: 0 }]); // Wrapped return
     }
 
     const currentPrice = historicalData[currentIndex].close;
@@ -252,7 +252,7 @@ export const ichimokuCloudStrategy: TradingStrategy = {
 
     if (tenkanKijunBullishCross && priceAboveKumo && chikouAboveCurrentKumo && futureKumoBullish) {
       if (portfolio.cash >= currentPrice * tradeAmount) {
-        return { action: 'BUY', amount: tradeAmount };
+        return Promise.resolve([{ action: 'BUY', amount: tradeAmount }]); // Wrapped return
       }
     }
 
@@ -271,11 +271,11 @@ export const ichimokuCloudStrategy: TradingStrategy = {
 
     if (tenkanKijunBearishCross && priceBelowKumo && chikouBelowCurrentKumo && futureKumoBearish) {
       if (portfolio.shares >= tradeAmount) {
-        return { action: 'SELL', amount: tradeAmount };
+        return Promise.resolve([{ action: 'SELL', amount: tradeAmount }]); // Wrapped return
       }
     }
 
-    return { action: 'HOLD', amount: 0 };
+    return Promise.resolve([{ action: 'HOLD', amount: 0 }]); // Wrapped return
   },
 };
 

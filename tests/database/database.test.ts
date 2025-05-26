@@ -45,7 +45,7 @@ const resetMocks = () => {
   
   // Default mock implementations that can be overridden in specific tests
   mockDbInstance.prepare.mockImplementation(jest.fn().mockReturnThis());
-  mockDbInstance.transaction.mockImplementation((fn) => (...args) => fn(...args)); // Ensure transaction executes the passed function
+  mockDbInstance.transaction.mockImplementation((fn) => (...args: any[]) => fn(...args)); // Ensure transaction executes the passed function
 };
 
 
@@ -278,7 +278,8 @@ describe('Database Module Tests', () => {
 
     test('should retrieve by symbol and date range', () => {
       mockDbInstance.prepare.mockReturnValue({ all: jest.fn(mockQueryImplementation) });
-      const result = queryHistoricalData('TSLA', now - 3*86400, now - 1*86400);
+      // Added interval: '1d' to match the expectation of 3 daily records
+      const result = queryHistoricalData('TSLA', now - 3*86400, now - 1*86400, undefined, '1d');
       expect(result.length).toBe(3); // 3 daily TSLA records (ignoring 5min one for this generic call)
       expect(result[0].id).toBe(1);
       expect(result[2].id).toBe(3);

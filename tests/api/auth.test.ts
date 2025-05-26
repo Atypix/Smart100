@@ -1,15 +1,16 @@
 // tests/api/auth.test.ts
 import request from 'supertest';
 import { app } from '../../src/index'; // Assuming app is exported from src/index.ts
-import { clearUsers, createUser, findUserByEmail, getAllUsers } from '../../src/services/userService';
+import { createUser, findUserByEmail, getAllUsers } from '../../src/services/userService'; // Removed clearUsers
 import logger from '../../src/utils/logger';
+import { db } from '../../src/database'; // Added db import
 
 // Suppress console logs from the application during tests for cleaner test output
 // Note: This might hide useful debugging logs if tests fail unexpectedly.
 // Consider enabling them by default and only suppressing if output is too verbose.
-jest.spyOn(logger, 'info').mockImplementation(() => {});
-jest.spyOn(logger, 'warn').mockImplementation(() => {});
-jest.spyOn(logger, 'error').mockImplementation(() => {});
+jest.spyOn(logger, 'info').mockImplementation(jest.fn());
+jest.spyOn(logger, 'warn').mockImplementation(jest.fn());
+jest.spyOn(logger, 'error').mockImplementation(jest.fn());
 
 
 describe('Auth Endpoints API', () => {
@@ -17,7 +18,7 @@ describe('Auth Endpoints API', () => {
   // and app.listen is conditional (as configured in src/index.ts)
 
   beforeEach(() => {
-    clearUsers(); // Clear users before each test
+    db.exec('DELETE FROM users'); // Clear users table using db context
     // Ensure JWT_SECRET is set for tests, as it's crucial for /login
     // You might need a more robust way if it's not picked up from a .env.test or similar
     process.env.JWT_SECRET = 'test_jwt_secret_for_api_tests_1234567890_!@#$%^&*()';

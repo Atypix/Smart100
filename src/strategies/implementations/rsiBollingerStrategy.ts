@@ -1,7 +1,7 @@
 import { TradingStrategy, StrategyContext, StrategySignal, StrategyParameterDefinition } from '../strategy.types';
 import { calculateRSI, calculateBollingerBands } from '../../utils/technicalIndicators';
 import { HistoricalDataPoint } from '../../services/dataService'; // Assuming OHLCV is part of HistoricalDataPoint or equivalent
-import { logger } from '../../utils/logger';
+import logger from '../../utils/logger'; // Changed to default import
 
 const rsiBollingerStrategyParameters: StrategyParameterDefinition[] = [
   { 
@@ -71,7 +71,7 @@ export const rsiBollingerStrategy: TradingStrategy = {
   description: 'Generates BUY signals when RSI is oversold and price is at/below lower Bollinger Band. Generates SELL signals when RSI is overbought and price is at/above upper Bollinger Band.',
   parameters: rsiBollingerStrategyParameters,
 
-  execute: (context: StrategyContext): StrategySignal => {
+  async execute(context: StrategyContext): Promise<StrategySignal[]> { // Changed signature
     const { historicalData, currentIndex, portfolio, parameters } = context;
     const {
       rsiPeriod,
@@ -95,7 +95,7 @@ export const rsiBollingerStrategy: TradingStrategy = {
     const requiredDataLength = Math.max(rsiPeriod + 1, bollingerPeriod +1); // Need +1 for price changes in RSI
     if (currentIndex < requiredDataLength -1) { // -1 because currentIndex is 0-based
         // logger.debug(`[${rsiBollingerStrategy.id}] Not enough data at index ${currentIndex}. Need data for up to index ${requiredDataLength -1}. Holding.`);
-        return { action: 'HOLD' };
+        return Promise.resolve([{ action: 'HOLD' }]); // Wrapped return
     }
     
     const closingPrices = historicalData.map((d: HistoricalDataPoint) => d.close);
@@ -116,17 +116,17 @@ export const rsiBollingerStrategy: TradingStrategy = {
       isNaN(currentBollingerLower)
     ) {
       // logger.debug(`[${rsiBollingerStrategy.id}] Indicator values are NaN at index ${currentIndex}. RSI: ${currentRSI}, UpperBB: ${currentBollingerUpper}, LowerBB: ${currentBollingerLower}. Holding.`);
-      return { action: 'HOLD' };
+      return Promise.resolve([{ action: 'HOLD' }]); // Wrapped return
     }
 
     // BUY Signal
     if (currentRSI < rsiOversold && currentPrice <= currentBollingerLower) {
       if (portfolio.cash >= currentPrice * tradeAmount) {
         // logger.info(`[${rsiBollingerStrategy.id}] BUY signal at index ${currentIndex}: RSI (${currentRSI.toFixed(2)}) < ${rsiOversold} AND Price (${currentPrice.toFixed(2)}) <= Lower BB (${currentBollingerLower.toFixed(2)})`);
-        return { action: 'BUY', amount: tradeAmount };
+        return Promise.resolve([{ action: 'BUY', amount: tradeAmount }]); // Wrapped return
       } else {
         // logger.debug(`[${rsiBollingerStrategy.id}] BUY signal triggered but insufficient cash at index ${currentIndex}. Holding.`);
-        return { action: 'HOLD' };
+        return Promise.resolve([{ action: 'HOLD' }]); // Wrapped return
       }
     }
 
@@ -134,14 +134,14 @@ export const rsiBollingerStrategy: TradingStrategy = {
     if (currentRSI > rsiOverbought && currentPrice >= currentBollingerUpper) {
       if (portfolio.shares >= tradeAmount) {
         // logger.info(`[${rsiBollingerStrategy.id}] SELL signal at index ${currentIndex}: RSI (${currentRSI.toFixed(2)}) > ${rsiOverbought} AND Price (${currentPrice.toFixed(2)}) >= Upper BB (${currentBollingerUpper.toFixed(2)})`);
-        return { action: 'SELL', amount: tradeAmount };
+        return Promise.resolve([{ action: 'SELL', amount: tradeAmount }]); // Wrapped return
       } else {
         // logger.debug(`[${rsiBollingerStrategy.id}] SELL signal triggered but insufficient shares at index ${currentIndex}. Holding.`);
-        return { action: 'HOLD' };
+        return Promise.resolve([{ action: 'HOLD' }]); // Wrapped return
       }
     }
 
     // logger.debug(`[${rsiBollingerStrategy.id}] No signal at index ${currentIndex}. RSI: ${currentRSI.toFixed(2)}, Price: ${currentPrice.toFixed(2)}, LowerBB: ${currentBollingerLower.toFixed(2)}, UpperBB: ${currentBollingerUpper.toFixed(2)}. Holding.`);
-    return { action: 'HOLD' };
+    return Promise.resolve([{ action: 'HOLD' }]); // Wrapped return
   },
 };

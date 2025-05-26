@@ -1,16 +1,18 @@
 // In tests/strategies/ichimokuStrategy.test.ts
-import { ichimokuCloudStrategy } from '../../../src/strategies/implementations/ichimokuStrategy';
-import { StrategyContext, HistoricalDataPoint, Portfolio, Trade, StrategySignal } from '../../../src/strategies/strategy.types';
-import { logger } from '../../../src/utils/logger';
+import { ichimokuCloudStrategy } from '../../src/strategies/implementations/ichimokuStrategy'; // Corrected path
+import { StrategyContext, StrategySignal } from '../../src/strategies/strategy.types'; // Corrected path, removed problematic imports
+import { HistoricalDataPoint } from '../../src/services/dataService'; // Direct import
+import { Portfolio, Trade } from '../../src/backtest/index'; // Direct import
+import logger from '../../src/utils/logger'; // Corrected path and default import
 
 // Mock the logger
-jest.mock('../../../src/utils/logger', () => ({
-  logger: {
+jest.mock('../../src/utils/logger', () => ({ // Corrected path
+  default: { // Mocking the default export
     info: jest.fn(),
     warn: jest.fn(),
     error: jest.fn(),
     debug: jest.fn(), // Used in ichimokuStrategy for insufficient data
-  },
+  }
 }));
 
 // Helper to create HistoricalDataPoint, simplified for Ichimoku needs (close, high, low primarily)
@@ -52,7 +54,7 @@ describe('Ichimoku Cloud Strategy', () => {
     expect(ichimokuCloudStrategy.parameters.find(p => p.name === 'tenkanPeriod')?.defaultValue).toBe(9);
   });
 
-  test('should return HOLD if insufficient historical data for calculations', () => {
+  test('should return HOLD if insufficient historical data for calculations', async () => { // Made async
     // Default periods: tenkan=9, kijun=26, senkouB=52, chikou=26, displacement=26
     // Min data length required approx: 52 (senkouB) + 26 (chikou lag) + 26 (displacement) = 104.
     // Let's set current index to something less than the longest lookback required by calculations.
@@ -61,12 +63,12 @@ describe('Ichimoku Cloud Strategy', () => {
     mockContext.historicalData = Array(100).fill(null).map((_, i) => createDataPoint(`2023-01-${(i % 30) + 1}`, 100 + i));
     mockContext.currentIndex = 50; // Needs at least 104 points based on default params.
     
-    const signal = ichimokuCloudStrategy.execute(mockContext);
-    expect(signal.action).toBe('HOLD');
+    const signals = await ichimokuCloudStrategy.execute(mockContext); // Awaited and changed variable name
+    expect(signals[0].action).toBe('HOLD'); // Used signals[0]
     // expect(logger.debug).toHaveBeenCalledWith(expect.stringContaining('Ichimoku: Not enough data'));
   });
   
-  test('should return HOLD if calculated Ichimoku components are null', () => {
+  test('should return HOLD if calculated Ichimoku components are null', async () => { // Made async
     // Create enough data points, but make some essential ones lead to null calculations (e.g., too few for a period)
     // This test is tricky because calculateIchimokuComponents itself returns nulls if underlying data is insufficient for a period.
     // The "insufficient data" check at the start of execute should catch most of this.
@@ -111,8 +113,8 @@ describe('Ichimoku Cloud Strategy', () => {
     // or more complex mocking. We assume the primary guards are data length and then signal logic.
     // For now, this specific test on "null components" will be less direct.
     // If data is just flat, it will hold, which is fine.
-    const signal = ichimokuCloudStrategy.execute(mockContext);
-    expect(signal.action).toBe('HOLD'); // Flat data usually leads to HOLD or components being very close.
+    const signals = await ichimokuCloudStrategy.execute(mockContext); // Awaited and changed variable name
+    expect(signals[0].action).toBe('HOLD'); // Used signals[0], Flat data usually leads to HOLD or components being very close.
   });
 
   // --- Bullish Scenario Test ---
@@ -121,7 +123,7 @@ describe('Ichimoku Cloud Strategy', () => {
   // 2. Price is above the Kumo (current)
   // 3. Chikou Span is above the Kumo (current)
   // 4. Future Kumo is bullish
-  test('should return BUY signal on strong bullish conditions', () => {
+  test('should return BUY signal on strong bullish conditions', async () => { // Made async
     // This requires carefully crafted data. For simplicity, we'll mock the conditions
     // by ensuring calculateIchimokuComponents returns values that meet the criteria.
     // This is an integration test of the execute logic, not the calculator's precision.
@@ -164,8 +166,8 @@ describe('Ichimoku Cloud Strategy', () => {
     
     // Given the complexity, this test will be a placeholder for a more robust data-driven one.
     // For now, we'll just ensure it doesn't crash and returns a valid signal.
-    const signal = ichimokuCloudStrategy.execute(mockContext);
-    expect(['BUY', 'SELL', 'HOLD']).toContain(signal.action); // General check
+    const signals = await ichimokuCloudStrategy.execute(mockContext); // Awaited and changed variable name
+    expect(['BUY', 'SELL', 'HOLD']).toContain(signals[0].action); // Used signals[0], General check
     
     // To make a more concrete test for BUY (this is still an approximation):
     // Create a scenario where the last few points are sharply up after a period of sideways movement.
@@ -176,7 +178,7 @@ describe('Ichimoku Cloud Strategy', () => {
     mockContext.currentIndex = data.length -1;
     mockContext.portfolio.cash = 200 * (defaultParams.tradeAmount as number); // Ensure enough cash for price around 200
 
-    const buySignal = ichimokuCloudStrategy.execute(mockContext);
+    const buySignals = await ichimokuCloudStrategy.execute(mockContext); // Awaited and changed variable name
     // This is still a guess if it will be BUY. If not, data needs more refinement.
     // For a true unit test of the execute logic, mocking calculateIchimokuComponents is better.
     // If this specific data doesn't yield BUY, the test should be adjusted or calculateIchimokuComponents mocked.
@@ -186,14 +188,14 @@ describe('Ichimoku Cloud Strategy', () => {
     // The main point here is to ensure it runs and returns a valid signal.
     // A dedicated test with known data that *must* produce a BUY would be ideal but is hard to craft here.
     // For now, we accept any valid signal, but in a real scenario, this needs more work.
-    expect(buySignal.action).toBeDefined(); // Placeholder for a more specific assertion
-    if(buySignal.action === 'BUY') {
-        expect(buySignal.amount).toBe(defaultParams.tradeAmount);
+    expect(buySignals[0].action).toBeDefined(); // Used buySignals[0], Placeholder for a more specific assertion
+    if(buySignals[0].action === 'BUY') {
+        expect(buySignals[0].amount).toBe(defaultParams.tradeAmount);
     }
   });
 
   // --- Bearish Scenario Test (Similar complexity to Bullish) ---
-  test('should return SELL signal on strong bearish conditions', () => {
+  test('should return SELL signal on strong bearish conditions', async () => { // Made async
     const dataPoints = 150;
     mockContext.historicalData = Array(dataPoints).fill(null).map((_, i) => 
       createDataPoint(`2023-0${Math.floor(i/30)+1}-${(i%30)+1}`, 200 - i * 0.5, 200 - i * 0.5 + 1, 200 - i * 0.5 -1 ) // Generally falling price
@@ -201,15 +203,15 @@ describe('Ichimoku Cloud Strategy', () => {
     mockContext.currentIndex = dataPoints - 1;
     mockContext.portfolio.shares = defaultParams.tradeAmount as number; // Ensure enough shares
 
-    const signal = ichimokuCloudStrategy.execute(mockContext);
-    expect(['BUY', 'SELL', 'HOLD']).toContain(signal.action);
-     if(signal.action === 'SELL') {
-        expect(signal.amount).toBe(defaultParams.tradeAmount);
+    const signals = await ichimokuCloudStrategy.execute(mockContext); // Awaited and changed variable name
+    expect(['BUY', 'SELL', 'HOLD']).toContain(signals[0].action); // Used signals[0]
+     if(signals[0].action === 'SELL') {
+        expect(signals[0].amount).toBe(defaultParams.tradeAmount);
     }
   });
 
   // --- Hold Scenario Test ---
-  test('should return HOLD signal when conditions are mixed or neutral', () => {
+  test('should return HOLD signal when conditions are mixed or neutral', async () => { // Made async
     // Sideways market, price inside Kumo, no clear TK cross, Chikou entangled
     const dataPoints = 150;
     mockContext.historicalData = Array(dataPoints).fill(null).map((_, i) => {
@@ -219,11 +221,11 @@ describe('Ichimoku Cloud Strategy', () => {
     });
     mockContext.currentIndex = dataPoints - 1;
 
-    const signal = ichimokuCloudStrategy.execute(mockContext);
-    expect(signal.action).toBe('HOLD');
+    const signals = await ichimokuCloudStrategy.execute(mockContext); // Awaited and changed variable name
+    expect(signals[0].action).toBe('HOLD'); // Used signals[0]
   });
   
-   test('should use tradeAmount parameter for BUY/SELL signals', () => {
+   test('should use tradeAmount parameter for BUY/SELL signals', async () => { // Made async
     const customTradeAmount = 5;
     mockContext.parameters.tradeAmount = customTradeAmount;
     // Create a bullish-like scenario (simplified, actual signal depends on full calculation)
@@ -237,11 +239,11 @@ describe('Ichimoku Cloud Strategy', () => {
     // This is a general check. A specific BUY or SELL outcome for Ichimoku is complex to guarantee
     // without pre-calculated data or mocking internal calculations.
     // The goal here is: IF a BUY/SELL signal is generated, it uses the customTradeAmount.
-    const signal = ichimokuCloudStrategy.execute(mockContext);
-    if (signal.action === 'BUY' || signal.action === 'SELL') {
-      expect(signal.amount).toBe(customTradeAmount);
+    const signals = await ichimokuCloudStrategy.execute(mockContext); // Awaited and changed variable name
+    if (signals[0].action === 'BUY' || signals[0].action === 'SELL') { // Used signals[0]
+      expect(signals[0].amount).toBe(customTradeAmount);
     } else {
-      expect(signal.action).toBe('HOLD'); // If conditions aren't met for BUY/SELL
+      expect(signals[0].action).toBe('HOLD'); // If conditions aren't met for BUY/SELL
     }
   });
 

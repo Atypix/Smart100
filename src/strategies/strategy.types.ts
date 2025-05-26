@@ -37,7 +37,7 @@ export interface TradingStrategy {
   parameters: StrategyParameterDefinition[]; // Definitions of parameters this strategy uses
 
   // Function to execute the strategy for a given historical data point and context
-  execute: (context: StrategyContext) => StrategySignal;
+  execute: (context: StrategyContext) => Promise<StrategySignal[]>; // Changed to return Promise<StrategySignal[]>
 
   // Optional: Function to calculate and return any indicators the strategy might expose for plotting/logging
   // getIndicators?: (context: StrategyContext) => Record<string, number | null>;

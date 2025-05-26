@@ -21,12 +21,12 @@ jest.mock('yahoo-finance2', () => ({
 
 // Mock logger
 jest.mock('../../src/utils/logger', () => ({
-  logger: {
+  default: { // Mocking the default export
     info: jest.fn(),
     warn: jest.fn(),
     error: jest.fn(),
     debug: jest.fn(),
-  },
+  }
 }));
 
 import axios from 'axios';
@@ -49,7 +49,7 @@ import {
   queryHistoricalData as mockQueryHistoricalData,
 } from '../../src/database'; // Mocked functions
 import type { FinancialData } from '../../src/database'; // Import type for mock data
-import { logger } from '../../src/utils/logger'; // Mocked logger
+import logger from '../../src/utils/logger'; // Mocked logger - changed to default import
 
 // Typedef for mocked axios
 const mockedAxios = axios as jest.Mocked<typeof axios>;

@@ -1,7 +1,7 @@
 import { TradingStrategy, StrategyContext, StrategySignal, StrategyParameterDefinition } from '../strategy.types';
 import { calculateMACD } from '../../utils/technicalIndicators';
 import { HistoricalDataPoint } from '../../services/dataService';
-import { logger } from '../../utils/logger'; // Optional for debugging
+import logger from '../../utils/logger'; // Optional for debugging - Changed to default import
 
 const macdStrategyParameters: StrategyParameterDefinition[] = [
   {
@@ -51,7 +51,7 @@ export const macdStrategy: TradingStrategy = {
   description: 'Generates BUY signals when the MACD line crosses above the Signal line, and SELL signals when it crosses below.',
   parameters: macdStrategyParameters,
 
-  execute: (context: StrategyContext): StrategySignal => {
+  async execute(context: StrategyContext): Promise<StrategySignal[]> { // Changed signature
     const { historicalData, currentIndex, portfolio, parameters } = context;
     const {
       shortPeriod,
@@ -68,13 +68,13 @@ export const macdStrategy: TradingStrategy = {
     // Ensure there's at least one previous data point to check for a crossover
     if (currentIndex < 1) {
       // logger.debug(`[${macdStrategy.id}] Not enough data for crossover detection at index ${currentIndex}. Holding.`);
-      return { action: 'HOLD' };
+      return Promise.resolve([{ action: 'HOLD' }]); // Wrapped return
     }
 
     // Validate that longPeriod is greater than shortPeriod (already in parameter definition, but good for robustness)
     if (longPeriod <= shortPeriod) {
         // logger.warn(`[${macdStrategy.id}] Long period (${longPeriod}) must be greater than short period (${shortPeriod}). Holding.`);
-        return {action: 'HOLD'};
+        return Promise.resolve([{action: 'HOLD'}]); // Wrapped return
     }
 
     const closingPrices = historicalData.map((d: HistoricalDataPoint) => d.close);
@@ -92,7 +92,7 @@ export const macdStrategy: TradingStrategy = {
       isNaN(previousSignal)
     ) {
       // logger.debug(`[${macdStrategy.id}] NaN MACD/Signal value at index ${currentIndex} or ${currentIndex-1}. Holding.`);
-      return { action: 'HOLD' };
+      return Promise.resolve([{ action: 'HOLD' }]); // Wrapped return
     }
 
     const currentPrice = historicalData[currentIndex].close;
@@ -101,10 +101,10 @@ export const macdStrategy: TradingStrategy = {
     if (previousMACD < previousSignal && currentMACD > currentSignal) {
       if (portfolio.cash >= currentPrice * tradeAmount) {
         // logger.info(`[${macdStrategy.id}] BUY signal at index ${currentIndex}: MACD (${currentMACD.toFixed(2)}) crossed above Signal (${currentSignal.toFixed(2)})`);
-        return { action: 'BUY', amount: tradeAmount };
+        return Promise.resolve([{ action: 'BUY', amount: tradeAmount }]); // Wrapped return
       } else {
         // logger.debug(`[${macdStrategy.id}] BUY signal triggered but insufficient cash at index ${currentIndex}. Holding.`);
-        return { action: 'HOLD' };
+        return Promise.resolve([{ action: 'HOLD' }]); // Wrapped return
       }
     }
 
@@ -112,14 +112,14 @@ export const macdStrategy: TradingStrategy = {
     if (previousMACD > previousSignal && currentMACD < currentSignal) {
       if (portfolio.shares >= tradeAmount) {
         // logger.info(`[${macdStrategy.id}] SELL signal at index ${currentIndex}: MACD (${currentMACD.toFixed(2)}) crossed below Signal (${currentSignal.toFixed(2)})`);
-        return { action: 'SELL', amount: tradeAmount };
+        return Promise.resolve([{ action: 'SELL', amount: tradeAmount }]); // Wrapped return
       } else {
         // logger.debug(`[${macdStrategy.id}] SELL signal triggered but insufficient shares at index ${currentIndex}. Holding.`);
-        return { action: 'HOLD' };
+        return Promise.resolve([{ action: 'HOLD' }]); // Wrapped return
       }
     }
     
     // logger.debug(`[${macdStrategy.id}] No crossover at index ${currentIndex}. PrevMACD: ${previousMACD.toFixed(2)}, CurrMACD: ${currentMACD.toFixed(2)}, PrevSignal: ${previousSignal.toFixed(2)}, CurrSignal: ${currentSignal.toFixed(2)}. Holding.`);
-    return { action: 'HOLD' };
+    return Promise.resolve([{ action: 'HOLD' }]); // Wrapped return
   },
 };

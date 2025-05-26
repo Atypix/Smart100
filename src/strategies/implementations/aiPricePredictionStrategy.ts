@@ -3,7 +3,7 @@ import { HistoricalDataPoint } from '../../services/dataService';
 import { createPriceSequences, normalizeData } from '../../utils/aiDataUtils';
 import { createModel, compileModel } from '../../aiModels/simplePricePredictorModel';
 import * as tf from '@tensorflow/tfjs-node';
-import { logger } from '../../utils/logger';
+import logger from '../../utils/logger'; // Changed to default import
 
 const aiPricePredictionStrategyParameters: StrategyParameterDefinition[] = [
   { name: 'lookbackPeriod', label: 'Lookback Period', type: 'number', defaultValue: 10, min: 5, max: 50, step: 1 },
@@ -48,7 +48,7 @@ class AIPricePredictionStrategy implements TradingStrategy {
   }
 
 
-  async execute(context: StrategyContext): Promise<StrategySignal> {
+  async execute(context: StrategyContext): Promise<StrategySignal[]> { // Return type changed to Promise<StrategySignal[]>
     const { historicalData, currentIndex, portfolio, parameters } = context;
     const {
       lookbackPeriod,
@@ -74,7 +74,7 @@ class AIPricePredictionStrategy implements TradingStrategy {
         const splitPoint = Math.floor(historicalData.length * trainingDataSplit);
         if (splitPoint < lookbackPeriod + predictionHorizon || historicalData.length - splitPoint < lookbackPeriod + 1) {
             logger.error(`[${this.id}] Not enough data for training and subsequent prediction. Total: ${historicalData.length}, Split: ${splitPoint}, Lookback: ${lookbackPeriod}, Horizon: ${predictionHorizon}`);
-            return { action: 'HOLD' };
+            return [{ action: 'HOLD' }]; // Wrapped in array
         }
 
         const trainingFullData = historicalData.slice(0, splitPoint);
@@ -82,7 +82,7 @@ class AIPricePredictionStrategy implements TradingStrategy {
 
         if (trainingClosePrices.length < lookbackPeriod + predictionHorizon) {
              logger.error(`[${this.id}] Not enough trainingClosePrices for a single sequence. Length: ${trainingClosePrices.length}, Need: ${lookbackPeriod + predictionHorizon}`);
-            return { action: 'HOLD' };
+            return [{ action: 'HOLD' }]; // Wrapped in array
         }
         
         const { sequences: trainSequences, targets: trainTargets } = createPriceSequences(
@@ -93,7 +93,7 @@ class AIPricePredictionStrategy implements TradingStrategy {
 
         if (trainSequences.length === 0) {
           logger.error(`[${this.id}] No training sequences could be created from data up to splitPoint ${splitPoint}.`);
-          return { action: 'HOLD' };
+          return [{ action: 'HOLD' }]; // Wrapped in array
         }
 
         const { normalizedSequences, minMax } = normalizeData(trainSequences);
@@ -125,7 +125,7 @@ class AIPricePredictionStrategy implements TradingStrategy {
       if (this.isTrained && this.model && this.normalizationParams) {
         if (currentIndex < lookbackPeriod - 1) {
           // logger.debug(`[${this.id}] Not enough data for prediction at currentIndex ${currentIndex}. Need ${lookbackPeriod -1}. Holding.`);
-          return { action: 'HOLD' };
+          return [{ action: 'HOLD' }]; // Wrapped in array
         }
 
         const currentPriceData = historicalData
@@ -134,7 +134,7 @@ class AIPricePredictionStrategy implements TradingStrategy {
 
         if (currentPriceData.length < lookbackPeriod) {
             // logger.warn(`[${this.id}] Sliced price data for prediction is too short. Index: ${currentIndex}, Lookback: ${lookbackPeriod}. Holding.`);
-            return { action: 'HOLD' };
+            return [{ action: 'HOLD' }]; // Wrapped in array
         }
         
         const { normalizedSequences: normalizedCurrentSequenceWrapper } = normalizeData(
@@ -144,7 +144,7 @@ class AIPricePredictionStrategy implements TradingStrategy {
         
         if (normalizedCurrentSequenceWrapper.length === 0 || normalizedCurrentSequenceWrapper[0].length === 0) {
             logger.warn(`[${this.id}] Normalization of current sequence failed or produced empty result. Index: ${currentIndex}. Holding.`);
-            return { action: 'HOLD' };
+            return [{ action: 'HOLD' }]; // Wrapped in array
         }
         const normalizedCurrentSequence = normalizedCurrentSequenceWrapper[0];
 
@@ -162,13 +162,13 @@ class AIPricePredictionStrategy implements TradingStrategy {
         if (predictionValue >= buyThreshold) {
           if (portfolio.cash >= currentPrice * tradeAmount) {
             // logger.info(`[${this.id}] BUY signal: Prediction ${predictionValue.toFixed(3)} >= ${buyThreshold}. Price ${currentPrice.toFixed(2)}`);
-            return { action: 'BUY', amount: tradeAmount };
+            return [{ action: 'BUY', amount: tradeAmount }]; // Wrapped in array
           }
           // logger.debug(`[${this.id}] BUY condition met (Pred: ${predictionValue.toFixed(3)}) but insufficient cash. Holding.`);
         } else if (predictionValue <= sellThreshold) {
           if (portfolio.shares >= tradeAmount) {
             // logger.info(`[${this.id}] SELL signal: Prediction ${predictionValue.toFixed(3)} <= ${sellThreshold}. Price ${currentPrice.toFixed(2)}`);
-            return { action: 'SELL', amount: tradeAmount };
+            return [{ action: 'SELL', amount: tradeAmount }]; // Wrapped in array
           }
           // logger.debug(`[${this.id}] SELL condition met (Pred: ${predictionValue.toFixed(3)}) but insufficient shares. Holding.`);
         } else {
@@ -185,7 +185,7 @@ class AIPricePredictionStrategy implements TradingStrategy {
       // this.resetState(); // Optional: uncomment to force retrain on next call after an error
     }
 
-    return { action: 'HOLD' };
+    return [{ action: 'HOLD' }]; // Wrapped in array
   }
 }
 

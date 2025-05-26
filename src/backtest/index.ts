@@ -1,5 +1,5 @@
 import { fetchHistoricalDataFromDB, HistoricalDataPoint } from '../services/dataService';
-import { logger } from '../utils/logger';
+import logger from '../utils/logger'; // Changed to default import
 import { 
   TradingStrategy, 
   StrategyContext, 
@@ -71,7 +71,7 @@ export const adaptedSimpleThresholdStrategy: TradingStrategy = {
   name: 'Simple Threshold Strategy',
   description: 'Buys if price > upperThreshold, Sells if price < lowerThreshold.',
   parameters: simpleThresholdStrategyParams,
-  execute: (context: StrategyContext): StrategySignal => {
+  async execute(context: StrategyContext): Promise<StrategySignal[]> { // Made async, returns Promise<StrategySignal[]>
     const currentDataPoint = context.historicalData[context.currentIndex];
     const price = currentDataPoint.close;
     const upperThreshold = context.parameters.upperThreshold as number;
@@ -79,11 +79,11 @@ export const adaptedSimpleThresholdStrategy: TradingStrategy = {
     const tradeAmount = context.parameters.tradeAmount as number;
 
     if (price > upperThreshold && context.portfolio.cash >= price * tradeAmount) {
-      return { action: 'BUY', amount: tradeAmount };
+      return Promise.resolve([{ action: 'BUY', amount: tradeAmount }]); // Wrapped in Promise and array
     } else if (price < lowerThreshold && context.portfolio.shares >= tradeAmount) {
-      return { action: 'SELL', amount: tradeAmount };
+      return Promise.resolve([{ action: 'SELL', amount: tradeAmount }]); // Wrapped in Promise and array
     } else {
-      return { action: 'HOLD' };
+      return Promise.resolve([{ action: 'HOLD' }]); // Wrapped in Promise and array
     }
   },
 };
@@ -203,17 +203,20 @@ export async function runBacktest(
       parameters: effectiveStrategyParams,
     };
 
-    const signal = selectedStrategy.execute(context);
+    const signals = await selectedStrategy.execute(context); // Awaited the call
     
-    // Default to trading 1 share if signal.amount is not specified or is zero/negative
-    // This logic could also be strategy-specific or part of portfolio management.
-    const sharesToTrade = (signal.amount && signal.amount > 0) ? signal.amount : 1;
-    const currentPrice = historicalData[i].close; // Assume trades execute at the closing price of the current period
+    // Process the first signal if available
+    if (signals && signals.length > 0) {
+      const signal = signals[0]; // Use the first signal
+      // Default to trading 1 share if signal.amount is not specified or is zero/negative
+      // This logic could also be strategy-specific or part of portfolio management.
+      const sharesToTrade = (signal.amount && signal.amount > 0) ? signal.amount : 1;
+      const currentPrice = historicalData[i].close; // Assume trades execute at the closing price of the current period
 
-    if (signal.action === 'BUY') {
-      const cost = currentPrice * sharesToTrade;
-      if (portfolio.cash >= cost) {
-        portfolio.cash -= cost;
+      if (signal.action === 'BUY') {
+        const cost = currentPrice * sharesToTrade;
+        if (portfolio.cash >= cost) {
+          portfolio.cash -= cost;
         portfolio.shares += sharesToTrade;
         const trade: Trade = {
           timestamp: historicalData[i].timestamp,
@@ -246,9 +249,11 @@ export async function runBacktest(
         logger.debug(`Attempted SELL for ${symbol} at ${currentPrice} via ${selectedStrategy.name}, but insufficient shares. Have ${portfolio.shares}, tried to sell ${sharesToTrade}.`, { portfolio });
       }
     }
-    // For 'HOLD', no action is taken on the portfolio.
-
-    // Update current portfolio value after any potential trade
+      // For 'HOLD' (or if no actionable signal), no action is taken on the portfolio by this primary signal processing logic.
+    } else {
+      // logger.debug(`No actionable signal received or signal array empty for ${symbol} at index ${i} via ${selectedStrategy.name}. Holding.`);
+    }
+    // Update current portfolio value after any potential trade or at end of period
     portfolio.currentValue = portfolio.cash + portfolio.shares * currentPrice;
     portfolioHistoryTimeline.push({ timestamp: historicalData[i].timestamp, value: portfolio.currentValue });
   }
