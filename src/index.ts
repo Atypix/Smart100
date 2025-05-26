@@ -23,17 +23,9 @@ app.get('/', (req, res) => {
   res.send('Smart100 API Running');
 });
 
-// Mount authentication routes
-import authRoutes from './api/authRoutes';
-app.use('/auth', authRoutes);
-
-// Mount protected data routes
-import dataRoutes from './api/dataRoutes';
-app.use('/api', dataRoutes); // All routes in dataRoutes will be prefixed with /api
-
-// Mount strategy and backtesting routes
-import strategyRoutes from './api/strategyRoutes'; // Import the new strategy router
-app.use('/api', strategyRoutes); // All routes in strategyRoutes will also be prefixed with /api
+// Mount all API routes
+import mainRouter from './api';
+app.use('/api', mainRouter);
 
 // Start the server only if the module is run directly
 if (require.main === module) {

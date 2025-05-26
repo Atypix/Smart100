@@ -107,7 +107,6 @@ export const updateApiKey = async (id: string, data: Partial<ApiKeyFormData>): P
 
 export const deleteApiKey = async (id: string): Promise<void> => {
   const token = getToken(); // Use the new getToken function
-  const token = getToken(); // Use the new getToken function
   const response = await fetch(`${API_BASE_URL}/keys/${id}`, {
     method: 'DELETE',
     headers: {

@@ -106,6 +106,7 @@ This document tracks the progress and future direction of the project to impleme
 *   Updated `README.md` with details on new features (Strategy Framework, Ichimoku, JSON backtest execution, Frontend UI, Backend APIs, User Authentication, API Key Management), setup, and usage.
 *   Updated this `PROJECT_TRACKING.md` file to reflect completed items and new future ideas.
 *   Added general guidance on deployment (including considerations for AWS) to `README.md`.
+*   Code review and backend routing refactor: Standardized all backend API endpoints under the `/api` prefix for consistency. Cleaned up minor frontend code issues. Updated `README.md` to reflect these changes and ensure accuracy of documented API endpoints and available strategies.
 
 ## III. Future Development Ideas
 
@@ -125,3 +126,7 @@ This document tracks the progress and future direction of the project to impleme
 *   **Enhanced Deployment Scripts:** Provide Dockerfiles or more specific deployment scripts for platforms like AWS.
 *   **API for Backtester:** Further develop the API, potentially adding features like saving/loading configurations, retrieving past results, etc.
 *   **Indicator Library Integration:** Re-evaluate or explore more comprehensive TA libraries that might include Ichimoku and other complex indicators directly, or contribute to existing ones.
+
+## IV. Technical Debt / Issues
+
+*   **Address widespread TypeScript compilation errors in the test suite:** Current tests (`npm test`) are largely failing due to numerous TS compilation errors, preventing effective automated testing. This requires a dedicated effort to fix type definitions, imports, and related issues across most test files.
