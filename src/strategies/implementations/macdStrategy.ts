@@ -1,7 +1,7 @@
 import { TradingStrategy, StrategyContext, StrategySignal, StrategyParameterDefinition } from '../strategy.types';
 import { calculateMACD } from '../../utils/technicalIndicators';
 import { HistoricalDataPoint } from '../../services/dataService';
-import { logger } from '../../utils/logger'; // Optional for debugging
+import logger from '../../utils/logger'; // Optional for debugging
 
 const macdStrategyParameters: StrategyParameterDefinition[] = [
   {

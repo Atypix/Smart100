@@ -3,7 +3,7 @@ import { HistoricalDataPoint } from '../../services/dataService';
 import { createPriceSequences, normalizeData } from '../../utils/aiDataUtils';
 import { createModel, compileModel } from '../../aiModels/simplePricePredictorModel';
 import * as tf from '@tensorflow/tfjs-node';
-import { logger } from '../../utils/logger';
+import logger from '../../utils/logger'; // Corrected import
 
 const aiPricePredictionStrategyParameters: StrategyParameterDefinition[] = [
   { name: 'lookbackPeriod', label: 'Lookback Period', type: 'number', defaultValue: 10, min: 5, max: 50, step: 1 },

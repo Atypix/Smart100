@@ -1,6 +1,7 @@
 // In src/strategies/strategy.types.ts
-import { HistoricalDataPoint } from '../services/dataService'; // Assuming HistoricalDataPoint is from dataService
-import { Portfolio, Trade } from '../backtest'; // Assuming Portfolio and Trade are from backtest
+import { HistoricalDataPoint } from '../services/dataService'; // Direct import for internal use
+import type { Portfolio, Trade } from '../backtest'; // Direct import for internal use, assuming they are exported from backtest
+
 
 export type StrategyParameterType = 'number' | 'string' | 'boolean';
 
@@ -37,7 +38,7 @@ export interface TradingStrategy {
   parameters: StrategyParameterDefinition[]; // Definitions of parameters this strategy uses
 
   // Function to execute the strategy for a given historical data point and context
-  execute: (context: StrategyContext) => StrategySignal;
+  execute: (context: StrategyContext) => StrategySignal | Promise<StrategySignal>; // Allow async strategies
 
   // Optional: Function to calculate and return any indicators the strategy might expose for plotting/logging
   // getIndicators?: (context: StrategyContext) => Record<string, number | null>;

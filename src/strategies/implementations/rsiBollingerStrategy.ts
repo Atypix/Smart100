@@ -1,7 +1,7 @@
 import { TradingStrategy, StrategyContext, StrategySignal, StrategyParameterDefinition } from '../strategy.types';
 import { calculateRSI, calculateBollingerBands } from '../../utils/technicalIndicators';
 import { HistoricalDataPoint } from '../../services/dataService'; // Assuming OHLCV is part of HistoricalDataPoint or equivalent
-import { logger } from '../../utils/logger';
+import logger from '../../utils/logger'; // Corrected import
 
 const rsiBollingerStrategyParameters: StrategyParameterDefinition[] = [
   { 
