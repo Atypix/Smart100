@@ -4,7 +4,8 @@ jest.mock('../../src/services/dataService', () => ({
   fetchHistoricalDataFromDB: jest.fn(),
 }));
 jest.mock('../../src/utils/logger', () => ({
-  default: { // Corrected mock for default export
+  __esModule: true, // Added for proper ES Module default export mocking
+  default: { 
     info: jest.fn(),
     warn: jest.fn(),
     error: jest.fn(),

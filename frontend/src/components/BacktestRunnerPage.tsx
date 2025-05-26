@@ -1,12 +1,15 @@
 // frontend/src/components/BacktestRunnerPage.tsx
-import React, { useState, useEffect, useCallback } from 'react';
-import axios, { AxiosError } from 'axios';
-import {
+import React, { useState, useCallback } from 'react'; // Removed useEffect
+import axios from 'axios';
+import type { AxiosError } from 'axios'; // For type usage if needed
+import type {
   TradingStrategy,
-  StrategyParameterDefinition,
+  // StrategyParameterDefinition, // Removed as unused
   BacktestSettings,
   BacktestResult,
   ApiError,
+  HistoricalDataPoint as FrontendHistoricalDataPoint, // Keep alias for clarity if needed
+  Trade, // Use the Trade type from types.ts
 } from '../types';
 import StrategySelector from './StrategySelector';
 import StrategyParameterForm from './StrategyParameterForm';
@@ -15,7 +18,7 @@ import ResultsDisplay from './ResultsDisplay';
 import EquityChart from './EquityChart'; // Import EquityChart
 import TradesOnPriceChart from './TradesOnPriceChart'; // Import TradesOnPriceChart
 import { logger } from '../utils/logger';
-import { HistoricalDataPoint as FrontendHistoricalDataPoint, Trade as FrontendTrade } from '../types'; // For chart props
+// FrontendTrade alias was removed as it's not used after clarifying Trade type.
 
 const BacktestRunnerPage: React.FC = () => {
   // Note: availableStrategies is fetched by StrategySelector itself.
@@ -153,12 +156,14 @@ const BacktestRunnerPage: React.FC = () => {
             {/* Trades on Price Chart */}
             {backtestResult.historicalDataUsed && backtestResult.historicalDataUsed.length > 0 && backtestResult.trades && (
               <TradesOnPriceChart 
-                priceData={backtestResult.historicalDataUsed as ReadonlyArray<FrontendHistoricalDataPoint>} // Cast if necessary, ensure types align
-                tradesData={backtestResult.trades.map(trade => ({ // Map to TradesOnPriceChart's expected prop structure
-                  entryTimestamp: trade.timestamp,
-                  entryPrice: trade.price,
-                  type: trade.action.toLowerCase() as 'buy' | 'sell', // Ensure type compatibility
-                  amount: trade.sharesTraded,
+                priceData={backtestResult.historicalDataUsed as ReadonlyArray<FrontendHistoricalDataPoint>} 
+                tradesData={backtestResult.trades.map((trade: Trade) => ({ // Ensure this map produces what TradesOnPriceChart expects
+                  timestamp: trade.timestamp, // Assuming TradesOnPriceChart expects these field names
+                  date: trade.date,
+                  action: trade.action,
+                  price: trade.price,
+                  sharesTraded: trade.sharesTraded,
+                  cashAfterTrade: trade.cashAfterTrade
                 }))}
               />
             )}

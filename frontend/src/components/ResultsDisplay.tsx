@@ -1,6 +1,6 @@
 // frontend/src/components/ResultsDisplay.tsx
 import React from 'react';
-import { BacktestResult, Trade } from '../types'; // Assuming types.ts is in ../
+import type { BacktestResult, Trade } from '../types'; // Assuming types.ts is in ../
 import { logger } from '../utils/logger';
 
 interface ResultsDisplayProps {

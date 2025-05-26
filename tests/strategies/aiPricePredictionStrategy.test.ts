@@ -91,9 +91,15 @@ describe('AIPricePredictionStrategy', () => {
     baseContext = {
       historicalData: createMockHistoricalData(100), // e.g., 100 data points
       currentIndex: 99, // Default to the last point for prediction tests after training
-      portfolio: { cash: 10000, shares: 10, initialCash: 10000, trades: [] },
+      portfolio: { 
+        cash: 10000, 
+        shares: 10, 
+        initialValue: 10000, // Changed initialCash to initialValue
+        currentValue: 10000 + 10 * (100 + (99 * 0.1)) // Cash + shares * last price
+        // trades: [] was removed as it's not part of Portfolio type
+      },
       parameters: { ...defaultParams },
-      tradeHistory: [], // Added missing property
+      tradeHistory: [], 
       // Removed getAvailableStrategies and getStrategy as they are not part of StrategyContext
     };
   });

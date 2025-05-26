@@ -131,7 +131,8 @@ function getRecentData(symbol: string, source_api: string, interval: string, thr
   `);
 
   try {
-    return stmt.all({ symbol, source_api, interval, threshold_seconds });
+    // Cast the result of stmt.all to FinancialData[]
+    return stmt.all({ symbol, source_api, interval, threshold_seconds }) as FinancialData[];
   } catch (error) {
     console.error('Error fetching recent data from financial_data:', error);
     return [];
@@ -152,10 +153,10 @@ function getFallbackData(symbol: string, source_api: string, interval: string): 
   try {
     // This might return data from different fetched_at if the latest fetch didn't get all timestamps
     // A more sophisticated approach might be needed if strict consistency of a single fetch batch is required.
-    const results = stmt.all({ symbol, source_api, interval });
+    const results = stmt.all({ symbol, source_api, interval }) as FinancialData[]; // Cast to FinancialData[]
     if (results.length > 0) {
         // If we have results, we want all records from the MOST RECENT `fetched_at` timestamp available
-        const mostRecentFetchedAt = results[0].fetched_at;
+        const mostRecentFetchedAt = results[0].fetched_at; // Now results[0] is FinancialData
         const finalResults = db.prepare(`
             SELECT * FROM financial_data
             WHERE symbol = @symbol
@@ -163,7 +164,7 @@ function getFallbackData(symbol: string, source_api: string, interval: string): 
               AND interval = @interval
               AND fetched_at = @mostRecentFetchedAt
             ORDER BY timestamp DESC
-        `).all({symbol, source_api, interval, mostRecentFetchedAt});
+        `).all({symbol, source_api, interval, mostRecentFetchedAt}) as FinancialData[]; // Cast to FinancialData[]
         return finalResults;
     }
     return [];
@@ -199,7 +200,8 @@ function queryHistoricalData(
 
   try {
     const stmt = db.prepare(sql);
-    return stmt.all(params);
+    // Cast the result of stmt.all to FinancialData[]
+    return stmt.all(params) as FinancialData[];
   } catch (error) {
     console.error('Error querying historical data from financial_data:', error);
     // In a real application, you might want to throw a custom error or handle it differently

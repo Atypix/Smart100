@@ -1,9 +1,10 @@
 // frontend/src/components/EquityChart.test.tsx
-import React from 'react';
+/// <reference types="@testing-library/jest-dom" />
+// import React from 'react'; // Removed as unused
 import { render, screen } from '@testing-library/react';
-import '@testing-library/jest-dom';
+// import '@testing-library/jest-dom'; // Referenced via triple-slash directive
 import EquityChart from './EquityChart';
-import { EquityDataPoint } from '../types'; // Assuming EquityDataPoint is defined in types.ts or directly in EquityChart
+import type { EquityDataPoint } from '../types'; // Import type from centralized types
 
 // Mock Recharts components
 jest.mock('recharts', () => {

@@ -44,9 +44,13 @@ export interface HistoricalDataPoint {
   low: number;
   close: number;
   volume: number;
+  // Added fields to match backend HistoricalDataPoint for compatibility
+  interval?: string;
+  source_api?: string;
+  symbol?: string;
 }
 
-export interface Trade {
+export interface Trade { // Ensure this matches backend Trade structure
   timestamp: number;
   date: string; // Date string from backend
   action: 'BUY' | 'SELL';
@@ -63,10 +67,17 @@ export interface BacktestResult {
   finalPortfolioValue: number;
   totalProfitOrLoss: number;
   profitOrLossPercentage: number;
-  trades: Trade[];
+  trades: Trade[]; // Uses the Trade interface defined above
   totalTrades: number;
   dataPointsProcessed: number;
-  historicalDataUsed?: HistoricalDataPoint[]; // Added for charting
+  historicalDataUsed?: HistoricalDataPoint[];
+  portfolioHistory?: { timestamp: number; value: number }[];
+}
+
+// --- Charting Specific Types ---
+export interface EquityDataPoint {
+  timestamp: number; // Unix epoch seconds or milliseconds (ensure consistency with usage)
+  value: number;
 }
 
 // --- API Error Structure (example) ---

@@ -1,4 +1,9 @@
 // tests/services/apiKeyService.test.ts
+
+// Set the environment variable *before* any modules are imported, especially apiKeyService.
+const MOCK_ENCRYPTION_KEY = 'a0123456789b0123456789c0123456789d0123456789e0123456789f01234567'; // 32 bytes hex
+process.env.API_ENCRYPTION_KEY = MOCK_ENCRYPTION_KEY;
+
 import { db, initializeSchema } from '../../src/database';
 import * as apiKeyService from '../../src/services/apiKeyService';
 import * as userService from '../../src/services/userService';
@@ -6,13 +11,14 @@ import { User } from '../../src/models/user.types';
 import { ApiKey, CreateApiKeyInput, UpdateApiKeyInput } from '../../src/models/apiKey.types';
 import { v4 as uuidv4 } from 'uuid';
 
-// Mock process.env.API_ENCRYPTION_KEY
-const MOCK_ENCRYPTION_KEY = 'a0123456789b0123456789c0123456789d0123456789e0123456789f01234567'; // 32 bytes hex
-process.env.API_ENCRYPTION_KEY = MOCK_ENCRYPTION_KEY;
-
-// Mock uuidv4
-jest.mock('uuidv4', () => ({
-  v4: jest.fn(),
+// Mock uuid - this needs to be here, after imports but before it's used in `beforeEach` or tests.
+// Provide a default implementation that always returns a valid string.
+let mockUuidCounter = 0; // Counter to ensure unique default UUIDs
+jest.mock('uuid', () => ({
+  v4: jest.fn().mockImplementation(() => {
+    mockUuidCounter++;
+    return `mock-uuid-default-${mockUuidCounter}`;
+  }),
 }));
 
 let testUser: User;
@@ -41,7 +47,16 @@ beforeEach(async () => {
   });
 
   // Reset uuidv4 mock for each test if needed or set specific sequences
-  (uuidv4 as jest.Mock).mockImplementation(() => `mock-uuid-${Math.random().toString(36).substring(2, 15)}`);
+  // The default mock is now set above. If a test needs a specific UUID sequence beyond mockReturnValueOnce,
+  // it can use mockImplementationOnce or clear and set a new default mockImplementation here.
+  // For now, the default top-level mock should cover createUser's needs.
+  // Ensure the counter is reset if tests are sensitive to specific generated IDs from the default mock.
+  mockUuidCounter = 0; 
+  // We can also clear any prior mock settings for v4 if needed:
+  // (uuidv4 as jest.Mock).mockClear(); 
+  // And then set a new general implementation if the default one is not suitable for all calls in a test.
+  // For this case, the default mock should be fine.
+  // (uuidv4 as jest.Mock).mockImplementation(() => `mock-uuid-${Math.random().toString(36).substring(2, 15)}`);
 });
 
 afterAll(() => {
@@ -156,7 +171,7 @@ describe('API Key Service (Database and Encryption)', () => {
       expect(tempDecryptedKey?.api_secret).toBe('s_update');
     });
     
-    it('should update only the secret if provided', () => {
+    it('should update only the secret if provided', async () => { // Marked async for consistency if any await was needed, but not strictly required here.
       const created = apiKeyService.createApiKey({ user_id: testUser.id, exchange_name: 'E_Secret', api_key: 'k_secret', api_secret: 's_secret_old' });
       const updateData: UpdateApiKeyInput = { api_secret: 's_secret_new' };
       const updated = apiKeyService.updateApiKey(created.id, testUser.id, updateData);
@@ -165,7 +180,7 @@ describe('API Key Service (Database and Encryption)', () => {
       expect(updated!.api_secret).toBe('s_secret_new');
     });
 
-    it('should only update timestamps if no data is provided for update', () => {
+    it('should only update timestamps if no data is provided for update', async () => {
         const created = apiKeyService.createApiKey({ user_id: testUser.id, exchange_name: 'E_Timestamp', api_key: 'k_time', api_secret: 's_time' });
         const originalUpdatedAt = created.updated_at;
 

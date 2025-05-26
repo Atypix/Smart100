@@ -90,6 +90,7 @@ The initial phase of the project has focused on establishing a robust foundation
 *   **Testing Framework**:
     *   Configured Jest for unit testing (`jest.config.js`), including `ts-jest` for TypeScript support.
     *   Added an initial sample utility function (`src/utils/math.ts`) and a corresponding test (`tests/utils/math.test.ts`).
+    *   Recent efforts have focused on improving TypeScript stability. The backend codebase (TypeScript files in `src/` and `tests/`) is now confirmed to be free of compilation errors as per `tsc --noEmit`. Issues persist with reliably running backend tests via `npm test` from the project root in the current execution environment. The frontend codebase (`frontend/src/`) still has a number of TypeScript compilation errors, and its test execution setup requires further configuration.
 *   **Version Control**:
     *   The project has been initialized as a Git repository, and the foundational setup described above has been committed to the `main` branch.
     *   **Recent Additions (Phase 2):** The application now includes local data caching/archiving via SQLite and a foundational backtesting engine.

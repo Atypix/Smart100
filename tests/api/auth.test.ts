@@ -7,9 +7,9 @@ import logger from '../../src/utils/logger';
 // Suppress console logs from the application during tests for cleaner test output
 // Note: This might hide useful debugging logs if tests fail unexpectedly.
 // Consider enabling them by default and only suppressing if output is too verbose.
-jest.spyOn(logger, 'info').mockImplementation(() => {});
-jest.spyOn(logger, 'warn').mockImplementation(() => {});
-jest.spyOn(logger, 'error').mockImplementation(() => {});
+jest.spyOn(logger, 'info').mockImplementation(() => logger);
+jest.spyOn(logger, 'warn').mockImplementation(() => logger);
+jest.spyOn(logger, 'error').mockImplementation(() => logger);
 
 
 describe('Auth Endpoints API', () => {

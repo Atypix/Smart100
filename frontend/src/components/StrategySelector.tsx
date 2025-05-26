@@ -1,7 +1,8 @@
 // frontend/src/components/StrategySelector.tsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { TradingStrategy, ApiError } from '../types'; // Assuming types.ts is in ../
+import type { TradingStrategy, ApiError } from '../types'; // Assuming types.ts is in ../
+// ApiError might be unused, will be removed if TS6133 persists for it.
 import { logger } from '../utils/logger'; // Assuming a simple logger utility
 
 interface StrategySelectorProps {

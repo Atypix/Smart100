@@ -1,6 +1,7 @@
 // frontend/src/components/ApiKeyManager.tsx
-import React, { useState, useEffect, FormEvent } from 'react';
-import { ApiKey, ApiKeyFormData } from '../types';
+import React, { useState, useEffect } from 'react';
+import type { FormEvent } from 'react';
+import type { ApiKey, ApiKeyFormData } from '../types';
 import * as api from '../services/api'; // Assuming api.ts is in ../services
 
 const initialFormData: ApiKeyFormData = {

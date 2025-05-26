@@ -98,7 +98,7 @@ describe('Data Service Tests', () => {
       expect(mockGetRecentData).toHaveBeenCalledWith(symbol, source_api, interval, expect.any(Number));
       expect(result).toEqual(expectedTransformedOutput);
       expect(mockedAxios.get).not.toHaveBeenCalled();
-      expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('Using cached data records for IBM'));
+      expect(logger.info).toHaveBeenCalledWith(expect.stringContaining(`Using ${correspondingFinancialData.length} cached data records for ${symbol}`));
     });
 
     test('Caching: should call axios.get if getRecentData returns stale/no data', async () => {
@@ -114,29 +114,40 @@ describe('Data Service Tests', () => {
       mockedAxios.get.mockResolvedValue({ data: { [`Time Series (${interval})`]: mockApiTimeSeries } });
       const result = await fetchAlphaVantageData(symbol, apiKey);
       expect(result).toEqual(expectedTransformedOutput);
+      // Use correspondingFinancialData which is already FinancialData[] and matches what insertData would receive,
+      // ensuring id is undefined as it's DB generated.
       expect(mockInsertData).toHaveBeenCalledWith(
-        expect.arrayContaining(correspondingFinancialData.map(d => expect.objectContaining({ ...d, id: undefined, fetched_at: expect.any(Number) })))
+        expect.arrayContaining(correspondingFinancialData.map(d => expect.objectContaining({ 
+          ...d, 
+          id: undefined, 
+          fetched_at: expect.any(Number) 
+        })))
       );
-      expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('Successfully stored 2 records'));
+      expect(logger.info).toHaveBeenCalledWith(expect.stringContaining(`Successfully stored ${correspondingFinancialData.length} records`));
     });
 
     test('API Error & Fallback: should use fallback if API fails and fallback exists', async () => {
       (mockGetRecentData as jest.Mock).mockReturnValue([]);
-      mockedAxios.get.mockRejectedValue(new Error('Network Error'));
+      const mockError = new Error('Simulated Network Error'); // Use a generic error for this path
+      mockedAxios.get.mockRejectedValue(mockError);
       (mockGetFallbackData as jest.Mock).mockReturnValue(correspondingFinancialData); // Fallback data
       const result = await fetchAlphaVantageData(symbol, apiKey);
       expect(mockGetFallbackData).toHaveBeenCalledWith(symbol, source_api, interval);
       expect(result).toEqual(expectedTransformedOutput); // Transformed from fallback
-      expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('API call failed for IBM'));
-      expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('Using fallback data records for IBM'));
+      expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining(`API call failed for ${symbol}`));
+      expect(logger.info).toHaveBeenCalledWith(expect.stringContaining(`Using ${correspondingFinancialData.length} fallback data records for ${symbol}`));
     });
     
     test('API Error & Fallback: should throw if API fails and no fallback', async () => {
       (mockGetRecentData as jest.Mock).mockReturnValue([]);
-      mockedAxios.get.mockRejectedValue(new Error('Network Error'));
+      const mockError = new Error('Simulated Network Error'); // Generic error
+      mockedAxios.get.mockRejectedValue(mockError);
       (mockGetFallbackData as jest.Mock).mockReturnValue([]); // No fallback
-      await expect(fetchAlphaVantageData(symbol, apiKey)).rejects.toThrow('API fetch failed and no fallback data available');
-      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('API fetch failed for IBM (Axios error fetching Alpha Vantage data for IBM: Network Error) and no fallback data available.'));
+      // Construct expected error message based on a generic error being passed to handleApiErrorAndFetchFallback
+      const expectedApiErrorMsg = `Generic error processing Alpha Vantage data for ${symbol}: ${mockError.message}`;
+      const expectedErrorMessage = `API fetch failed for ${symbol} (${expectedApiErrorMsg}) and no fallback data available.`;
+      await expect(fetchAlphaVantageData(symbol, apiKey)).rejects.toThrow(expectedErrorMessage);
+      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining(expectedErrorMessage));
     });
 
     test('Data Transformation: API error message (e.g. "Error Message") should trigger fallback', async () => {
@@ -189,7 +200,7 @@ describe('Data Service Tests', () => {
       expect(mockGetRecentData).toHaveBeenCalledWith(symbol, source_api_yahoo, interval_yahoo, expect.any(Number));
       expect(result).toEqual(expectedTransformedOutput); // Transformed from FinancialData to YahooFinanceData
       expect(mockYahooHistorical).not.toHaveBeenCalled();
-      expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('Using cached data records for AAPL'));
+      expect(logger.info).toHaveBeenCalledWith(expect.stringContaining(`Using ${correspondingFinancialData.length} cached data records for ${symbol}`));
     });
 
     test('Caching: should call yahooFinance.historical if getRecentData returns stale/no data', async () => {
@@ -205,29 +216,39 @@ describe('Data Service Tests', () => {
       mockYahooHistorical.mockResolvedValue(mockApiOutput);
       const result = await fetchYahooFinanceData(symbol);
       expect(result).toEqual(expectedTransformedOutput);
+      // Use correspondingFinancialData, ensuring id is undefined
       expect(mockInsertData).toHaveBeenCalledWith(
-         expect.arrayContaining(correspondingFinancialData.map(d => expect.objectContaining({ ...d, id: undefined, fetched_at: expect.any(Number) })))
+         expect.arrayContaining(correspondingFinancialData.map(d => expect.objectContaining({ 
+           ...d, 
+           id: undefined, 
+           fetched_at: expect.any(Number) 
+          })))
       );
-      expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('Successfully stored 2 records'));
+      expect(logger.info).toHaveBeenCalledWith(expect.stringContaining(`Successfully stored ${correspondingFinancialData.length} records`));
     });
 
     test('API Error & Fallback: should use fallback if API fails and fallback exists', async () => {
       (mockGetRecentData as jest.Mock).mockReturnValue([]);
-      mockYahooHistorical.mockRejectedValue(new Error('Yahoo Network Error'));
+      const mockError = new Error('Simulated Yahoo Network Error'); // Generic error
+      mockYahooHistorical.mockRejectedValue(mockError);
       (mockGetFallbackData as jest.Mock).mockReturnValue(correspondingFinancialData);
       const result = await fetchYahooFinanceData(symbol);
       expect(mockGetFallbackData).toHaveBeenCalledWith(symbol, source_api_yahoo, interval_yahoo);
       expect(result).toEqual(expectedTransformedOutput); // Transformed from fallback
-      expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('Yahoo API call failed for AAPL'));
-      expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('Using fallback data records for AAPL'));
+      expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining(`Yahoo API call failed for ${symbol}`));
+      expect(logger.info).toHaveBeenCalledWith(expect.stringContaining(`Using ${correspondingFinancialData.length} fallback data records for ${symbol}`));
     });
 
     test('API Error & Fallback: should throw if API fails and no fallback', async () => {
       (mockGetRecentData as jest.Mock).mockReturnValue([]);
-      mockYahooHistorical.mockRejectedValue(new Error('Yahoo Network Error'));
+      const mockError = new Error('Simulated Yahoo Network Error'); // Generic error
+      mockYahooHistorical.mockRejectedValue(mockError);
       (mockGetFallbackData as jest.Mock).mockReturnValue([]);
-      await expect(fetchYahooFinanceData(symbol)).rejects.toThrow('Yahoo API fetch failed for AAPL (Error fetching data for symbol AAPL from Yahoo Finance API. Details: Yahoo Network Error) and no fallback data available.');
-      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('and no fallback data available.'));
+      // Construct expected error message based on a generic error
+      const expectedApiErrorMsg = `Error fetching data for symbol ${symbol} from Yahoo Finance API. Details: ${mockError.message}`;
+      const expectedErrorMessage = `Yahoo API fetch failed for ${symbol} (${expectedApiErrorMsg}) and no fallback data available.`;
+      await expect(fetchYahooFinanceData(symbol)).rejects.toThrow(expectedErrorMessage);
+      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining(expectedErrorMessage));
     });
 
     test('Data Transformation: ensure correct transformation from API to YahooFinanceData[] and FinancialData to YahooFinanceData[]', async () => {
@@ -396,75 +417,97 @@ describe('Data Service Tests', () => {
 
       expect(mockGetRecentData).toHaveBeenCalledTimes(1);
       expect(mockedAxios.get).toHaveBeenCalledTimes(1);
+      // correspondingFinancialData is already setup to match FinancialData structure for DB.
+      // Ensure it's ordered like expectedKlineDataOutput if order matters for arrayContaining's deep equality.
+      // The service sorts klines ascending before preparing for DB.
+      const expectedDataForDbInsert = expectedKlineDataOutput.map(kline => ({
+        symbol: symbol.toUpperCase(),
+        timestamp: Math.floor(kline.timestamp / 1000),
+        open: kline.open,
+        high: kline.high,
+        low: kline.low,
+        close: kline.close,
+        volume: kline.volume,
+        source_api: source_api_binance,
+        interval: interval,
+        id: undefined, // id is not passed to insertData
+        fetched_at: expect.any(Number),
+      }));
       expect(mockInsertData).toHaveBeenCalledWith(
-        expect.arrayContaining(correspondingFinancialData.map(d => expect.objectContaining({ 
-          ...d, 
-          id: undefined, // id is not part of the data passed to insertData
-          fetched_at: expect.any(Number) // fetched_at is dynamic
-        })))
+        expect.arrayContaining(expectedDataForDbInsert.map(d => expect.objectContaining(d)))
       );
-      expect(logger.info).toHaveBeenCalledWith(expect.stringContaining(`Attempting to store ${correspondingFinancialData.length} records`));
+      expect(logger.info).toHaveBeenCalledWith(expect.stringContaining(`Attempting to store ${expectedKlineDataOutput.length} records`));
     });
 
     test('Caching Bypass: should call API directly if startTime is provided, even if cache exists', async () => {
       const startTime = nowMilliseconds - 3600000; // 1 hour ago
-      (mockGetRecentData as jest.Mock).mockReturnValue(correspondingFinancialData); // Cache exists
+      // Ensure correspondingFinancialData has concrete fetched_at for this test's cache mock
+      const dbDataForCache = correspondingFinancialData.map(fd => ({...fd, fetched_at: nowEpochSeconds}));
+      (mockGetRecentData as jest.Mock).mockReturnValue(dbDataForCache); 
       mockedAxios.get.mockResolvedValue({ data: mockApiKlines }); // API response
 
       await fetchBinanceData(symbol, interval, startTime);
       
-      // getRecentData should not be called in this path
-      expect(mockGetRecentData).not.toHaveBeenCalled();
+      expect(mockGetRecentData).not.toHaveBeenCalled(); // Cache is bypassed
       expect(mockedAxios.get).toHaveBeenCalledTimes(1);
       expect(logger.info).toHaveBeenCalledWith(expect.stringContaining(`Specific time range provided for ${symbol.toUpperCase()}`));
     });
 
     test('API Error & Fallback Hit: should use fallback if API fails and fallback exists', async () => {
       (mockGetRecentData as jest.Mock).mockReturnValue([]); // No cache
-      mockedAxios.get.mockRejectedValue(new Error('Binance API Network Error'));
-      // Fallback data (DB format, timestamps in seconds)
-      const fallbackDbData = correspondingFinancialData.map(fd => ({...fd, timestamp: fd.timestamp }));
-      (mockGetFallbackData as jest.Mock).mockReturnValue(fallbackDbData);
+      const mockError = new Error('Simulated Binance API Network Error'); // Generic error
+      mockedAxios.get.mockRejectedValue(mockError);
+      
+      const fallbackDbDataSecondsTs = correspondingFinancialData.map(fd => ({...fd, fetched_at: nowEpochSeconds}));
+      (mockGetFallbackData as jest.Mock).mockReturnValue(fallbackDbDataSecondsTs);
 
       const result = await fetchBinanceData(symbol, interval);
       
       expect(mockGetFallbackData).toHaveBeenCalledWith(symbol.toUpperCase(), source_api_binance, interval);
-      // transformDbRecordToKlineData converts DB seconds to API milliseconds
-      expect(result).toEqual(expectedKlineDataOutput.map(k => ({...k, timestamp: k.timestamp})));
+      
+      const expectedResultFromFallback: KlineData[] = fallbackDbDataSecondsTs.map(dbData => ({
+        timestamp: dbData.timestamp * 1000, 
+        open: dbData.open, high: dbData.high, low: dbData.low, close: dbData.close, volume: dbData.volume,
+      })).sort((a,b) => a.timestamp - b.timestamp); 
+
+      expect(result).toEqual(expectedResultFromFallback);
       expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('Binance API call failed'));
-      expect(logger.info).toHaveBeenCalledWith(expect.stringContaining(`Using ${fallbackDbData.length} fallback data records`));
+      expect(logger.info).toHaveBeenCalledWith(expect.stringContaining(`Using ${fallbackDbDataSecondsTs.length} fallback data records`));
     });
     
     test('API Error & Fallback Hit (with time range): should filter fallback data', async () => {
-      const startTime = nowMilliseconds - 3600000 * 1.5; // 1.5 hours ago, should include first kline, exclude second
-      const endTime = nowMilliseconds - 3600000 * 0.5; // 0.5 hours ago
+      const startTime = nowMilliseconds - 3600000 * 1.5; 
+      const endTime = nowMilliseconds - 3600000 * 0.5;   
       
-      (mockGetRecentData as jest.Mock).mockReturnValue([]); // No cache for this path with time params
-      mockedAxios.get.mockRejectedValue(new Error('Binance API Network Error'));
+      (mockGetRecentData as jest.Mock).mockReturnValue([]); 
+      const mockError = new Error('Simulated Binance API Network Error');
+      mockedAxios.get.mockRejectedValue(mockError);
       
-      // Fallback data contains both klines
-      const fallbackDbDataAll = correspondingFinancialData.map(fd => ({...fd, timestamp: fd.timestamp }));
-      (mockGetFallbackData as jest.Mock).mockReturnValue(fallbackDbDataAll);
+      const fallbackDbDataAllSecondsTs = correspondingFinancialData.map(fd => ({...fd, fetched_at: nowEpochSeconds}));
+      (mockGetFallbackData as jest.Mock).mockReturnValue(fallbackDbDataAllSecondsTs);
 
       const result = await fetchBinanceData(symbol, interval, startTime, endTime);
       
       expect(mockGetFallbackData).toHaveBeenCalledWith(symbol.toUpperCase(), source_api_binance, interval);
-      // Expected: only the first kline from expectedKlineDataOutput matches the time range
+      
       const expectedFilteredOutput = expectedKlineDataOutput.filter(k => k.timestamp >= startTime && k.timestamp <= endTime);
+      
       expect(result).toEqual(expectedFilteredOutput);
       expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('Binance API call failed'));
-      expect(logger.info).toHaveBeenCalledWith(expect.stringContaining(`Using ${fallbackDbDataAll.length} fallback data records`)); // Logs total before filter
+      expect(logger.info).toHaveBeenCalledWith(expect.stringContaining(`Using ${fallbackDbDataAllSecondsTs.length} fallback data records`)); 
     });
 
     test('API Error & Fallback Miss: should throw if API fails and no fallback', async () => {
       (mockGetRecentData as jest.Mock).mockReturnValue([]);
-      mockedAxios.get.mockRejectedValue(new Error('Binance API Network Error'));
+      const mockError = new Error('Simulated Binance API Network Error'); // Generic error
+      mockedAxios.get.mockRejectedValue(mockError);
       (mockGetFallbackData as jest.Mock).mockReturnValue([]); // No fallback
-
-      await expect(fetchBinanceData(symbol, interval)).rejects.toThrow(
-        expect.stringContaining('Binance API fetch failed for BTCUSDT (Axios error fetching Binance data for BTCUSDT: Binance API Network Error) and no fallback data available.')
-      );
-      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('and no fallback data available.'));
+      
+      // Construct expected error message based on a generic error
+      const expectedApiErrorMsg = `Generic error processing Binance data for ${symbol.toUpperCase()}: ${mockError.message}`;
+      const expectedErrorMessage = `Binance API fetch failed for ${symbol.toUpperCase()} (${expectedApiErrorMsg}) and no fallback data available.`;
+      await expect(fetchBinanceData(symbol, interval)).rejects.toThrow(expectedErrorMessage);
+      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining(expectedErrorMessage));
     });
 
     test('API Malformed Response: should attempt fallback if API returns non-array', async () => {

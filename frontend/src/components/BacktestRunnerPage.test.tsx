@@ -1,10 +1,12 @@
 // frontend/src/components/BacktestRunnerPage.test.tsx
-import React from 'react';
+/// <reference types="@testing-library/jest-dom" />
+// import React from 'react'; // Removed as unused
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import '@testing-library/jest-dom';
+// import '@testing-library/jest-dom'; // Referenced via triple-slash directive
 import axios from 'axios';
+import type { AxiosError } from 'axios'; // Added type import for AxiosError
 import BacktestRunnerPage from './BacktestRunnerPage';
-import { TradingStrategy, BacktestResult, ApiError } from '../types'; // Adjust path as necessary
+import type { TradingStrategy, BacktestResult, ApiError } from '../types'; // Changed to type-only import
 import { logger } from '../utils/logger'; // Adjust path
 
 // Mock axios globally
@@ -86,7 +88,16 @@ describe('BacktestRunnerPage', () => {
 
   test('displays error message if fetching strategies fails', async () => {
     const errorMessage = 'Failed to fetch strategies';
-    mockedAxios.get.mockRejectedValueOnce({ response: { data: { message: errorMessage } } as AxiosError<ApiError> });
+    const mockAxiosError = {
+      isAxiosError: true,
+      response: { data: { message: errorMessage }, status: 500, statusText: 'Internal Server Error', headers: {}, config: {} as any },
+      message: errorMessage,
+      name: 'AxiosError',
+      code: 'ERR_BAD_RESPONSE',
+      config: {} as any,
+      toJSON: () => ({})
+    } as AxiosError<ApiError>;
+    mockedAxios.get.mockRejectedValueOnce(mockAxiosError);
     render(<BacktestRunnerPage />);
 
     await waitFor(() => {
@@ -163,7 +174,16 @@ describe('BacktestRunnerPage', () => {
   test('displays error message if backtest API call fails', async () => {
     mockedAxios.get.mockResolvedValueOnce({ data: mockStrategies }); // StrategySelector
     const backtestErrorMessage = 'Backend backtest error';
-    mockedAxios.post.mockRejectedValueOnce({ response: { data: { message: backtestErrorMessage } } as AxiosError<ApiError> });
+    const mockAxiosError = {
+      isAxiosError: true,
+      response: { data: { message: backtestErrorMessage }, status: 400, statusText: 'Bad Request', headers: {}, config: {} as any },
+      message: backtestErrorMessage,
+      name: 'AxiosError',
+      code: 'ERR_BAD_REQUEST',
+      config: {} as any,
+      toJSON: () => ({})
+    } as AxiosError<ApiError>;
+    mockedAxios.post.mockRejectedValueOnce(mockAxiosError);
 
     render(<BacktestRunnerPage />);
     

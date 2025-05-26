@@ -1,7 +1,7 @@
 // frontend/src/components/StrategyParameterForm.tsx
 import React, { useEffect, useState } from 'react';
-import { TradingStrategy, StrategyParameterDefinition } from '../types';
-import { logger } from '../utils/logger';
+import type { TradingStrategy, StrategyParameterDefinition } from '../types';
+import logger from '../utils/logger'; // Corrected: logger is a default export
 
 interface StrategyParameterFormProps {
   strategy: TradingStrategy | null;

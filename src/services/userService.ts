@@ -45,10 +45,17 @@ export const getAllUsers = (): User[] => {
 // clearUsers might be used in tests. If tests fail due to its removal, 
 // they might need to be adapted or this function could be conditionally kept for testing environments.
 // For now, it's removed as per instructions to switch to DB persistence.
-// export const clearUsers = () => {
-//   // This would now need to be a DB operation, e.g., db.exec('DELETE FROM users');
-//   // For testing purposes, this might be:
-//   // if (process.env.NODE_ENV === 'test') {
-//   //   db.exec('DELETE FROM users');
-//   // }
-// };
+export const clearUsers = () => {
+  // This would now need to be a DB operation, e.g., db.exec('DELETE FROM users');
+  // For testing purposes, this might be:
+  if (process.env.NODE_ENV === 'test') { // Guard for safety, only allow in test env
+    try {
+      db.exec('DELETE FROM users;');
+    } catch (error) {
+      console.error("Error in clearUsers:", error);
+      // Potentially re-throw or handle if critical for test setup
+    }
+  } else {
+    console.warn("clearUsers was called outside of a test environment. Operation skipped.");
+  }
+};
