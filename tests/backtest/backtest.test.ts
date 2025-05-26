@@ -4,12 +4,12 @@ jest.mock('../../src/services/dataService', () => ({
   fetchHistoricalDataFromDB: jest.fn(),
 }));
 jest.mock('../../src/utils/logger', () => ({
-  logger: {
+  default: { // Corrected mock for default export
     info: jest.fn(),
     warn: jest.fn(),
     error: jest.fn(),
     debug: jest.fn(),
-  },
+  }
 }));
 // Mock strategyManager's getStrategy
 jest.mock('../../src/strategies/strategyManager', () => ({
@@ -29,7 +29,7 @@ import {
 } from '../../src/backtest'; // Adjust path as necessary
 import { fetchHistoricalDataFromDB as mockFetchHistoricalDataFromDB } from '../../src/services/dataService'; // Mocked function
 import { HistoricalDataPoint } from '../../src/services/dataService'; // Actual type
-import { logger } from '../../src/utils/logger'; // Mocked logger
+import logger from '../../src/utils/logger'; // Corrected import, Mocked logger
 import { getStrategy as mockGetStrategy } from '../../src/strategies/strategyManager'; // Mocked getStrategy
 import { adaptedSimpleThresholdStrategy } from '../../src/strategies/implementations/simpleThresholdStrategy'; // Import actual strategy for mock return
 
@@ -306,7 +306,8 @@ describe('Backtesting Module Tests', () => {
 
   describe('runBacktest with Invalid Strategy ID', () => {
     test('should handle invalid strategy ID gracefully', async () => {
-      (mockFetchHistoricalDataFromDB as jest.Mock).mockResolvedValue(profitableData); // Data doesn't matter much here
+      const dummyData: HistoricalDataPoint[] = []; // Define dummy data for this test scope
+      (mockFetchHistoricalDataFromDB as jest.Mock).mockResolvedValue(dummyData);
       (mockGetStrategy as jest.Mock).mockReturnValue(undefined); // Simulate strategy not found
 
       const invalidStrategyId = 'non-existent-strategy';

@@ -21,12 +21,13 @@ jest.mock('yahoo-finance2', () => ({
 
 // Mock logger
 jest.mock('../../src/utils/logger', () => ({
-  logger: {
+  __esModule: true, // Indicate it's an ES Module
+  default: {
     info: jest.fn(),
     warn: jest.fn(),
     error: jest.fn(),
     debug: jest.fn(),
-  },
+  }
 }));
 
 import axios from 'axios';
@@ -49,7 +50,7 @@ import {
   queryHistoricalData as mockQueryHistoricalData,
 } from '../../src/database'; // Mocked functions
 import type { FinancialData } from '../../src/database'; // Import type for mock data
-import { logger } from '../../src/utils/logger'; // Mocked logger
+import logger from '../../src/utils/logger'; // Corrected import, Mocked logger
 
 // Typedef for mocked axios
 const mockedAxios = axios as jest.Mocked<typeof axios>;
@@ -256,8 +257,17 @@ describe('Data Service Tests', () => {
       { id: 2, symbol: symbol, timestamp: startTimestamp + (2*86400), open: 201, high: 203, low: 200, close: 202, volume: 110, source_api: 'DB', fetched_at: startTimestamp, interval: '1d' },
     ];
     const expectedTransformedResult: HistoricalDataPoint[] = mockDbResponse.map(dbRow => ({
-      ...dbRow, // Includes all fields from FinancialData
-      date: new Date(dbRow.timestamp * 1000), // Plus the 'date' field
+      // Select only properties belonging to HistoricalDataPoint
+      timestamp: dbRow.timestamp,
+      date: new Date(dbRow.timestamp * 1000),
+      open: dbRow.open,
+      high: dbRow.high,
+      low: dbRow.low,
+      close: dbRow.close,
+      volume: dbRow.volume,
+      interval: dbRow.interval,
+      source_api: dbRow.source_api,
+      symbol: dbRow.symbol,
     }));
 
     test('should call queryHistoricalData and transform results', async () => {

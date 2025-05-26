@@ -1,7 +1,7 @@
 // In src/strategies/implementations/ichimokuStrategy.ts
 import { HistoricalDataPoint } from '../../services/dataService';
 import { TradingStrategy, StrategyContext, StrategySignal, StrategyParameterDefinition } from '../strategy.types';
-import { logger } from '../../utils/logger';
+import logger from '../../utils/logger'; // Corrected import
 
 // --- Helper Functions for Ichimoku Calculations ---
 

@@ -1,5 +1,5 @@
 import { fetchHistoricalDataFromDB, HistoricalDataPoint } from '../services/dataService';
-import { logger } from '../utils/logger';
+import logger from '../utils/logger'; // Corrected import
 import { 
   TradingStrategy, 
   StrategyContext, 
@@ -203,7 +203,7 @@ export async function runBacktest(
       parameters: effectiveStrategyParams,
     };
 
-    const signal = selectedStrategy.execute(context);
+    const signal = await Promise.resolve(selectedStrategy.execute(context)); // Handle sync/async strategies
     
     // Default to trading 1 share if signal.amount is not specified or is zero/negative
     // This logic could also be strategy-specific or part of portfolio management.

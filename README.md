@@ -278,7 +278,7 @@ Key directories and files, including recent additions:
 
 ## 7. Backend API Endpoints
 
-The backend provides the following API endpoints to support the frontend UI and potentially other clients:
+All backend endpoints are prefixed with `/api`. The backend provides the following API endpoints to support the frontend UI and potentially other clients:
 
 *   **`GET /api/strategies`**
     *   **Description:** Retrieves a list of all available trading strategies that can be used for backtesting.

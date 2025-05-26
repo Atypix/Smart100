@@ -1,5 +1,8 @@
 import { aiPricePredictionStrategy } from '../../src/strategies/implementations/aiPricePredictionStrategy';
-import { StrategyContext, StrategySignal, HistoricalDataPoint, Portfolio, StrategyParameters } from '../../src/strategies/strategy.types';
+// Removed StrategyParameters from import as it's unused and not exported
+import { StrategyContext, StrategySignal } from '../../src/strategies/strategy.types'; // Removed HistoricalDataPoint, Portfolio
+import { HistoricalDataPoint } from '../../src/services/dataService'; // Added direct import
+import { Portfolio } from '../../src/backtest'; // Added direct import
 import * as tf from '@tensorflow/tfjs-node';
 import { createPriceSequences, normalizeData } from '../../src/utils/aiDataUtils';
 import { createModel, compileModel } from '../../src/aiModels/simplePricePredictorModel';
@@ -42,18 +45,22 @@ describe('AIPricePredictionStrategy', () => {
   };
 
   const createMockHistoricalData = (length: number, startPrice: number = 100): HistoricalDataPoint[] => {
-    return Array(length).fill(null).map((_, i) => ({
-      timestamp: Date.now() + i * 3600000, // hourly data
-      open: startPrice + i * 0.1,
-      high: startPrice + i * 0.1 + 0.05,
-      low: startPrice + i * 0.1 - 0.05,
-      close: startPrice + i * 0.1,
-      volume: 100 + i * 10,
-      sourceApi: 'mock',
-      symbol: 'MOCK',
-      interval: '1h',
-      fetchedAt: Date.now(),
-    }));
+    return Array(length).fill(null).map((_, i) => {
+      const timestampInMilliseconds = Date.now() + i * 3600000; // hourly data
+      return {
+        timestamp: Math.floor(timestampInMilliseconds / 1000), // Unix epoch seconds
+        date: new Date(timestampInMilliseconds), // Date object
+        open: startPrice + i * 0.1,
+        high: startPrice + i * 0.1 + 0.05,
+        low: startPrice + i * 0.1 - 0.05,
+        close: startPrice + i * 0.1,
+        volume: 100 + i * 10,
+        source_api: 'mock', // Corrected field name
+        symbol: 'MOCK',
+        interval: '1h',
+        // fetchedAt is not part of HistoricalDataPoint
+      };
+    });
   };
   
   const mockTensor = (shape: number[] = [1]) => {
@@ -86,8 +93,8 @@ describe('AIPricePredictionStrategy', () => {
       currentIndex: 99, // Default to the last point for prediction tests after training
       portfolio: { cash: 10000, shares: 10, initialCash: 10000, trades: [] },
       parameters: { ...defaultParams },
-      getAvailableStrategies: jest.fn(() => []), // Not used by this strategy
-      getStrategy: jest.fn(() => undefined),   // Not used by this strategy
+      tradeHistory: [], // Added missing property
+      // Removed getAvailableStrategies and getStrategy as they are not part of StrategyContext
     };
   });
 
@@ -118,7 +125,7 @@ describe('AIPricePredictionStrategy', () => {
   it('should make a BUY prediction after training', async () => {
     const strategy = aiPricePredictionStrategy as any;
     strategy.isTrained = true;
-    strategy.model = mockedCreateModel(); // Get a fresh mock model instance
+    strategy.model = mockedCreateModel(defaultParams.lookbackPeriod, defaultParams.lstmUnits, defaultParams.denseUnits);
     strategy.normalizationParams = { min: 90, max: 110 };
     
     const context = { ...baseContext, currentIndex: defaultParams.lookbackPeriod + 5 }; // Ensure enough data for lookback
@@ -144,7 +151,7 @@ describe('AIPricePredictionStrategy', () => {
   it('should make a SELL prediction after training', async () => {
     const strategy = aiPricePredictionStrategy as any;
     strategy.isTrained = true;
-    strategy.model = mockedCreateModel();
+    strategy.model = mockedCreateModel(defaultParams.lookbackPeriod, defaultParams.lstmUnits, defaultParams.denseUnits);
     strategy.normalizationParams = { min: 90, max: 110 };
 
     const context = { ...baseContext, currentIndex: defaultParams.lookbackPeriod + 5 };
@@ -167,7 +174,7 @@ describe('AIPricePredictionStrategy', () => {
   it('should make a HOLD prediction after training (between thresholds)', async () => {
     const strategy = aiPricePredictionStrategy as any;
     strategy.isTrained = true;
-    strategy.model = mockedCreateModel();
+    strategy.model = mockedCreateModel(defaultParams.lookbackPeriod, defaultParams.lstmUnits, defaultParams.denseUnits);
     strategy.normalizationParams = { min: 90, max: 110 };
 
     const context = { ...baseContext, currentIndex: defaultParams.lookbackPeriod + 5 };
@@ -198,7 +205,7 @@ describe('AIPricePredictionStrategy', () => {
   it('should HOLD if data is insufficient for prediction after training', async () => {
     const strategy = aiPricePredictionStrategy as any;
     strategy.isTrained = true;
-    strategy.model = mockedCreateModel();
+    strategy.model = mockedCreateModel(defaultParams.lookbackPeriod, defaultParams.lstmUnits, defaultParams.denseUnits);
     strategy.normalizationParams = { min: 90, max: 110 };
 
     const context = { ...baseContext, currentIndex: defaultParams.lookbackPeriod - 2 }; // Not enough for lookback
@@ -212,7 +219,7 @@ describe('AIPricePredictionStrategy', () => {
   
   it('model dispose should be called on resetState', () => {
     const strategy = aiPricePredictionStrategy as any;
-    strategy.model = mockedCreateModel(); // Assign a mock model
+    strategy.model = mockedCreateModel(defaultParams.lookbackPeriod, defaultParams.lstmUnits, defaultParams.denseUnits);
     
     strategy.resetState();
     expect(mockModelDispose).toHaveBeenCalled();

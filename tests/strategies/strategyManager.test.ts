@@ -1,16 +1,16 @@
 // In tests/strategies/strategyManager.test.ts
 import { TradingStrategy, StrategyParameterDefinition, StrategySignal, StrategyContext } from '../../src/strategies/strategy.types';
 import { registerStrategy, getStrategy, getAvailableStrategies } from '../../src/strategies/strategyManager';
-import { logger } from '../../src/utils/logger';
+import logger from '../../src/utils/logger'; // Corrected import
 
 // Mock the logger
 jest.mock('../../src/utils/logger', () => ({
-  logger: {
+  default: { // Corrected mock for default export
     info: jest.fn(),
     warn: jest.fn(),
     error: jest.fn(),
     debug: jest.fn(),
-  },
+  }
 }));
 
 // Define some mock strategies for testing
@@ -94,7 +94,7 @@ describe('StrategyManager', () => {
         registerStrategy(null as any);
         expect(logger.error).toHaveBeenCalledWith('StrategyManager: Attempted to register an invalid or ID-less strategy.');
         
-        logger.error.mockClear(); // Clear mock for next check
+        (logger.error as jest.Mock).mockClear(); // Clear mock for next check
         
         registerStrategy({ name: 'No ID Strategy' } as any);
         expect(logger.error).toHaveBeenCalledWith('StrategyManager: Attempted to register an invalid or ID-less strategy.');

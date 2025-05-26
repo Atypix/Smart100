@@ -1,6 +1,6 @@
 // In src/strategies/strategyManager.ts
 import { TradingStrategy } from './strategy.types';
-import { logger } from '../utils/logger'; // Optional: for logging registration events
+import logger from '../utils/logger'; // Optional: for logging registration events
 
 // Import strategies to be registered
 import { adaptedSimpleThresholdStrategy } from './implementations/simpleThresholdStrategy';
