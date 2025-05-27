@@ -15,13 +15,15 @@ export const authenticateJWT = (req: AuthenticatedRequest, res: Response, next: 
     const token = authHeader.substring(7); // Remove "Bearer " prefix
 
     if (!token) {
-      return res.status(401).json({ error: 'Access denied, token missing.' });
+      res.status(401).json({ error: 'Access denied, token missing.' });
+      return;
     }
 
     const jwtSecret = process.env.JWT_SECRET;
     if (!jwtSecret) {
       logger.error('JWT_SECRET is not defined in environment variables for token verification.');
-      return res.status(500).json({ error: 'Internal server error: JWT configuration missing.' });
+      res.status(500).json({ error: 'Internal server error: JWT configuration missing.' });
+      return;
     }
 
     try {
@@ -31,17 +33,21 @@ export const authenticateJWT = (req: AuthenticatedRequest, res: Response, next: 
     } catch (error) {
       if (error instanceof jsonwebtoken.TokenExpiredError) {
         logger.warn('Access denied due to expired token:', error.message);
-        return res.status(403).json({ error: 'Access denied, token expired.' });
+        res.status(403).json({ error: 'Access denied, token expired.' });
+        return;
       }
       if (error instanceof jsonwebtoken.JsonWebTokenError) {
         logger.warn('Access denied due to invalid token:', error.message);
-        return res.status(403).json({ error: 'Invalid token.' });
+        res.status(403).json({ error: 'Invalid token.' });
+        return;
       }
       logger.error('Error during token verification:', error);
-      return res.status(403).json({ error: 'Forbidden, error verifying token.' });
+      res.status(403).json({ error: 'Forbidden, error verifying token.' });
+      return;
     }
   } else {
     // No Authorization header or not a Bearer token
-    return res.status(401).json({ error: 'Access denied, no token provided or invalid format.' });
+    res.status(401).json({ error: 'Access denied, no token provided or invalid format.' });
+    return;
   }
 };

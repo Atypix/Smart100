@@ -11,9 +11,9 @@ import { aiPricePredictionStrategy } from './implementations/aiPricePredictionSt
 import { aiSelectorStrategy } from './implementations/aiSelectorStrategy'; // Import AI Selector Strategy
 // ... import other strategies here as they are created
 
-const strategyRegistry = new Map<string, TradingStrategy>();
+const strategyRegistry = new Map<string, TradingStrategy<any>>();
 
-export function registerStrategy(strategy: TradingStrategy): void {
+export function registerStrategy(strategy: TradingStrategy<any>): void {
   if (!strategy || !strategy.id) {
     logger.error('StrategyManager: Attempted to register an invalid or ID-less strategy.');
     return;
@@ -25,7 +25,7 @@ export function registerStrategy(strategy: TradingStrategy): void {
   logger.info(`StrategyManager: Strategy '${strategy.name}' (ID: ${strategy.id}) registered.`);
 }
 
-export function getStrategy(id: string): TradingStrategy | undefined {
+export function getStrategy(id: string): TradingStrategy<any> | undefined {
   const strategy = strategyRegistry.get(id);
   if (strategy && typeof (strategy as any).reset === 'function') {
     logger.info(`[StrategyManager] Resetting state for strategy ID: ${id}`);
@@ -34,7 +34,7 @@ export function getStrategy(id: string): TradingStrategy | undefined {
   return strategy;
 }
 
-export function getAvailableStrategies(): TradingStrategy[] {
+export function getAvailableStrategies(): TradingStrategy<any>[] {
   return Array.from(strategyRegistry.values());
 }
 

@@ -17,12 +17,13 @@ export interface StrategyParameterDefinition {
   step?: number;   // New: for numerical parameters, defines increment for grid search
 }
 
-export interface StrategyContext {
+export interface StrategyContext<T_Params extends Record<string, any> = Record<string, any>> {
+  symbol: string; // Added
   historicalData: HistoricalDataPoint[]; // Array of historical data points up to the current point for indicator calculation
   currentIndex: number;                // Index of the current dataPoint within historicalData
   portfolio: Portfolio;
   tradeHistory: Trade[];
-  parameters: Record<string, number | string | boolean>; // Strategy-specific parameters
+  parameters: T_Params; // Strategy-specific parameters
 }
 
 export type StrategyAction = 'BUY' | 'SELL' | 'HOLD';
@@ -32,17 +33,17 @@ export interface StrategySignal {
   amount?: number; // Number of shares or percentage of portfolio to trade
 }
 
-export interface TradingStrategy {
+export interface TradingStrategy<T_Parameters extends Record<string, any> = Record<string, any>> {
   id: string; // Unique identifier (e.g., 'ichimoku-cloud', 'rsi-bollinger')
   name: string; // User-friendly name (e.g., 'Ichimoku Cloud Strategy', 'RSI + Bollinger Bands')
   description?: string;
   parameters: StrategyParameterDefinition[]; // Definitions of parameters this strategy uses
 
   // Function to execute the strategy for a given historical data point and context
-  execute: (context: StrategyContext) => StrategySignal | Promise<StrategySignal>; // Allow async strategies
+  execute: (context: StrategyContext<T_Parameters>) => StrategySignal | Promise<StrategySignal>; // Allow async strategies
 
   // Optional: Function to calculate and return any indicators the strategy might expose for plotting/logging
-  // getIndicators?: (context: StrategyContext) => Record<string, number | null>;
+  // getIndicators?: (context: StrategyContext<T_Parameters>) => Record<string, number | null>;
 }
 
 export interface AIDecision {

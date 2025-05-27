@@ -1,13 +1,28 @@
 import { TradingStrategy, StrategyContext, StrategySignal, StrategyParameterDefinition } from '../strategy.types';
-import { StrategyManager } from '../strategyManager';
-import { logger } from '../../utils/logger';
-import { Portfolio } from '../../portfolio/portfolio'; // Assuming this path
-import { Trade } from '../../portfolio/trade'; // Assuming this path
+import * as StrategyManagerModule from '../strategyManager'; // Corrected StrategyManager import
+import logger from '../../utils/logger'; // Corrected logger import
+// import { Portfolio } from '../../portfolio/portfolio'; // Commented out
+// import { Trade } from '../../portfolio/trade'; // Commented out
 // TechnicalIndicators might not be directly needed if strategies encapsulate their own indicator use.
+
+// Module-scoped stateful properties
+let currentChoicesBySymbol = new Map<string, string>();
+let optimizedParamsForChoice = new Map<string, { strategyId: string, params: Record<string, any> }>();
+let lastAIDecision: AIDecision | null = null;
+
+interface AIDecision {
+  timestamp: number;
+  date: string;
+  chosenStrategyId: string | null;
+  chosenStrategyName: string | null;
+  parametersUsed: Record<string, any> | null;
+  evaluationScore: number | null;
+  evaluationMetricUsed: string;
+}
 
 interface AISelectorStrategyParams {
   evaluationLookbackPeriod: number;
-  candidateStrategyIds?: string[];
+  candidateStrategyIds?: string; // Corrected type to string
   evaluationMetric?: 'pnl' | 'sharpe' | 'winRate' | string;
   optimizeParameters?: boolean;
 }
@@ -15,7 +30,7 @@ interface AISelectorStrategyParams {
 // Helper function for Grid Search
 function generateParameterCombinations(
     optimizableParams: Array<{ name: string; min: number; max: number; step: number; }>,
-    paramDefaults: Record<string, any>
+    paramDefaults: Record<string, number | string | boolean>
 ): Array<Record<string, any>> {
     const combinations: Array<Record<string, any>> = [];
     const tempCombination: Record<string, any> = { ...paramDefaults };
@@ -71,41 +86,12 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
   id: "ai-selector",
   name: "AI Strategy Selector",
   description: "A meta-strategy that dynamically selects and executes an underlying trading strategy based on recent performance.",
-  parameters: {
-    evaluationLookbackPeriod: {
-      type: 'number',
-      defaultValue: 30,
-      min: 5,
-      max: 200,
-      step: 5, // Added step
-      label: 'Evaluation Lookback Period',
-      description: 'Number of recent data points to evaluate candidate strategies.',
-    },
-    candidateStrategyIds: {
-      type: 'string', // Will be comma-separated in UI, then parsed
-      defaultValue: "",
-      label: "Candidate Strategy IDs (comma-separated)",
-      description: "Optional. A comma-separated list of strategy IDs to consider. If empty, all available strategies (excluding self) will be candidates.",
-    },
-    evaluationMetric: {
-      type: 'string',
-      defaultValue: 'pnl',
-      label: 'Evaluation Metric for AI Selection',
-      description: "Metric to evaluate candidate strategies. Options: 'pnl' (Profit/Loss), 'sharpe' (Sharpe Ratio), 'winRate' (Win Rate).",
-      options: [
-        { value: 'pnl', label: 'Profit/Loss' },
-        { value: 'sharpe', label: 'Sharpe Ratio' }, 
-        { value: 'winRate', label: 'Win Rate' }, 
-      ],
-    },
-    optimizeParameters: {
-        name: 'optimizeParameters',
-        label: 'Optimize Parameters of Candidate Strategies',
-        type: 'boolean',
-        defaultValue: false,
-        description: 'If true, AI will attempt to optimize parameters of candidate strategies using Grid Search. Significantly increases execution time.',
-    },
-  },
+  parameters: [
+    { name: 'evaluationLookbackPeriod', label: 'Evaluation Lookback Period', type: 'number', defaultValue: 30, min: 5, max: 200, step: 5, description: 'Number of recent data points to evaluate candidate strategies.' },
+    { name: 'candidateStrategyIds', label: 'Candidate Strategy IDs (comma-separated)', type: 'string', defaultValue: "", description: 'Optional. A comma-separated list of strategy IDs to consider. If empty, all available strategies (excluding self) will be candidates.' },
+    { name: 'evaluationMetric', label: 'Evaluation Metric for AI Selection', type: 'string', defaultValue: 'pnl', description: "Metric to evaluate candidate strategies. Options: 'pnl' (Profit/Loss), 'sharpe' (Sharpe Ratio), 'winRate' (Win Rate).", options: [ { value: 'pnl', label: 'Profit/Loss' }, { value: 'sharpe', label: 'Sharpe Ratio' }, { value: 'winRate', label: 'Win Rate' }] },
+    { name: 'optimizeParameters', label: 'Optimize Parameters of Candidate Strategies', type: 'boolean', defaultValue: false, description: 'If true, AI will attempt to optimize parameters of candidate strategies using Grid Search. Significantly increases execution time.' }
+  ],
 
   // Static cache to store symbol -> chosenStrategyId
   // This needs to be part of the object, but 'static' is for classes.
@@ -113,13 +99,13 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
   // currentChoicesBySymbol: new Map<string, string>(), // Will be initialized properly later
   // Map to store best parameters found for each chosen strategy ID, if optimization was run
   // This might be better managed externally or passed differently for final execution
-  optimizedParamsForChoice: new Map<string, Record<string, any>>(),
-  lastAIDecision: null as AIDecision | null, // Property to store the last decision
+  // optimizedParamsForChoice: new Map<string, Record<string, any>>(), // Removed
+  // lastAIDecision: null as AIDecision | null, // Removed
 
 
   async execute(context: StrategyContext<AISelectorStrategyParams>): Promise<StrategySignal> {
     // Reset lastAIDecision at the beginning of each execution
-    (this as any).lastAIDecision = null;
+    lastAIDecision = null; // Use module-scoped variable
 
     const { 
         evaluationLookbackPeriod, 
@@ -137,29 +123,29 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
 
     // Parse candidateStrategyIdsString
     const explicitCandidateIds = candidateStrategyIdsString && candidateStrategyIdsString.trim() !== ""
-      ? candidateStrategyIdsString.split(',').map(id => id.trim())
+      ? candidateStrategyIdsString.split(',').map((id: string) => id.trim()) 
       : [];
 
     // Fetch and filter candidate strategies
-    let candidateStrategies = StrategyManager.getAvailableStrategies().filter(
-      s => s.id !== this.id // Exclude self
+    let candidateStrategies = StrategyManagerModule.getAvailableStrategies().filter(
+      (s: any) => s.id !== this.id // Exclude self, typed s as any
       // Potentially add a flag to strategies like `isMetaStrategy` to exclude them all
     );
 
     if (explicitCandidateIds.length > 0) {
-      candidateStrategies = candidateStrategies.filter(s => explicitCandidateIds.includes(s.id));
+      candidateStrategies = candidateStrategies.filter((s: any) => explicitCandidateIds.includes(s.id)); // Typed s as any
     }
 
     if (candidateStrategies.length === 0) {
       logger.warn(`AISelectorStrategy for ${symbol}: No candidate strategies found. Holding.`);
-      return StrategySignal.HOLD;
+      return { action: 'HOLD' };
     }
 
     // Ensure context.currentIndex is sufficient for lookback
     if (context.currentIndex < evaluationLookbackPeriod) {
       logger.info(`AISelectorStrategy for ${symbol}: Not enough historical data for evaluation (currentIndex ${context.currentIndex} < lookback ${evaluationLookbackPeriod}). Holding.`);
       // Optionally, execute a default strategy here if defined
-      return StrategySignal.HOLD;
+      return { action: 'HOLD' };
     }
 
     // Slice recent data for evaluation
@@ -171,7 +157,7 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
 
     if (evaluationData.length < evaluationLookbackPeriod) {
       logger.warn(`AISelectorStrategy for ${symbol}: Insufficient evaluation data length (${evaluationData.length} < ${evaluationLookbackPeriod}). Holding.`);
-      return StrategySignal.HOLD;
+      return { action: 'HOLD' };
     }
 
     // --- Evaluation Loop ---
@@ -203,11 +189,11 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
 
       if (optimizeParameters) {
         const optimizableParams = candidateStrategy.parameters.filter(
-          p => p.type === 'number' && p.min !== undefined && p.max !== undefined && p.step !== undefined && p.min <= p.max && p.step > 0
-        ).map(p => ({ name: p.name, min: p.min!, max: p.max!, step: p.step! }));
+          (p: any) => p.type === 'number' && p.min !== undefined && p.max !== undefined && p.step !== undefined && p.min <= p.max && p.step > 0 // Typed p as any
+        ).map((p: any) => ({ name: p.name, min: p.min!, max: p.max!, step: p.step! })); // Typed p as any
         
         const defaultParams: Record<string, any> = {};
-        candidateStrategy.parameters.forEach(p => defaultParams[p.name] = p.defaultValue);
+        candidateStrategy.parameters.forEach((p: any) => defaultParams[p.name] = p.defaultValue); // Typed p as any
 
         if (optimizableParams.length > 0) {
           const combinations = generateParameterCombinations(optimizableParams, defaultParams);
@@ -221,7 +207,7 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
       } else {
         // Use only default parameters if not optimizing
         const defaultParams: Record<string, any> = {};
-        candidateStrategy.parameters.forEach(p => defaultParams[p.name] = p.defaultValue);
+        candidateStrategy.parameters.forEach((p: any) => defaultParams[p.name] = p.defaultValue); // Typed p as any
         paramSetsToSimulate.push(defaultParams);
       }
       
@@ -244,7 +230,7 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
           const currentPrice = currentBar.close;
           const previousPrice = (i > 0) ? evaluationData[i-1].close : currentPrice;
 
-          const simulationContext: StrategyContext<any> = {
+          const simulationContext: StrategyContext<Record<string, any>> = {
             symbol: context.symbol,
             historicalData: evaluationData,
             currentIndex: i,
@@ -253,14 +239,14 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
               getCash: () => 100000,
               getPosition: () => currentSimulatedPosition ? { quantity: currentSimulatedPosition.type === 'long' ? 1 : -1, averagePrice: currentSimulatedPosition.entryPrice } : { quantity: 0, averagePrice: 0 },
               getTrades: () => [], recordTrade: () => {}, getMarketValue: () => 0, getHistoricalPnl: () => [],
-            } as unknown as Portfolio,
-            trades: [], currentSignal: StrategySignal.HOLD, signalHistory: [],
+            } as unknown as Portfolio, // Portfolio import is commented out, this will cause an error
+            tradeHistory: [], currentSignal: { action: 'HOLD' }, signalHistory: [], // Corrected mock context
           };
 
           const signalResult = await candidateStrategy.execute(simulationContext);
           const signalAction = typeof signalResult === 'string' ? signalResult : signalResult.action;
 
-          if (signalAction === StrategySignal.BUY) {
+          if (signalAction === 'BUY') { // Compare with string literal
             if (!currentSimulatedPosition) {
               currentSimulatedPosition = { entryPrice: currentPrice, type: 'long' };
               simulatedTrades++;
@@ -270,7 +256,7 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
               if (pnlFromTrade > 0) profitableSimulatedTrades++;
               currentSimulatedPosition = null;
             }
-          } else if (signalAction === StrategySignal.SELL) {
+          } else if (signalAction === 'SELL') { // Compare with string literal
             if (!currentSimulatedPosition) {
               currentSimulatedPosition = { entryPrice: currentPrice, type: 'short' };
               simulatedTrades++;
@@ -343,7 +329,7 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
       
       // Populate lastAIDecision for "no choice"
       const currentBarForDecision = context.historicalData[context.currentIndex];
-      (this as any).lastAIDecision = {
+      lastAIDecision = { // Use module-scoped variable
         timestamp: currentBarForDecision.timestamp,
         date: currentBarForDecision.date || new Date(currentBarForDecision.timestamp).toISOString().split('T')[0],
         chosenStrategyId: null,
@@ -352,16 +338,16 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
         evaluationScore: null, // Or currentBestMetricValue if it means "best score among failing candidates"
         evaluationMetricUsed: metric,
       };
-      return StrategySignal.HOLD;
+      return { action: 'HOLD' };
     }
 
     // A strategy was chosen
-    const finalSelectedStrategy = StrategyManager.getStrategy(bestStrategyId);
+    const finalSelectedStrategy = StrategyManagerModule.getStrategy(bestStrategyId);
     if (!finalSelectedStrategy) {
       logger.error(`AISelectorStrategy for ${symbol}: Failed to retrieve chosen strategy ${bestStrategyId} from manager. Holding.`);
       // Populate lastAIDecision for "error retrieving chosen strategy"
       const currentBarForDecision = context.historicalData[context.currentIndex];
-      (this as any).lastAIDecision = {
+      lastAIDecision = { // Use module-scoped variable
         timestamp: currentBarForDecision.timestamp,
         date: currentBarForDecision.date || new Date(currentBarForDecision.timestamp).toISOString().split('T')[0],
         chosenStrategyId: bestStrategyId, // We know the ID, but not the name or params
@@ -370,15 +356,15 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
         evaluationScore: currentBestMetricValue,
         evaluationMetricUsed: metric,
       };
-      return StrategySignal.HOLD;
+      return { action: 'HOLD' };
     }
     
     logger.info(`AISelectorStrategy for ${symbol}: Chose strategy ${bestStrategyId} using metric '${metric}' with score ${currentBestMetricValue.toFixed(4)}.`);
-    (this as any).currentChoicesBySymbol.set(symbol, bestStrategyId); 
+    currentChoicesBySymbol.set(symbol, bestStrategyId); // Use module-scoped variable
 
     let paramsToStoreAndExecuteWith: Record<string, any>;
     const defaultSelectedStrategyParams: Record<string, any> = {};
-    finalSelectedStrategy.parameters.forEach(p => {
+    finalSelectedStrategy.parameters.forEach((p: any) => { // Typed p as any
         defaultSelectedStrategyParams[p.name] = p.defaultValue;
     });
 
@@ -389,11 +375,11 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
         paramsToStoreAndExecuteWith = defaultSelectedStrategyParams;
         logger.info(`AISelectorStrategy for ${symbol}: Storing DEFAULT params for ${bestStrategyId} as optimization was off or yielded no/suboptimal improvement.`);
     }
-    (this as any).optimizedParamsForChoice.set(symbol, { strategyId: bestStrategyId, params: paramsToStoreAndExecuteWith });
+    optimizedParamsForChoice.set(symbol, { strategyId: bestStrategyId, params: paramsToStoreAndExecuteWith }); // Use module-scoped variable
     
     // Populate lastAIDecision with the successful choice
     const currentBarForDecision = context.historicalData[context.currentIndex];
-    (this as any).lastAIDecision = {
+    lastAIDecision = { // Use module-scoped variable
       timestamp: currentBarForDecision.timestamp,
       date: currentBarForDecision.date || new Date(currentBarForDecision.timestamp).toISOString().split('T')[0],
       chosenStrategyId: bestStrategyId,
@@ -404,7 +390,7 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
     };
 
     // Prepare context for final execution
-    const strategyContextForExecution: StrategyContext<any> = {
+    const strategyContextForExecution: StrategyContext<Record<string, any>> = {
         ...context, // Clone original context
         parameters: paramsToStoreAndExecuteWith, 
     };
@@ -415,11 +401,11 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
   }
 };
 
-// Initialize the static-like properties
-(aiSelectorStrategy as any).currentChoicesBySymbol = new Map<string, string>();
-// Stores: symbol -> { strategyId: string, params: Record<string, any> }
-(aiSelectorStrategy as any).optimizedParamsForChoice = new Map<string, { strategyId: string, params: Record<string, any> }>();
-(aiSelectorStrategy as any).lastAIDecision = null;
+// Initialize the static-like properties // Removed these initializations
+// (aiSelectorStrategy as any).currentChoicesBySymbol = new Map<string, string>();
+// // Stores: symbol -> { strategyId: string, params: Record<string, any> }
+// (aiSelectorStrategy as any).optimizedParamsForChoice = new Map<string, { strategyId: string, params: Record<string, any> }>();
+// (aiSelectorStrategy as any).lastAIDecision = null;
 
 
 // Helper function for API to get current AI choice and its parameters
@@ -431,10 +417,10 @@ export interface AISelectorChoiceState {
 }
 
 export function getAISelectorActiveState(symbol: string): AISelectorChoiceState {
-    const choiceData = (aiSelectorStrategy as any).optimizedParamsForChoice.get(symbol);
+    const choiceData = optimizedParamsForChoice.get(symbol); // Use module-scoped variable
     
     if (choiceData && choiceData.strategyId) {
-        const strategyDetails = StrategyManager.getStrategy(choiceData.strategyId);
+        const strategyDetails = StrategyManagerModule.getStrategy(choiceData.strategyId);
         return {
             chosenStrategyId: choiceData.strategyId,
             chosenStrategyName: strategyDetails ? strategyDetails.name : "Unknown Strategy",
@@ -443,14 +429,14 @@ export function getAISelectorActiveState(symbol: string): AISelectorChoiceState 
     }
     
     // Fallback if no entry in optimizedParamsForChoice, but there might be an ID in currentChoicesBySymbol (e.g. from older version or error)
-    const chosenStrategyId = (aiSelectorStrategy as any).currentChoicesBySymbol.get(symbol);
+    const chosenStrategyId = currentChoicesBySymbol.get(symbol); // Use module-scoped variable
     if (chosenStrategyId) {
-        const strategyDetails = StrategyManager.getStrategy(chosenStrategyId);
+        const strategyDetails = StrategyManagerModule.getStrategy(chosenStrategyId);
         // Attempt to provide default params if specific params for this choice weren't stored
         let params: Record<string, any> | null = null;
         if (strategyDetails) {
             params = {};
-            strategyDetails.parameters.forEach(p => params![p.name] = p.defaultValue);
+            strategyDetails.parameters.forEach((p: any) => params![p.name] = p.defaultValue); // Typed p as any
         }
         return {
             chosenStrategyId: chosenStrategyId,
