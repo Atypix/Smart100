@@ -2,7 +2,6 @@ import { fetchHistoricalDataFromDB, HistoricalDataPoint } from '../services/data
 import logger from '../utils/logger'; // Corrected import
 import { 
   TradingStrategy, 
-  TradingStrategy, 
   StrategyContext, 
   StrategySignal, 
   StrategyParameterDefinition,
@@ -198,7 +197,8 @@ export async function runBacktest(
     // or initial value if i === 0.
     // Simpler: record after current day's processing.
     
-    const context: StrategyContext = {
+    const context: StrategyContext<Record<string, any>> = { // Explicitly use generic
+      symbol: symbol, // Added
       historicalData: historicalData,
       currentIndex: i,
       portfolio: { ...portfolio }, // Pass a copy to prevent direct modification by strategy
