@@ -41,6 +41,7 @@ const macdStrategyParameters: StrategyParameterDefinition[] = [
     defaultValue: 1,
     description: 'Number of shares/units to trade per signal.',
     min: 0.001,
+    max: 1000, // Added max for consistency
     step: 0.001,
   }
 ];

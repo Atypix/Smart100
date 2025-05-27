@@ -101,6 +101,13 @@ This document tracks the progress and future direction of the project to impleme
         *   Updated `.env.example` to include `API_ENCRYPTION_KEY` and `JWT_SECRET`.
         *   Documented new API endpoints in `README.md`.
 
+10. **Implement AI Meta-Strategy (AIStrategySelector) (Completed):**
+    *   Developed `AISelectorStrategy` (`src/strategies/implementations/aiSelectorStrategy.ts`) that dynamically chooses an underlying strategy based on recent simulated performance over a configurable lookback period.
+    *   Added `GET /api/ai/current-strategy/:symbol` endpoint (`src/api/aiRoutes.ts`) to expose the AI's current choice for a given symbol.
+    *   Integrated display of the AI's choice into the frontend's `BacktestRunnerPage.tsx` when the `ai-selector` strategy is selected, showing loading states, errors, and the chosen strategy's name and ID.
+    *   Added backend unit tests for `AISelectorStrategy` (`tests/strategies/aiSelectorStrategy.test.ts`).
+    *   Added backend integration tests for the new API endpoint (`tests/api/aiRoutes.test.ts`).
+
 ## II. Documentation (Completed)
 
 *   Updated `README.md` with details on new features (Strategy Framework, Ichimoku, JSON backtest execution, Frontend UI, Backend APIs, User Authentication, API Key Management), setup, and usage.
@@ -126,6 +133,7 @@ This document tracks the progress and future direction of the project to impleme
 *   **Enhanced Deployment Scripts:** Provide Dockerfiles or more specific deployment scripts for platforms like AWS.
 *   **API for Backtester:** Further develop the API, potentially adding features like saving/loading configurations, retrieving past results, etc.
 *   **Indicator Library Integration:** Re-evaluate or explore more comprehensive TA libraries that might include Ichimoku and other complex indicators directly, or contribute to existing ones.
+*   **Enhance `AISelectorStrategy`:** Improve with more sophisticated evaluation metrics (e.g., Sharpe ratio over lookback, risk-adjusted returns) or even lightweight machine learning models for selection if performance allows. Consider allowing the AI Selector to use non-default parameters for candidate strategies during its evaluation phase.
 
 ## IV. Technical Debt / Issues
 

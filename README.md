@@ -206,7 +206,7 @@ Key directories and files, including recent additions:
         import { fetchAlphaVantageData } from './dist/services/dataService'; // Adjust path after build
 
         async function main() {
-          const data = await fetchAlphaVantageData('IBM', process.env.ALPHA_VANTAGE_API_KEY || 'YOUR_KEY');
+          const data = await fetchAlphaVANTAGE_API_KEYata('IBM', process.env.ALPHA_VANTAGE_API_KEY || 'YOUR_KEY');
           console.log(JSON.stringify(data, null, 2));
         }
         main().catch(console.error);
@@ -263,6 +263,7 @@ Key directories and files, including recent additions:
         *   From the project root directory: `npm run dev:fullstack`
         *   This command uses `concurrently` to start both the backend API server (via `npm run dev`) and the frontend development server.
         *   The application now features user registration and login. On first visit, you'll be directed to the login page. If you don't have an account, you can navigate to the registration page.
+        *   The UI now also displays the currently recommended strategy by the `AI Strategy Selector` when it is selected, providing real-time insight into its choice for a given symbol before running a full backtest.
         *   **Note**: If you encounter issues with `concurrently` in your specific environment (e.g., "command not found" errors for `ts-node` or `concurrently` itself), you can run the backend and frontend in separate terminals:
             *   Terminal 1 (Root Directory): `npm run dev` (for backend)
             *   Terminal 2 (Root Directory): `npm run frontend:dev` (for frontend)
@@ -372,6 +373,31 @@ All backend endpoints are prefixed with `/api`. The backend provides the followi
             *   `404 Not Found`: If the API key with the given ID is not found or does not belong to the user.
             *   `500 Internal Server Error`: If there's an issue deleting the key.
 
+*   **AI Endpoints**
+    *   **`GET /api/ai/current-strategy/:symbol`**
+        *   **Description**: Retrieves the trading strategy currently selected by the AI Strategy Selector for the given trading symbol, based on its last evaluation.
+        *   **URL Parameters**:
+            *   `symbol` (string): The trading symbol (e.g., "BTCUSDT").
+        *   **Response Body (Success: 200 OK)**:
+            ```json
+            {
+              "symbol": "string",
+              "chosenStrategyId": "string",
+              "chosenStrategyName": "string",
+              "message": "string"
+            }
+            ```
+            (Example: `{"symbol": "BTCUSDT", "chosenStrategyId": "ichimoku-cloud", "chosenStrategyName": "Ichimoku Cloud Strategy", "message": "AI is currently using Ichimoku Cloud Strategy for BTCUSDT."}`)
+        *   **Response Body (Error: 404 Not Found)**: If no choice is currently available for the symbol (e.g., AISelectorStrategy hasn't run for this symbol yet, or no suitable candidate was found).
+            ```json
+            {
+              "symbol": "string",
+              "message": "string"
+            }
+            ```
+            (Example: `{"symbol": "XYZUSDT", "message": "AI choice not available for symbol XYZUSDT. AISelectorStrategy may not have been executed for this symbol yet."}`)
+        *   **Response Body (Error: 500 Internal Server Error)**: For other server-side issues during retrieval.
+
 ## 8. Available Trading Strategies
 
 The following strategies are currently implemented and can be used in `backtestConfig.json`:
@@ -426,6 +452,22 @@ The following strategies are currently implemented and can be used in `backtestC
         *   `buyThreshold` (number): Prediction score above which a BUY signal is considered (0.5 to 1.0). (Default: 0.6)
         *   `sellThreshold` (number): Prediction score below which a SELL signal is considered (0.0 to 0.5). (Default: 0.4)
         *   `tradeAmount` (number): Number of shares/units to trade per signal. (Default: 1)
+
+*   **AI Strategy Selector (`ai-selector`)**:
+    *   **Name**: AI Strategy Selector
+    *   **ID**: `ai-selector`
+    *   **Description**: A meta-strategy that dynamically selects and executes an underlying trading strategy. Its choice is based on a short-term performance simulation of candidate strategies using recent market data and a configurable evaluation metric. It can optionally optimize parameters for candidate strategies. It selects from other available, non-meta strategies.
+    *   **Parameters**:
+        *   `evaluationLookbackPeriod` (number): Number of recent data points used to evaluate candidate strategies. (Default: 30)
+        *   `candidateStrategyIds` (string): Optional comma-separated list of strategy IDs to consider (e.g., "ichimoku-cloud,macd-crossover"). If empty, all available concrete (non-meta) strategies are considered. (Default: "")
+        *   `evaluationMetric` (string): Specifies the metric used by the AI to evaluate and select the best underlying strategy. Default: `"pnl"`.
+            *   `"pnl"`: Selects the strategy with the highest simulated Profit/Loss over the lookback period.
+            *   `"sharpe"`: Selects the strategy with the best simplified Sharpe Ratio (average per-candle return divided by standard deviation of per-candle returns) over the lookback period.
+            *   `"winRate"`: Selects the strategy with the highest Win Rate (percentage of profitable simulated trades) over the lookback period.
+        *   `optimizeParameters` (boolean): If set to `true`, the AI Strategy Selector will attempt to optimize the parameters of its candidate strategies using a Grid Search algorithm. This significantly increases evaluation time but can lead to better strategy performance. Default: `false`.
+            *   **Note on Optimization**: When `optimizeParameters` is true, the AI evaluates strategies by searching for the best parameter combinations within predefined ranges (`min`, `max`, `step` which must be set in the individual strategy definitions for numerical parameters).
+            *   **Performance Warning**: Enabling `optimizeParameters` can be computationally intensive and may significantly slow down backtests or decision-making processes, especially with many candidate strategies, multiple optimizable parameters per strategy, or wide parameter ranges with small steps.
+    *   **Defining Optimizable Strategy Parameters**: For a strategy's parameters to be optimizable by the `AISelectorStrategy`, its numerical parameter definitions within its implementation file (e.g., `src/strategies/implementations/ichimokuStrategy.ts`) must include `min`, `max`, and `step` attributes to define the search space for the Grid Search.
 
 ## 9. Adding a New Strategy
 
@@ -493,7 +535,7 @@ Once registered, your new strategy can be used in `backtestConfig.json` by refer
 
 For a detailed list of potential future enhancements and the project roadmap, please refer to `PROJECT_TRACKING.md`. This includes ideas like:
 
-*   Implementing more sophisticated trading strategies (e.g., based on RSI, Bollinger Bands, MACD, or combinations).
+*   Implementing more sophisticated trading strategies.
 *   Adding more data sources and ensuring robust handling for different data formats.
 *   **UI Enhancements:**
     *   Developing advanced data visualization for backtest results (e.g., equity curves, trade markers on charts) within the React UI.

@@ -116,3 +116,28 @@ export const deleteApiKey = async (id: string): Promise<void> => {
   // For DELETE, we expect a 204 No Content, which handleResponse can manage.
   await handleResponse<void>(response); 
 };
+
+// --- AI Strategy Choice Service Functions ---
+
+export interface AIChoiceResponse {
+  symbol: string;
+  chosenStrategyId?: string | null; // Can be null if no choice
+  chosenStrategyName?: string | null; // Can be null
+  chosenParameters?: Record<string, any> | null; // New field for chosen parameters
+  message: string;
+}
+
+export const getAICurrentStrategy = async (symbol: string): Promise<AIChoiceResponse> => {
+  const response = await fetch(`${API_BASE_URL}/ai/current-strategy/${symbol}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      // No Authorization header needed for this public endpoint
+    },
+  });
+  // handleResponse will throw for non-ok responses (like 404 or 500)
+  // For 404 specifically, the backend sends a JSON body, which handleResponse will parse.
+  // The component calling this function will need to check the message or presence of chosenStrategyId
+  // to determine if a choice was actually found or if it's a "not found" message.
+  return handleResponse<AIChoiceResponse>(response);
+};
