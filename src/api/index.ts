@@ -24,4 +24,10 @@ logger.info('Strategy routes mounted under /strategies');
 mainRouter.use('/keys', apiKeyRoutes); // Mount the new API key routes under /keys
 logger.info('API Key routes mounted under /keys');
 
+// Mount AI routes
+import aiRoutes from './aiRoutes'; // Import AI routes
+mainRouter.use('/ai', aiRoutes); // Mount AI routes under /ai
+logger.info('AI routes mounted under /ai');
+
+
 export default mainRouter;

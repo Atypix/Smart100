@@ -8,6 +8,7 @@ import { ichimokuCloudStrategy } from './implementations/ichimokuStrategy'; // I
 import { rsiBollingerStrategy } from './implementations/rsiBollingerStrategy';
 import { macdStrategy } from './implementations/macdStrategy';
 import { aiPricePredictionStrategy } from './implementations/aiPricePredictionStrategy';
+import { aiSelectorStrategy } from './implementations/aiSelectorStrategy'; // Import AI Selector Strategy
 // ... import other strategies here as they are created
 
 const strategyRegistry = new Map<string, TradingStrategy>();
@@ -76,5 +77,11 @@ if (aiPricePredictionStrategy) {
 // if (anotherStrategy) {
 //   registerStrategy(anotherStrategy);
 // }
+
+if (aiSelectorStrategy) {
+  registerStrategy(aiSelectorStrategy);
+} else {
+  logger.error('StrategyManager: aiSelectorStrategy is undefined and cannot be registered.');
+}
 
 logger.info(`StrategyManager: Initialized with ${strategyRegistry.size} strategies.`);

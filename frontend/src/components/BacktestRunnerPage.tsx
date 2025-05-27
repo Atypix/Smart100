@@ -1,7 +1,7 @@
 // frontend/src/components/BacktestRunnerPage.tsx
-import React, { useState, useCallback } from 'react'; // Removed useEffect
+import React, { useState, useCallback, useEffect } from 'react';
 import axios from 'axios';
-import type { AxiosError } from 'axios'; // For type usage if needed
+import type { AxiosError } from 'axios';
 import type {
   TradingStrategy,
   // StrategyParameterDefinition, // Removed as unused
@@ -16,13 +16,11 @@ import StrategyParameterForm from './StrategyParameterForm';
 import BacktestSettingsForm from './BacktestSettingsForm';
 import ResultsDisplay from './ResultsDisplay';
 import EquityChart from './EquityChart'; // Import EquityChart
-import TradesOnPriceChart from './TradesOnPriceChart'; // Import TradesOnPriceChart
+import TradesOnPriceChart from './TradesOnPriceChart';
 import { logger } from '../utils/logger';
-// FrontendTrade alias was removed as it's not used after clarifying Trade type.
+import { getAICurrentStrategy, AIChoiceResponse } from '../services/api'; // Import AI choice function and type
 
 const BacktestRunnerPage: React.FC = () => {
-  // Note: availableStrategies is fetched by StrategySelector itself.
-  // We don't need to manage it here if StrategySelector is self-contained for fetching.
   const [selectedStrategy, setSelectedStrategy] = useState<TradingStrategy | null>(null);
   const [currentStrategyParams, setCurrentStrategyParams] = useState<Record<string, any>>({});
   
@@ -41,11 +39,19 @@ const BacktestRunnerPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  // State for AI Selector Strategy Choice
+  const [aiChosenStrategyInfo, setAiChosenStrategyInfo] = useState<AIChoiceResponse | null>(null);
+  const [isFetchingAIChoice, setIsFetchingAIChoice] = useState<boolean>(false);
+  const [aiChoiceError, setAiChoiceError] = useState<string | null>(null);
+
   const handleStrategySelect = useCallback((strategy: TradingStrategy | null) => {
     logger.info('BacktestRunnerPage: Strategy selected', strategy?.name || 'None');
     setSelectedStrategy(strategy);
     setBacktestResult(null); // Clear previous results
     setError(null); // Clear previous errors
+    setAiChosenStrategyInfo(null); // Clear AI choice info when strategy changes
+    setAiChoiceError(null); // Clear AI choice error
+
     if (strategy) {
       // Initialize params with defaults from the strategy definition
       const defaultParams = strategy.parameters.reduce((acc, param) => {
@@ -66,8 +72,40 @@ const BacktestRunnerPage: React.FC = () => {
 
   const handleSettingsChange = useCallback((settings: BacktestSettings) => {
     setCurrentBacktestSettings(settings);
+    setAiChosenStrategyInfo(null); // Clear AI choice info if symbol/settings change
+    setAiChoiceError(null);
     logger.debug('BacktestRunnerPage: Backtest settings changed', settings);
   }, []);
+
+  // Effect to fetch AI chosen strategy when 'ai-selector' is chosen and symbol is available
+  useEffect(() => {
+    if (selectedStrategy?.id === 'ai-selector' && currentBacktestSettings.symbol) {
+      const fetchAIChoice = async () => {
+        setIsFetchingAIChoice(true);
+        setAiChosenStrategyInfo(null);
+        setAiChoiceError(null);
+        try {
+          logger.info(`BacktestRunnerPage: Fetching AI choice for symbol ${currentBacktestSettings.symbol}`);
+          const data = await getAICurrentStrategy(currentBacktestSettings.symbol);
+          setAiChosenStrategyInfo(data);
+          logger.info('BacktestRunnerPage: AI choice fetched successfully', data);
+        } catch (err: any) {
+          const errorMessage = err.message || 'Failed to fetch AI strategy choice.';
+          setAiChoiceError(errorMessage);
+          logger.error('BacktestRunnerPage: Error fetching AI choice', err);
+        } finally {
+          setIsFetchingAIChoice(false);
+        }
+      };
+      fetchAIChoice();
+    } else {
+      // If not ai-selector or no symbol, clear any previous AI choice info
+      setAiChosenStrategyInfo(null);
+      setAiChoiceError(null);
+      setIsFetchingAIChoice(false);
+    }
+  }, [selectedStrategy, currentBacktestSettings.symbol]);
+
 
   const handleRunBacktest = async () => {
     if (!selectedStrategy) {
@@ -123,6 +161,27 @@ const BacktestRunnerPage: React.FC = () => {
           onParamsChange={handleParamsChange}
           initialParams={currentStrategyParams}
         />
+        {/* Display AI Chosen Strategy Info */}
+        {selectedStrategy?.id === 'ai-selector' && (
+          <div className="ai-choice-info" style={{ marginTop: '10px', padding: '10px', border: '1px solid #eee', borderRadius: '4px' }}>
+            {isFetchingAIChoice && <p>Fetching AI choice for {currentBacktestSettings.symbol}...</p>}
+            {aiChoiceError && <p style={{ color: 'red' }}>Error: {aiChoiceError}</p>}
+            {aiChosenStrategyInfo && !isFetchingAIChoice && !aiChoiceError && (
+              <div>
+                <p><strong>AI Selector Information for {currentBacktestSettings.symbol}:</strong></p>
+                {aiChosenStrategyInfo.chosenStrategyName ? (
+                  <p>Currently selected: <strong>{aiChosenStrategyInfo.chosenStrategyName}</strong> (ID: {aiChosenStrategyInfo.chosenStrategyId})</p>
+                ) : (
+                  <p>{aiChosenStrategyInfo.message}</p> 
+                )}
+                {/* Display the message from backend if it's informative, e.g., "AI choice not available..." */}
+                {aiChosenStrategyInfo.chosenStrategyName && aiChosenStrategyInfo.message && !aiChosenStrategyInfo.message.includes(aiChosenStrategyInfo.chosenStrategyName) && (
+                    <p><em>{aiChosenStrategyInfo.message}</em></p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
       
       <div className="backtest-section settings-section">
@@ -134,7 +193,7 @@ const BacktestRunnerPage: React.FC = () => {
       
       <button 
         onClick={handleRunBacktest} 
-        disabled={isLoading || !selectedStrategy}
+        disabled={isLoading || !selectedStrategy || isFetchingAIChoice}
         className="run-backtest-button" // Added class for potential specific styling
       >
         {isLoading ? 'Running...' : 'Run Backtest'}
