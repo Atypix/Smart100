@@ -1,15 +1,26 @@
 // src/api/authRoutes.ts
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction, RequestHandler } from 'express';
 import bcryptjs from 'bcryptjs';
 import jsonwebtoken from 'jsonwebtoken';
 import { createUser, findUserByEmail } from '../services/userService';
 import { User } from '../models/user.types';
 import logger from '../utils/logger';
 
+// Define interfaces for request bodies
+interface RegisterRequestBody {
+  email?: string;
+  password?: string;
+}
+
+interface LoginRequestBody {
+  email?: string;
+  password?: string;
+}
+
 const router = Router();
 
 // POST /register
-router.post('/register', async (req, res) => {
+router.post('/register', (async (req: Request<{}, {}, RegisterRequestBody>, res: Response, next: NextFunction) => {
   try {
     const { email, password } = req.body;
 
@@ -47,10 +58,10 @@ router.post('/register', async (req, res) => {
     const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
     res.status(500).json({ message: 'Internal server error during registration.', error: message });
   }
-});
+}) as RequestHandler);
 
 // POST /login
-router.post('/login', async (req, res) => {
+router.post('/login', (async (req: Request<{}, {}, LoginRequestBody>, res: Response, next: NextFunction) => {
   try {
     const { email, password } = req.body;
 
@@ -95,6 +106,6 @@ router.post('/login', async (req, res) => {
     const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
     res.status(500).json({ message: 'Internal server error during login.', error: message });
   }
-});
+}) as RequestHandler);
 
 export default router;
