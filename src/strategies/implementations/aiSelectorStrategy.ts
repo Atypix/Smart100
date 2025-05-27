@@ -114,9 +114,13 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
   // Map to store best parameters found for each chosen strategy ID, if optimization was run
   // This might be better managed externally or passed differently for final execution
   optimizedParamsForChoice: new Map<string, Record<string, any>>(),
+  lastAIDecision: null as AIDecision | null, // Property to store the last decision
 
 
   async execute(context: StrategyContext<AISelectorStrategyParams>): Promise<StrategySignal> {
+    // Reset lastAIDecision at the beginning of each execution
+    (this as any).lastAIDecision = null;
+
     const { 
         evaluationLookbackPeriod, 
         candidateStrategyIds: candidateStrategyIdsString, 
@@ -336,57 +340,76 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
 
     if (!bestStrategyId) {
       logger.warn(`AISelectorStrategy for ${symbol}: No suitable strategy found after evaluation (metric: ${metric}, best value: ${currentBestMetricValue}). Holding.`);
+      
+      // Populate lastAIDecision for "no choice"
+      const currentBarForDecision = context.historicalData[context.currentIndex];
+      (this as any).lastAIDecision = {
+        timestamp: currentBarForDecision.timestamp,
+        date: currentBarForDecision.date || new Date(currentBarForDecision.timestamp).toISOString().split('T')[0],
+        chosenStrategyId: null,
+        chosenStrategyName: null,
+        parametersUsed: null,
+        evaluationScore: null, // Or currentBestMetricValue if it means "best score among failing candidates"
+        evaluationMetricUsed: metric,
+      };
       return StrategySignal.HOLD;
     }
 
-    logger.info(`AISelectorStrategy for ${symbol}: Chose strategy ${bestStrategyId} using metric '${metric}' with score ${currentBestMetricValue.toFixed(4)}.`);
-    (this as any).currentChoicesBySymbol.set(symbol, bestStrategyId); 
-    if (bestStrategyId && bestOverallParams && Object.keys(bestOverallParams).length > 0) { // Ensure bestOverallParams is not empty
-        (this as any).optimizedParamsForChoice.set(symbol, { strategyId: bestStrategyId, params: bestOverallParams });
-        logger.info(`AISelectorStrategy for ${symbol}: Stored optimized params for ${bestStrategyId}: ${JSON.stringify(bestOverallParams)}`);
-    } else if (bestStrategyId) {
-        // If optimization was off or no better params found, ensure any old optimized params for this symbol are cleared.
-        // And store the default params used for this choice.
-        const defaultParamsForChosenStrategy: Record<string, any> = {};
-        const tempStrategy = StrategyManager.getStrategy(bestStrategyId);
-        if (tempStrategy) {
-            tempStrategy.parameters.forEach(p => defaultParamsForChosenStrategy[p.name] = p.defaultValue);
-        }
-        (this as any).optimizedParamsForChoice.set(symbol, { strategyId: bestStrategyId, params: defaultParamsForChosenStrategy });
-        logger.info(`AISelectorStrategy for ${symbol}: Stored default params for ${bestStrategyId} as optimization was off or yielded no improvement.`);
-    }
-
-
+    // A strategy was chosen
     const finalSelectedStrategy = StrategyManager.getStrategy(bestStrategyId);
     if (!finalSelectedStrategy) {
       logger.error(`AISelectorStrategy for ${symbol}: Failed to retrieve chosen strategy ${bestStrategyId} from manager. Holding.`);
+      // Populate lastAIDecision for "error retrieving chosen strategy"
+      const currentBarForDecision = context.historicalData[context.currentIndex];
+      (this as any).lastAIDecision = {
+        timestamp: currentBarForDecision.timestamp,
+        date: currentBarForDecision.date || new Date(currentBarForDecision.timestamp).toISOString().split('T')[0],
+        chosenStrategyId: bestStrategyId, // We know the ID, but not the name or params
+        chosenStrategyName: "Error: Strategy not found in manager",
+        parametersUsed: bestOverallParams, // Could be null if optimization was off/failed for this ID
+        evaluationScore: currentBestMetricValue,
+        evaluationMetricUsed: metric,
+      };
       return StrategySignal.HOLD;
     }
     
-    // Prepare context for final execution
-    const strategyContextForExecution: StrategyContext<any> = {
-        ...context, // Clone original context
-        parameters: {}, // Will be populated below
-    };
+    logger.info(`AISelectorStrategy for ${symbol}: Chose strategy ${bestStrategyId} using metric '${metric}' with score ${currentBestMetricValue.toFixed(4)}.`);
+    (this as any).currentChoicesBySymbol.set(symbol, bestStrategyId); 
 
-    // Get default parameters for the selected strategy
+    let paramsToStoreAndExecuteWith: Record<string, any>;
     const defaultSelectedStrategyParams: Record<string, any> = {};
     finalSelectedStrategy.parameters.forEach(p => {
         defaultSelectedStrategyParams[p.name] = p.defaultValue;
     });
 
     if (optimizeParameters && bestOverallParams && Object.keys(bestOverallParams).length > 0) {
-        // Merge defaults with optimized parameters
-        strategyContextForExecution.parameters = {
-            ...defaultSelectedStrategyParams,
-            ...bestOverallParams 
-        };
-        logger.info(`AISelectorStrategy for ${symbol}: Executing ${finalSelectedStrategy.id} with OPTIMIZED parameters: ${JSON.stringify(strategyContextForExecution.parameters)}`);
+        paramsToStoreAndExecuteWith = { ...defaultSelectedStrategyParams, ...bestOverallParams };
+        logger.info(`AISelectorStrategy for ${symbol}: Storing OPTIMIZED params for ${bestStrategyId}: ${JSON.stringify(paramsToStoreAndExecuteWith)}`);
     } else {
-        // Execute with default parameters of the chosen strategy
-        strategyContextForExecution.parameters = defaultSelectedStrategyParams;
-        logger.info(`AISelectorStrategy for ${symbol}: Executing ${finalSelectedStrategy.id} with DEFAULT parameters: ${JSON.stringify(strategyContextForExecution.parameters)}`);
+        paramsToStoreAndExecuteWith = defaultSelectedStrategyParams;
+        logger.info(`AISelectorStrategy for ${symbol}: Storing DEFAULT params for ${bestStrategyId} as optimization was off or yielded no/suboptimal improvement.`);
     }
+    (this as any).optimizedParamsForChoice.set(symbol, { strategyId: bestStrategyId, params: paramsToStoreAndExecuteWith });
+    
+    // Populate lastAIDecision with the successful choice
+    const currentBarForDecision = context.historicalData[context.currentIndex];
+    (this as any).lastAIDecision = {
+      timestamp: currentBarForDecision.timestamp,
+      date: currentBarForDecision.date || new Date(currentBarForDecision.timestamp).toISOString().split('T')[0],
+      chosenStrategyId: bestStrategyId,
+      chosenStrategyName: finalSelectedStrategy.name,
+      parametersUsed: paramsToStoreAndExecuteWith,
+      evaluationScore: currentBestMetricValue,
+      evaluationMetricUsed: metric,
+    };
+
+    // Prepare context for final execution
+    const strategyContextForExecution: StrategyContext<any> = {
+        ...context, // Clone original context
+        parameters: paramsToStoreAndExecuteWith, 
+    };
+    
+    logger.info(`AISelectorStrategy for ${symbol}: Executing ${finalSelectedStrategy.id} with effective parameters: ${JSON.stringify(strategyContextForExecution.parameters)}`);
     
     return finalSelectedStrategy.execute(strategyContextForExecution); 
   }
@@ -396,6 +419,7 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
 (aiSelectorStrategy as any).currentChoicesBySymbol = new Map<string, string>();
 // Stores: symbol -> { strategyId: string, params: Record<string, any> }
 (aiSelectorStrategy as any).optimizedParamsForChoice = new Map<string, { strategyId: string, params: Record<string, any> }>();
+(aiSelectorStrategy as any).lastAIDecision = null;
 
 
 // Helper function for API to get current AI choice and its parameters

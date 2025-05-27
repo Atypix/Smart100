@@ -238,14 +238,15 @@ const BacktestRunnerPage: React.FC = () => {
             {backtestResult.historicalDataUsed && backtestResult.historicalDataUsed.length > 0 && backtestResult.trades && (
               <TradesOnPriceChart 
                 priceData={backtestResult.historicalDataUsed as ReadonlyArray<FrontendHistoricalDataPoint>} 
-                tradesData={backtestResult.trades.map((trade: Trade) => ({ // Ensure this map produces what TradesOnPriceChart expects
-                  timestamp: trade.timestamp, // Assuming TradesOnPriceChart expects these field names
+                tradesData={backtestResult.trades.map((trade: Trade) => ({ 
+                  timestamp: trade.timestamp, 
                   date: trade.date,
                   action: trade.action,
                   price: trade.price,
                   sharesTraded: trade.sharesTraded,
                   cashAfterTrade: trade.cashAfterTrade
                 }))}
+                aiDecisionLog={backtestResult.aiDecisionLog} // Pass the AI decision log
               />
             )}
           </div>

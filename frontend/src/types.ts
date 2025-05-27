@@ -72,6 +72,18 @@ export interface BacktestResult {
   dataPointsProcessed: number;
   historicalDataUsed?: HistoricalDataPoint[];
   portfolioHistory?: { timestamp: number; value: number }[];
+  aiDecisionLog?: AIDecision[]; // New field
+}
+
+// --- AI Decision Log Type ---
+export interface AIDecision {
+  timestamp: number;
+  date: string;
+  chosenStrategyId: string | null;
+  chosenStrategyName?: string | null;
+  parametersUsed?: Record<string, any> | null;
+  evaluationScore?: number | null;
+  evaluationMetricUsed?: string | null;
 }
 
 // --- Charting Specific Types ---
