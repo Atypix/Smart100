@@ -456,10 +456,14 @@ The following strategies are currently implemented and can be used in `backtestC
 *   **AI Strategy Selector (`ai-selector`)**:
     *   **Name**: AI Strategy Selector
     *   **ID**: `ai-selector`
-    *   **Description**: A meta-strategy that dynamically selects and executes an underlying trading strategy. Its choice is based on a short-term performance simulation of candidate strategies using recent market data. It selects from other available, non-meta strategies.
+    *   **Description**: A meta-strategy that dynamically selects and executes an underlying trading strategy. Its choice is based on a short-term performance simulation of candidate strategies using recent market data and a configurable evaluation metric. It selects from other available, non-meta strategies.
     *   **Parameters**:
         *   `evaluationLookbackPeriod` (number): Number of recent data points used to evaluate candidate strategies. (Default: 30)
         *   `candidateStrategyIds` (string): Optional comma-separated list of strategy IDs to consider (e.g., "ichimoku-cloud,macd-crossover"). If empty, all available concrete (non-meta) strategies are considered. (Default: "")
+        *   `evaluationMetric` (string): Specifies the metric used by the AI to evaluate and select the best underlying strategy. Default: `"pnl"`.
+            *   `"pnl"`: Selects the strategy with the highest simulated Profit/Loss over the lookback period.
+            *   `"sharpe"`: Selects the strategy with the best simplified Sharpe Ratio (average per-candle return divided by standard deviation of per-candle returns) over the lookback period.
+            *   `"winRate"`: Selects the strategy with the highest Win Rate (percentage of profitable simulated trades) over the lookback period.
 
 ## 9. Adding a New Strategy
 

@@ -101,6 +101,7 @@ describe('AISelectorStrategy Execution', () => {
       parameters: {
         evaluationLookbackPeriod: 30,
         candidateStrategyIds: '', // All strategies are candidates
+        evaluationMetric: 'pnl', // Explicitly set for these P&L focused tests
       },
       portfolio: {} as any, // Mock as needed for main execution, not simulation part
       trades: [],
@@ -382,6 +383,7 @@ describe('AISelectorStrategy - Specific Candidate IDs', () => {
     // StratB (HOLD) and StratC (SELL) are candidates. Prices are increasing.
     // HOLD (P&L 0) should be better than SELL (P&L < 0). StratA (BUY, P&L > 0) is NOT a candidate.
     // So StratB should be chosen.
+    mockContext.parameters.evaluationMetric = 'pnl'; // Explicitly P&L for this test too
     
     await aiSelectorStrategy.execute(mockContext);
 
@@ -406,5 +408,244 @@ describe('AISelectorStrategy - Specific Candidate IDs', () => {
     // StratB's main execute IS called. StratC's main execute is NOT.
     expect(stratB_execute).toHaveBeenCalledWith(mockContext); 
     expect(stratC_execute).not.toHaveBeenCalledWith(mockContext);
+  });
+});
+
+describe('AISelectorStrategy - Metric-Specific Selection', () => {
+  let mockContext: StrategyContext<any>;
+  const lookback = 10; // Shorter lookback for simpler metric test data
+
+  // More dynamic data for varied returns
+  const metricTestData: HistoricalData[] = Array.from({ length: lookback + 5 }, (_, i) => ({ // +5 for main context current index
+    timestamp: Date.now() - (lookback + 5 - i) * 24 * 60 * 60 * 1000,
+    open: 100 + i * 2,
+    high: 105 + i * 2,
+    low: 95 + i * 2,
+    // close prices: 100, 101, 102, 103, 104, 103, 102, 104, 105, 106 -- varied for Sharpe
+    close: [100,101,102,103,104,103,102,104,105,106,107,108,109,110,111][i] || 100 + i,
+    volume: 1000,
+    symbol: 'METRIC_TEST',
+  }));
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    getAISelectorChoices().clear();
+
+    mockContext = {
+      symbol: 'METRIC_TEST',
+      historicalData: metricTestData,
+      currentIndex: metricTestData.length -1, // current bar is the last one
+      parameters: {
+        evaluationLookbackPeriod: lookback, // Use the shorter lookback
+        candidateStrategyIds: '',
+        evaluationMetric: 'pnl', // Default, will be overridden in tests
+      },
+      portfolio: {} as any, trades: [], currentSignal: StrategySignal.HOLD, signalHistory: [],
+    };
+  });
+
+  test("Selection by 'winRate'", async () => {
+    mockContext.parameters.evaluationMetric = 'winRate';
+
+    // StratWin: High Win Rate (4 wins / 5 trades = 0.8), P&L = 1+1+1+1-4 = 0
+    const stratWin_execute = jest.fn()
+      .mockResolvedValueOnce(StrategySignal.BUY)  // Bar 0: Buy at 100
+      .mockResolvedValueOnce(StrategySignal.SELL) // Bar 1: Sell at 101 (Win: +1)
+      .mockResolvedValueOnce(StrategySignal.BUY)  // Bar 2: Buy at 102
+      .mockResolvedValueOnce(StrategySignal.SELL) // Bar 3: Sell at 103 (Win: +1)
+      .mockResolvedValueOnce(StrategySignal.BUY)  // Bar 4: Buy at 104
+      .mockResolvedValueOnce(StrategySignal.SELL) // Bar 5: Sell at 103 (Loss: -1)
+      .mockResolvedValueOnce(StrategySignal.BUY)  // Bar 6: Buy at 102
+      .mockResolvedValueOnce(StrategySignal.SELL) // Bar 7: Sell at 104 (Win: +2)
+      .mockResolvedValueOnce(StrategySignal.BUY)  // Bar 8: Buy at 105
+      .mockResolvedValueOnce(StrategySignal.SELL) // Bar 9: Sell at 106 (Win: +1)
+      .mockResolvedValue(StrategySignal.HOLD); // Subsequent calls
+
+    // StratPnl: Lower Win Rate (1 win / 1 trade = 1.0, but fewer trades), Higher P&L = 6
+    // To make it more distinct from StratWin, let's give it 1 win / 2 trades = 0.5
+    const stratPnl_execute = jest.fn()
+      .mockResolvedValueOnce(StrategySignal.BUY)  // Bar 0: Buy at 100
+      .mockResolvedValueOnce(StrategySignal.SELL) // Bar 1: Sell at 101 (Win: +1)
+      .mockResolvedValueOnce(StrategySignal.BUY)  // Bar 2: Buy at 102
+      .mockResolvedValueOnce(StrategySignal.SELL) // Bar 3: Sell at 100 (Loss: -2)
+      .mockResolvedValue(StrategySignal.HOLD);   // PNL = -1, WinRate = 0.5 (1/2)
+
+    const dummyStratWin = createDummyStrategy('stratWin', 'High WinRate Strat', stratWin_execute);
+    const dummyStratPnl = createDummyStrategy('stratPnl', 'High P&L Strat', stratPnl_execute);
+
+    (StrategyManager.getAvailableStrategies as jest.Mock).mockReturnValue([dummyStratWin, dummyStratPnl]);
+    (StrategyManager.getStrategy as jest.Mock).mockImplementation(id => {
+      if (id === 'stratWin') return dummyStratWin;
+      if (id === 'stratPnl') return dummyStratPnl;
+      return undefined;
+    });
+    
+    await aiSelectorStrategy.execute(mockContext);
+    // Expected for stratWin: 5 trades, 4 profitable. WinRate = 0.8. PNL = 1+1-1+2+1 = 4
+    // Expected for stratPnl: 2 trades, 1 profitable. WinRate = 0.5. PNL = 1-2 = -1
+
+    expect(getAISelectorChoices().get('METRIC_TEST')).toBe('stratWin');
+    expect(logger.info).toHaveBeenCalledWith(expect.stringContaining("Chose strategy stratWin using metric 'winRate' with score 0.8000"));
+    expect(dummyStratWin.execute).toHaveBeenCalledWith(mockContext); // Main context execution
+  });
+
+
+  test("Selection by 'sharpe'", async () => {
+    mockContext.parameters.evaluationMetric = 'sharpe';
+
+    // StratSharpe: Lower P&L, but very consistent positive returns (low std dev)
+    // Returns: (101-100)/100=0.01, (102-101)/101=0.0099, (103-102)/102=0.0098. Total PNL = 3. Sharp ~ high
+    const stratSharpe_execute = jest.fn()
+      .mockResolvedValueOnce(StrategySignal.BUY)  // Bar 0: Buy at 100
+      .mockResolvedValueOnce(StrategySignal.HOLD) // Bar 1: Price 101. Return for holding: (101-100)/100 = 0.01
+      .mockResolvedValueOnce(StrategySignal.HOLD) // Bar 2: Price 102. Return for holding: (102-101)/101 = 0.0099...
+      .mockResolvedValueOnce(StrategySignal.SELL) // Bar 3: Price 103. Return for holding: (103-102)/102 = 0.0098...  Sell for PNL=3
+      .mockResolvedValue(StrategySignal.HOLD);    // PNL = 3. Returns for Sharpe: [0.01, 0.0099, 0.0098] (approx)
+
+    // StratVolatile: Higher P&L possible, but volatile returns (high std dev)
+    // PNL = 6. Returns for Sharpe: [0.04, -0.0097, 0.019] (approx)
+    const stratVolatile_execute = jest.fn()
+      .mockResolvedValueOnce(StrategySignal.BUY)  // Bar 0: Buy at 100
+      .mockResolvedValueOnce(StrategySignal.HOLD) // Bar 1: Price 101
+      .mockResolvedValueOnce(StrategySignal.HOLD) // Bar 2: Price 102
+      .mockResolvedValueOnce(StrategySignal.HOLD) // Bar 3: Price 103
+      .mockResolvedValueOnce(StrategySignal.HOLD) // Bar 4: Price 104. Return for holding: (104-100)/100 = 0.04 (if held from start)
+                                                 // Let's make it trade more for clearer period returns
+                                                 // Buy at 100 (Bar 0), Sell at 104 (Bar 4). PNL = 4. Returns while holding: [0.01,0.0099,0.0098,0.0097]
+                                                 // Buy at 103 (Bar 5), Sell at 102 (Bar 6). PNL = -1. Returns while holding: [-0.0097]
+                                                 // Buy at 104 (Bar 7), Sell at 106 (Bar 9). PNL = +2. Returns while holding: [0.0096, 0.0095]
+                                                 // Total PNL = 4-1+2 = 5
+      .mockReset() // Reset any previous calls if this mock is reused
+      .mockResolvedValueOnce(StrategySignal.BUY)  // Bar 0: Buy at 100
+      .mockResolvedValueOnce(StrategySignal.HOLD) // Bar 1: Price 101. Ret: 0.01
+      .mockResolvedValueOnce(StrategySignal.HOLD) // Bar 2: Price 102. Ret: 0.0099
+      .mockResolvedValueOnce(StrategySignal.SELL) // Bar 3: Price 103. Sell. PNL = 3. Ret: 0.0098. Trade 1 (Win)
+      .mockResolvedValueOnce(StrategySignal.BUY)  // Bar 4: Price 104. Buy.
+      .mockResolvedValueOnce(StrategySignal.SELL) // Bar 5: Price 103. Sell. PNL = -1. Ret: -0.0096. Trade 2 (Loss)
+      .mockResolvedValueOnce(StrategySignal.BUY)  // Bar 6: Price 102. Buy
+      .mockResolvedValueOnce(StrategySignal.SELL) // Bar 7: Price 104. Sell. PNL = +2. Ret: 0.0196. Trade 3 (Win)
+      .mockResolvedValue(StrategySignal.HOLD);   // Total PNL = 3-1+2 = 4. Win Rate 2/3 = 0.66
+                                                 // StratSharpe PNL = 3. Win Rate 1/1 = 1.0
+
+    const dummyStratSharpe = createDummyStrategy('stratSharpe', 'High Sharpe Strat', stratSharpe_execute);
+    const dummyStratVolatile = createDummyStrategy('stratVolatile', 'Volatile P&L Strat', stratVolatile_execute);
+
+    (StrategyManager.getAvailableStrategies as jest.Mock).mockReturnValue([dummyStratSharpe, dummyStratVolatile]);
+    (StrategyManager.getStrategy as jest.Mock).mockImplementation(id => {
+      if (id === 'stratSharpe') return dummyStratSharpe;
+      if (id === 'stratVolatile') return dummyStratVolatile;
+      return undefined;
+    });
+    
+    await aiSelectorStrategy.execute(mockContext);
+    // StratSharpe: PNL=3. Trades=1, Profitable=1. WinRate=1.0. Returns for position: [0.01, 0.00990099, 0.00980392]. AvgRet ~0.0099. StdDev ~0.00009. Sharpe ~ High.
+    // StratVolatile: PNL=4. Trades=3, Profitable=2. WinRate=0.66. Returns for positions: [0.01, 0.0099, 0.0098], [-0.0096], [0.0196]. Will have higher std dev.
+    
+    expect(getAISelectorChoices().get('METRIC_TEST')).toBe('stratSharpe');
+    expect(logger.info).toHaveBeenCalledWith(expect.stringContaining("Chose strategy stratSharpe using metric 'sharpe'"));
+    expect(dummyStratSharpe.execute).toHaveBeenCalledWith(mockContext);
+  });
+
+  test("Default to 'pnl' if evaluationMetric is invalid", async () => {
+    mockContext.parameters.evaluationMetric = 'invalidMetricName';
+
+    // StratPnl: PNL = 10
+    const stratPnl_execute = jest.fn()
+      .mockResolvedValueOnce(StrategySignal.BUY)  // Bar 0: Buy at 100
+      .mockResolvedValueOnce(StrategySignal.SELL); // Bar 1: Sell at 101. PNL = 1. Trade 1 (Win)
+      // Let's make PNL higher: buy at 100, sell at 110 (imaginary price for simplicity of PNL focus)
+      // For real data: Buy at 100 (Bar 0), Sell at 106 (Bar 9). PNL = 6
+    stratPnl_execute.mockReset()
+        .mockResolvedValueOnce(StrategySignal.BUY) // Bar 0: Buy at 100
+        .mockResolvedValueOnce(StrategySignal.HOLD) // Bar 1: 101
+        .mockResolvedValueOnce(StrategySignal.HOLD) // Bar 2: 102
+        .mockResolvedValueOnce(StrategySignal.HOLD) // Bar 3: 103
+        .mockResolvedValueOnce(StrategySignal.HOLD) // Bar 4: 104
+        .mockResolvedValueOnce(StrategySignal.HOLD) // Bar 5: 103
+        .mockResolvedValueOnce(StrategySignal.HOLD) // Bar 6: 102
+        .mockResolvedValueOnce(StrategySignal.HOLD) // Bar 7: 104
+        .mockResolvedValueOnce(StrategySignal.HOLD) // Bar 8: 105
+        .mockResolvedValueOnce(StrategySignal.SELL) // Bar 9: Sell at 106. PNL = 6. WinRate = 1/1 = 1.0
+        .mockResolvedValue(StrategySignal.HOLD);
+
+
+    // StratWin: WinRate = 0.8 (4/5), PNL = 4 (as from winRate test)
+    const stratWin_execute = jest.fn()
+      .mockResolvedValueOnce(StrategySignal.BUY)  // Bar 0: Buy at 100, Sell at 101 (PNL +1) Win
+      .mockResolvedValueOnce(StrategySignal.SELL)
+      .mockResolvedValueOnce(StrategySignal.BUY)  // Bar 2: Buy at 102, Sell at 103 (PNL +1) Win
+      .mockResolvedValueOnce(StrategySignal.SELL)
+      .mockResolvedValueOnce(StrategySignal.BUY)  // Bar 4: Buy at 104, Sell at 103 (PNL -1) Loss
+      .mockResolvedValueOnce(StrategySignal.SELL)
+      .mockResolvedValueOnce(StrategySignal.BUY)  // Bar 6: Buy at 102, Sell at 104 (PNL +2) Win
+      .mockResolvedValueOnce(StrategySignal.SELL)
+      .mockResolvedValueOnce(StrategySignal.BUY)  // Bar 8: Buy at 105, Sell at 106 (PNL +1) Win
+      .mockResolvedValueOnce(StrategySignal.SELL)
+      .mockResolvedValue(StrategySignal.HOLD);
+
+    const dummyStratPnl = createDummyStrategy('stratPnlForDefault', 'High PNL for Default', stratPnl_execute);
+    const dummyStratWin = createDummyStrategy('stratWinForDefault', 'High WinRate for Default', stratWin_execute);
+    
+    (StrategyManager.getAvailableStrategies as jest.Mock).mockReturnValue([dummyStratPnl, dummyStratWin]);
+    (StrategyManager.getStrategy as jest.Mock).mockImplementation(id => {
+      if (id === 'stratPnlForDefault') return dummyStratPnl;
+      if (id === 'stratWinForDefault') return dummyStratWin;
+      return undefined;
+    });
+
+    await aiSelectorStrategy.execute(mockContext);
+    // StratPnl: PNL = 6, WinRate = 1.0
+    // StratWin: PNL = 4, WinRate = 0.8
+    // Defaulting to PNL, stratPnlForDefault should win.
+    expect(getAISelectorChoices().get('METRIC_TEST')).toBe('stratPnlForDefault');
+    expect(logger.info).toHaveBeenCalledWith(expect.stringContaining("Chose strategy stratPnlForDefault using metric 'pnl' with score 6.0000"));
+    expect(dummyStratPnl.execute).toHaveBeenCalledWith(mockContext);
+  });
+
+   test("Default to 'pnl' if evaluationMetric is missing", async () => {
+    delete mockContext.parameters.evaluationMetric; // Remove the metric parameter
+
+    // Same strategies and expectations as the 'invalidMetricName' test
+    const stratPnl_execute = jest.fn()
+        .mockResolvedValueOnce(StrategySignal.BUY) 
+        .mockResolvedValueOnce(StrategySignal.HOLD) 
+        .mockResolvedValueOnce(StrategySignal.HOLD) 
+        .mockResolvedValueOnce(StrategySignal.HOLD) 
+        .mockResolvedValueOnce(StrategySignal.HOLD) 
+        .mockResolvedValueOnce(StrategySignal.HOLD) 
+        .mockResolvedValueOnce(StrategySignal.HOLD) 
+        .mockResolvedValueOnce(StrategySignal.HOLD) 
+        .mockResolvedValueOnce(StrategySignal.HOLD) 
+        .mockResolvedValueOnce(StrategySignal.SELL) 
+        .mockResolvedValue(StrategySignal.HOLD);
+
+
+    const stratWin_execute = jest.fn()
+      .mockResolvedValueOnce(StrategySignal.BUY)
+      .mockResolvedValueOnce(StrategySignal.SELL)
+      .mockResolvedValueOnce(StrategySignal.BUY)
+      .mockResolvedValueOnce(StrategySignal.SELL)
+      .mockResolvedValueOnce(StrategySignal.BUY)
+      .mockResolvedValueOnce(StrategySignal.SELL)
+      .mockResolvedValueOnce(StrategySignal.BUY)
+      .mockResolvedValueOnce(StrategySignal.SELL)
+      .mockResolvedValueOnce(StrategySignal.BUY)
+      .mockResolvedValueOnce(StrategySignal.SELL)
+      .mockResolvedValue(StrategySignal.HOLD);
+
+    const dummyStratPnl = createDummyStrategy('stratPnlForMissing', 'High PNL for Missing', stratPnl_execute);
+    const dummyStratWin = createDummyStrategy('stratWinForMissing', 'High WinRate for Missing', stratWin_execute);
+    
+    (StrategyManager.getAvailableStrategies as jest.Mock).mockReturnValue([dummyStratPnl, dummyStratWin]);
+    (StrategyManager.getStrategy as jest.Mock).mockImplementation(id => {
+      if (id === 'stratPnlForMissing') return dummyStratPnl;
+      if (id === 'stratWinForMissing') return dummyStratWin;
+      return undefined;
+    });
+
+    await aiSelectorStrategy.execute(mockContext);
+    expect(getAISelectorChoices().get('METRIC_TEST')).toBe('stratPnlForMissing');
+    expect(logger.info).toHaveBeenCalledWith(expect.stringContaining("Chose strategy stratPnlForMissing using metric 'pnl' with score 6.0000"));
+    expect(dummyStratPnl.execute).toHaveBeenCalledWith(mockContext);
   });
 });

@@ -8,6 +8,7 @@ import { Trade } from '../../portfolio/trade'; // Assuming this path
 interface AISelectorStrategyParams {
   evaluationLookbackPeriod: number;
   candidateStrategyIds?: string[];
+  evaluationMetric?: 'pnl' | 'sharpe' | 'winRate' | string; // Allow string for flexibility, but guide with specific types
 }
 
 export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
@@ -29,6 +30,17 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
       label: "Candidate Strategy IDs (comma-separated)",
       description: "Optional. A comma-separated list of strategy IDs to consider. If empty, all available strategies (excluding self) will be candidates.",
     },
+    evaluationMetric: {
+      type: 'string',
+      defaultValue: 'pnl',
+      label: 'Evaluation Metric for AI Selection',
+      description: "Metric to evaluate candidate strategies. Options: 'pnl' (Profit/Loss), 'sharpe' (Sharpe Ratio), 'winRate' (Win Rate).",
+      options: [
+        { value: 'pnl', label: 'Profit/Loss' },
+        { value: 'sharpe', label: 'Sharpe Ratio (placeholder)' }, // Mark as placeholder if not implemented
+        { value: 'winRate', label: 'Win Rate (placeholder)' }, // Mark as placeholder if not implemented
+      ],
+    },
   },
 
   // Static cache to store symbol -> chosenStrategyId
@@ -37,9 +49,14 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
   // currentChoicesBySymbol: new Map<string, string>(), // Will be initialized properly later
 
   async execute(context: StrategyContext<AISelectorStrategyParams>): Promise<StrategySignal> {
-    logger.info(`AISelectorStrategy: Starting execution for symbol ${context.symbol} at index ${context.currentIndex}`);
-    const { evaluationLookbackPeriod, candidateStrategyIds: candidateStrategyIdsString } = context.parameters;
-    const symbol = context.symbol; // Assuming context.symbol is available and correct
+    const { evaluationLookbackPeriod, candidateStrategyIds: candidateStrategyIdsString, evaluationMetric: rawEvaluationMetric } = context.parameters;
+    const symbol = context.symbol; 
+    
+    // Ensure evaluationMetric is valid, default to 'pnl'
+    const validMetrics = ['pnl', 'sharpe', 'winRate'];
+    const metric = validMetrics.includes(rawEvaluationMetric || '') ? rawEvaluationMetric : 'pnl';
+
+    logger.info(`AISelectorStrategy: Starting execution for symbol ${symbol} at index ${context.currentIndex}. Evaluation Metric: ${metric}`);
 
     // Parse candidateStrategyIdsString
     const explicitCandidateIds = candidateStrategyIdsString && candidateStrategyIdsString.trim() !== ""
@@ -81,14 +98,32 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
     }
 
     // --- Evaluation Loop ---
-    logger.verbose(`AISelectorStrategy for ${symbol}: Evaluating ${candidateStrategies.length} candidates over ${evaluationData.length} periods.`);
+    // Note: The actual evaluation logic using different metrics ('sharpe', 'winRate') is not implemented in this step.
+    // This step only focuses on adding the parameter and making it accessible.
+    // The loop will still use 'maxPnl' for now.
+    logger.verbose(`AISelectorStrategy for ${symbol}: Evaluating ${candidateStrategies.length} candidates over ${evaluationData.length} periods using metric: ${metric}.`);
     let bestStrategyId: string | null = null;
-    let maxPnl = -Infinity;
+    let currentBestMetricValue = -Infinity; // Generalized for P&L, Sharpe (can be negative), WinRate (0-1)
+
+    // TODO: Adapt comparison logic based on the chosen 'metric' (e.g. for Sharpe, higher is better; for WinRate, higher is better)
+    // For now, the existing P&L logic will serve as the placeholder for other metrics as well.
+    // If metric is 'pnl', currentBestMetricValue behaves like maxPnl.
+    // If metric is 'sharpe', a different calculation and comparison would be needed.
+    // If metric is 'winRate', a different calculation and comparison would be needed.
+
+    interface SimulatedPosition {
+      entryPrice: number;
+      type: 'long' | 'short';
+    }
 
     for (const candidateStrategy of candidateStrategies) {
-      let currentPnl = 0;
-      let position = 0; // 0 = no position, 1 = long
-      let entryPrice = 0;
+      let simulatedPnl = 0;
+      let simulatedTrades = 0;
+      let profitableSimulatedTrades = 0;
+      const periodReturns: number[] = [];
+      let currentSimulatedPosition: SimulatedPosition | null = null;
+      let lastPrice = evaluationData.length > 0 ? evaluationData[0].close : 0;
+
 
       // Prepare default parameters for the candidate strategy
       const candidateParams: { [key: string]: any } = {};
@@ -101,68 +136,147 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
       // Simulate over the evaluationData
       for (let i = 0; i < evaluationData.length; i++) {
         const currentBar = evaluationData[i];
-        if (!currentBar) continue; // Should not happen if data is clean
+        if (!currentBar) continue; 
+
+        const currentPrice = currentBar.close;
+        const previousPrice = (i > 0) ? evaluationData[i-1].close : currentPrice;
+
 
         const simulationContext: StrategyContext<any> = {
-          // symbol: symbol, // Already available via currentBar.symbol if needed
-          symbol: context.symbol, // Pass the main symbol
-          historicalData: evaluationData, // The sliced historical data for this simulation run
-          currentIndex: i, // Current index within the evaluationData slice
-          parameters: candidateParams, // Default parameters for the candidate strategy
-          // TODO: The following need careful consideration for simulation:
-          // What should portfolio, trades, currentSignal, and signalHistory be for simulation?
-          // For a simple P&L, we might not need a full Portfolio object.
-          portfolio: { // Simplified mock portfolio for this simulation
-            getCash: () => 100000, // Arbitrary large number, won't be used in this P&L calc
-            getPosition: () => ({ quantity: position, averagePrice: entryPrice }),
-            getTrades: () => [],
-            recordTrade: (trade: Trade) => { /* Mock */ },
-            getMarketValue: () => 0, // Mock
-            getHistoricalPnl: () => [], // Mock
-          } as unknown as Portfolio, // Cast to Portfolio, acknowledging it's a simplified mock
-          trades: [], // Mock
-          currentSignal: StrategySignal.HOLD, // Mock, strategy will determine this
-          signalHistory: [], // Mock
-          // logger: logger, // Could pass logger if strategies use it heavily
+          symbol: context.symbol,
+          historicalData: evaluationData,
+          currentIndex: i,
+          parameters: candidateParams,
+          portfolio: { 
+            getCash: () => 100000,
+            getPosition: () => {
+              if (currentSimulatedPosition) {
+                return { 
+                  quantity: currentSimulatedPosition.type === 'long' ? 1 : -1, 
+                  averagePrice: currentSimulatedPosition.entryPrice 
+                };
+              }
+              return { quantity: 0, averagePrice: 0 };
+            },
+            getTrades: () => [], recordTrade: () => {}, getMarketValue: () => 0, getHistoricalPnl: () => [],
+          } as unknown as Portfolio,
+          trades: [], currentSignal: StrategySignal.HOLD, signalHistory: [],
         };
 
-        // Execute the candidate strategy
-        const signal = await candidateStrategy.execute(simulationContext);
+        const signalResult = await candidateStrategy.execute(simulationContext);
+        const signalAction = typeof signalResult === 'string' ? signalResult : signalResult.action;
 
-        if (position === 0 && signal === StrategySignal.BUY) {
-          position = 1;
-          entryPrice = currentBar.close;
-          logger.silly(`AISelectorStrategy Sim (${candidateStrategy.id}) for ${symbol}: BUY at ${entryPrice} on bar ${i}`);
-        } else if (position === 1 && signal === StrategySignal.SELL) {
-          currentPnl += (currentBar.close - entryPrice);
-          position = 0;
-          entryPrice = 0;
-          logger.silly(`AISelectorStrategy Sim (${candidateStrategy.id}) for ${symbol}: SELL at ${currentBar.close} (Entry: ${entryPrice}). P&L: ${currentPnl} on bar ${i}`);
+
+        // P&L and Win Rate Calculation Update
+        if (signalAction === StrategySignal.BUY) {
+          if (!currentSimulatedPosition) { // Open long
+            currentSimulatedPosition = { entryPrice: currentPrice, type: 'long' };
+            simulatedTrades++;
+            logger.silly(`AISelectorStrategy Sim (${candidateStrategy.id}) for ${symbol}: Opened LONG at ${currentPrice} on bar ${i}`);
+          } else if (currentSimulatedPosition.type === 'short') { // Close short
+            const pnlFromTrade = currentSimulatedPosition.entryPrice - currentPrice;
+            simulatedPnl += pnlFromTrade;
+            if (pnlFromTrade > 0) profitableSimulatedTrades++;
+            logger.silly(`AISelectorStrategy Sim (${candidateStrategy.id}) for ${symbol}: Closed SHORT at ${currentPrice} (Entry: ${currentSimulatedPosition.entryPrice}). P&L: ${pnlFromTrade.toFixed(2)} on bar ${i}`);
+            currentSimulatedPosition = null;
+          }
+        } else if (signalAction === StrategySignal.SELL) {
+          if (!currentSimulatedPosition) { // Open short
+            currentSimulatedPosition = { entryPrice: currentPrice, type: 'short' };
+            simulatedTrades++;
+            logger.silly(`AISelectorStrategy Sim (${candidateStrategy.id}) for ${symbol}: Opened SHORT at ${currentPrice} on bar ${i}`);
+          } else if (currentSimulatedPosition.type === 'long') { // Close long
+            const pnlFromTrade = currentPrice - currentSimulatedPosition.entryPrice;
+            simulatedPnl += pnlFromTrade;
+            if (pnlFromTrade > 0) profitableSimulatedTrades++;
+            logger.silly(`AISelectorStrategy Sim (${candidateStrategy.id}) for ${symbol}: Closed LONG at ${currentPrice} (Entry: ${currentSimulatedPosition.entryPrice}). P&L: ${pnlFromTrade.toFixed(2)} on bar ${i}`);
+            currentSimulatedPosition = null;
+          }
         }
-        // Hold signals do nothing to P&L or position
+
+        // Sharpe Ratio - Per-Candle Returns
+        let candleReturn = 0;
+        if (currentSimulatedPosition) { // Based on the position held *during* the candle (i.e., before this signal might close it)
+                                      // or more accurately, position held at the *start* of this candle.
+                                      // For simplicity, let's use the position status *after* the above BUY/SELL logic, assuming signal acts on current bar's open/close.
+                                      // This means the return is for the period the position was held leading *up to* the currentPrice.
+          if (currentSimulatedPosition.type === 'long') {
+            candleReturn = previousPrice > 0 ? (currentPrice - previousPrice) / previousPrice : 0;
+          } else if (currentSimulatedPosition.type === 'short') {
+            candleReturn = previousPrice > 0 ? (previousPrice - currentPrice) / previousPrice : 0;
+          }
+        }
+        periodReturns.push(candleReturn);
+        lastPrice = currentPrice;
       }
 
-      // If still in a position at the end, close it at the last price for P&L calculation
-      if (position === 1 && evaluationData.length > 0) {
-        const lastPrice = evaluationData[evaluationData.length - 1].close;
-        currentPnl += (lastPrice - entryPrice);
-        logger.silly(`AISelectorStrategy Sim (${candidateStrategy.id}) for ${symbol}: Closed final position at ${lastPrice}. Final P&L for sim: ${currentPnl}`);
+      // Finalize P&L for any open position
+      if (currentSimulatedPosition && evaluationData.length > 0) {
+        // lastPrice is already updated from the loop
+        if (currentSimulatedPosition.type === 'long') {
+          const pnlFromTrade = lastPrice - currentSimulatedPosition.entryPrice;
+          simulatedPnl += pnlFromTrade;
+          if (pnlFromTrade > 0) profitableSimulatedTrades++; // Count it if the "close" is profitable
+          logger.silly(`AISelectorStrategy Sim (${candidateStrategy.id}) for ${symbol}: Auto-closed LONG at ${lastPrice} (Entry: ${currentSimulatedPosition.entryPrice}). P&L: ${pnlFromTrade.toFixed(2)} at end of eval.`);
+        } else if (currentSimulatedPosition.type === 'short') {
+          const pnlFromTrade = currentSimulatedPosition.entryPrice - lastPrice;
+          simulatedPnl += pnlFromTrade;
+          if (pnlFromTrade > 0) profitableSimulatedTrades++;
+          logger.silly(`AISelectorStrategy Sim (${candidateStrategy.id}) for ${symbol}: Auto-closed SHORT at ${lastPrice} (Entry: ${currentSimulatedPosition.entryPrice}). P&L: ${pnlFromTrade.toFixed(2)} at end of eval.`);
+        }
+        currentSimulatedPosition = null;
+      }
+      
+      // Calculate Final Metrics
+      const pnlScore = simulatedPnl;
+      const winRateScore = simulatedTrades > 0 ? profitableSimulatedTrades / simulatedTrades : 0;
+      
+      let sharpeScore = 0;
+      if (periodReturns.length >= 2) { // Need at least 2 returns for standard deviation
+        const averageReturn = periodReturns.reduce((a, b) => a + b, 0) / periodReturns.length;
+        const stdDev = Math.sqrt(periodReturns.map(x => Math.pow(x - averageReturn, 2)).reduce((a, b) => a + b, 0) / (periodReturns.length -1)); // Sample std dev
+        
+        // Assuming risk-free rate of 0 for simplicity.
+        // Handle stdDev = 0: If avg return is positive, very high Sharpe; negative, very low; zero, zero.
+        if (stdDev === 0) {
+          sharpeScore = averageReturn > 0 ? 1000 : (averageReturn < 0 ? -1000 : 0); // Arbitrary large numbers for effectively infinite Sharpe
+        } else {
+          sharpeScore = averageReturn / stdDev;
+        }
+        // Annualize Sharpe: (Daily Sharpe) * sqrt(252 trading days). Assuming daily data for now.
+        // This requires knowing the interval of evaluationData. For now, let's skip annualization here.
+        // sharpeScore = sharpeScore * Math.sqrt(252); // Example if daily data
       }
 
-      logger.verbose(`AISelectorStrategy for ${symbol}: Candidate ${candidateStrategy.id} simulated P&L: ${currentPnl.toFixed(2)}`);
+      let calculatedMetricValue = 0;
+      switch (metric) {
+        case 'pnl':
+          calculatedMetricValue = pnlScore;
+          break;
+        case 'winRate':
+          calculatedMetricValue = winRateScore;
+          break;
+        case 'sharpe':
+          calculatedMetricValue = sharpeScore;
+          break;
+        default: // Should not happen due to earlier validation
+          calculatedMetricValue = pnlScore;
+      }
+      
+      logger.verbose(`AISelectorStrategy for ${symbol}: Candidate ${candidateStrategy.id} - P&L: ${pnlScore.toFixed(2)}, WinRate: ${winRateScore.toFixed(2)}, Sharpe: ${sharpeScore.toFixed(2)}. Chosen metric (${metric}) value: ${calculatedMetricValue.toFixed(2)}`);
 
-      if (currentPnl > maxPnl) {
-        maxPnl = currentPnl;
+      if (calculatedMetricValue > currentBestMetricValue) {
+        currentBestMetricValue = calculatedMetricValue;
         bestStrategyId = candidateStrategy.id;
       }
     }
 
     if (!bestStrategyId) {
-      logger.warn(`AISelectorStrategy for ${symbol}: No suitable strategy found after evaluation. Holding.`);
+      logger.warn(`AISelectorStrategy for ${symbol}: No suitable strategy found after evaluation (metric: ${metric}, best value: ${currentBestMetricValue}). Holding.`);
       return StrategySignal.HOLD;
     }
 
-    logger.info(`AISelectorStrategy for ${symbol}: Chose strategy ${bestStrategyId} with simulated P&L ${maxPnl.toFixed(2)}.`);
+    logger.info(`AISelectorStrategy for ${symbol}: Chose strategy ${bestStrategyId} using metric '${metric}' with score ${currentBestMetricValue.toFixed(4)}.`);
     (this as any).currentChoicesBySymbol.set(symbol, bestStrategyId);
 
     const finalSelectedStrategy = StrategyManager.getStrategy(bestStrategyId);
