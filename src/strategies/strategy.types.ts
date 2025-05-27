@@ -11,9 +11,10 @@ export interface StrategyParameterDefinition {
   type: StrategyParameterType;
   defaultValue: number | string | boolean;
   description?: string;
-  min?: number; // Optional: for number types
-  max?: number; // Optional: for number types
-  step?: number; // Optional: for number types
+  options?: Array<{ value: string | number; label: string }>; // For string/number types to provide selection options
+  min?: number;    // New: for numerical parameters
+  max?: number;    // New: for numerical parameters
+  step?: number;   // New: for numerical parameters, defines increment for grid search
 }
 
 export interface StrategyContext {

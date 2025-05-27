@@ -15,7 +15,7 @@ const aiPricePredictionStrategyParameters: StrategyParameterDefinition[] = [
   { name: 'denseUnits', label: 'Dense Units (0 for none)', type: 'number', defaultValue: 16, min: 0, max: 64, step: 1 },
   { name: 'buyThreshold', label: 'Buy Signal Threshold', type: 'number', defaultValue: 0.6, min: 0.5, max: 1.0, step: 0.01 },
   { name: 'sellThreshold', label: 'Sell Signal Threshold', type: 'number', defaultValue: 0.4, min: 0.0, max: 0.5, step: 0.01 },
-  { name: 'tradeAmount', label: 'Trade Amount', type: 'number', defaultValue: 1, min: 0.001, step: 0.001 },
+  { name: 'tradeAmount', label: 'Trade Amount', type: 'number', defaultValue: 1, min: 0.001, max: 1000, step: 0.001 }, // Added max
 ];
 
 class AIPricePredictionStrategy implements TradingStrategy {

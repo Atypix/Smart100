@@ -456,7 +456,7 @@ The following strategies are currently implemented and can be used in `backtestC
 *   **AI Strategy Selector (`ai-selector`)**:
     *   **Name**: AI Strategy Selector
     *   **ID**: `ai-selector`
-    *   **Description**: A meta-strategy that dynamically selects and executes an underlying trading strategy. Its choice is based on a short-term performance simulation of candidate strategies using recent market data and a configurable evaluation metric. It selects from other available, non-meta strategies.
+    *   **Description**: A meta-strategy that dynamically selects and executes an underlying trading strategy. Its choice is based on a short-term performance simulation of candidate strategies using recent market data and a configurable evaluation metric. It can optionally optimize parameters for candidate strategies. It selects from other available, non-meta strategies.
     *   **Parameters**:
         *   `evaluationLookbackPeriod` (number): Number of recent data points used to evaluate candidate strategies. (Default: 30)
         *   `candidateStrategyIds` (string): Optional comma-separated list of strategy IDs to consider (e.g., "ichimoku-cloud,macd-crossover"). If empty, all available concrete (non-meta) strategies are considered. (Default: "")
@@ -464,6 +464,10 @@ The following strategies are currently implemented and can be used in `backtestC
             *   `"pnl"`: Selects the strategy with the highest simulated Profit/Loss over the lookback period.
             *   `"sharpe"`: Selects the strategy with the best simplified Sharpe Ratio (average per-candle return divided by standard deviation of per-candle returns) over the lookback period.
             *   `"winRate"`: Selects the strategy with the highest Win Rate (percentage of profitable simulated trades) over the lookback period.
+        *   `optimizeParameters` (boolean): If set to `true`, the AI Strategy Selector will attempt to optimize the parameters of its candidate strategies using a Grid Search algorithm. This significantly increases evaluation time but can lead to better strategy performance. Default: `false`.
+            *   **Note on Optimization**: When `optimizeParameters` is true, the AI evaluates strategies by searching for the best parameter combinations within predefined ranges (`min`, `max`, `step` which must be set in the individual strategy definitions for numerical parameters).
+            *   **Performance Warning**: Enabling `optimizeParameters` can be computationally intensive and may significantly slow down backtests or decision-making processes, especially with many candidate strategies, multiple optimizable parameters per strategy, or wide parameter ranges with small steps.
+    *   **Defining Optimizable Strategy Parameters**: For a strategy's parameters to be optimizable by the `AISelectorStrategy`, its numerical parameter definitions within its implementation file (e.g., `src/strategies/implementations/ichimokuStrategy.ts`) must include `min`, `max`, and `step` attributes to define the search space for the Grid Search.
 
 ## 9. Adding a New Strategy
 

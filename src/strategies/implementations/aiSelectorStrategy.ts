@@ -8,8 +8,64 @@ import { Trade } from '../../portfolio/trade'; // Assuming this path
 interface AISelectorStrategyParams {
   evaluationLookbackPeriod: number;
   candidateStrategyIds?: string[];
-  evaluationMetric?: 'pnl' | 'sharpe' | 'winRate' | string; // Allow string for flexibility, but guide with specific types
+  evaluationMetric?: 'pnl' | 'sharpe' | 'winRate' | string;
+  optimizeParameters?: boolean;
 }
+
+// Helper function for Grid Search
+function generateParameterCombinations(
+    optimizableParams: Array<{ name: string; min: number; max: number; step: number; }>,
+    paramDefaults: Record<string, any>
+): Array<Record<string, any>> {
+    const combinations: Array<Record<string, any>> = [];
+    const tempCombination: Record<string, any> = { ...paramDefaults };
+
+    function recurse(paramIndex: number) {
+        if (paramIndex === optimizableParams.length) {
+            combinations.push({ ...tempCombination });
+            return;
+        }
+
+        const param = optimizableParams[paramIndex];
+        // Ensure min, max, step are valid numbers
+        const min = Number(param.min);
+        const max = Number(param.max);
+        const step = Number(param.step);
+
+        if (isNaN(min) || isNaN(max) || isNaN(step)) {
+             logger.warn(`[generateParameterCombinations] Invalid min/max/step for param ${param.name}. Skipping.`);
+             recurse(paramIndex + 1); // Try next parameter
+             return;
+        }
+        if (step <= 0) { // Prevent infinite loops or no progress
+            logger.warn(`[generateParameterCombinations] Invalid step value ${step} for param ${param.name}. Using default value only.`);
+            tempCombination[param.name] = paramDefaults[param.name] !== undefined ? paramDefaults[param.name] : min; // Use default or min
+            recurse(paramIndex + 1);
+            return;
+        }
+
+        let currentValue = min;
+        while (currentValue <= max) {
+            tempCombination[param.name] = currentValue;
+            recurse(paramIndex + 1);
+            if (currentValue === max && step > 0) break; // Ensure max is included but avoid overshooting with large steps
+            currentValue += step;
+            if (currentValue > max && (currentValue - step) < max) { // Add max if step overshoots it
+                tempCombination[param.name] = max;
+                recurse(paramIndex + 1);
+                break;
+            }
+        }
+    }
+    
+    if (optimizableParams.length === 0) {
+        return [paramDefaults]; // No optimizable params, return defaults
+    }
+
+    recurse(0);
+    return combinations.length > 0 ? combinations : [paramDefaults]; // Fallback if recursion somehow yields no combos
+}
+
 
 export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
   id: "ai-selector",
@@ -21,6 +77,7 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
       defaultValue: 30,
       min: 5,
       max: 200,
+      step: 5, // Added step
       label: 'Evaluation Lookback Period',
       description: 'Number of recent data points to evaluate candidate strategies.',
     },
@@ -37,9 +94,16 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
       description: "Metric to evaluate candidate strategies. Options: 'pnl' (Profit/Loss), 'sharpe' (Sharpe Ratio), 'winRate' (Win Rate).",
       options: [
         { value: 'pnl', label: 'Profit/Loss' },
-        { value: 'sharpe', label: 'Sharpe Ratio (placeholder)' }, // Mark as placeholder if not implemented
-        { value: 'winRate', label: 'Win Rate (placeholder)' }, // Mark as placeholder if not implemented
+        { value: 'sharpe', label: 'Sharpe Ratio' }, 
+        { value: 'winRate', label: 'Win Rate' }, 
       ],
+    },
+    optimizeParameters: {
+        name: 'optimizeParameters',
+        label: 'Optimize Parameters of Candidate Strategies',
+        type: 'boolean',
+        defaultValue: false,
+        description: 'If true, AI will attempt to optimize parameters of candidate strategies using Grid Search. Significantly increases execution time.',
     },
   },
 
@@ -47,9 +111,18 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
   // This needs to be part of the object, but 'static' is for classes.
   // We'll make it a property of the strategy object itself.
   // currentChoicesBySymbol: new Map<string, string>(), // Will be initialized properly later
+  // Map to store best parameters found for each chosen strategy ID, if optimization was run
+  // This might be better managed externally or passed differently for final execution
+  optimizedParamsForChoice: new Map<string, Record<string, any>>(),
+
 
   async execute(context: StrategyContext<AISelectorStrategyParams>): Promise<StrategySignal> {
-    const { evaluationLookbackPeriod, candidateStrategyIds: candidateStrategyIdsString, evaluationMetric: rawEvaluationMetric } = context.parameters;
+    const { 
+        evaluationLookbackPeriod, 
+        candidateStrategyIds: candidateStrategyIdsString, 
+        evaluationMetric: rawEvaluationMetric,
+        optimizeParameters 
+    } = context.parameters;
     const symbol = context.symbol; 
     
     // Ensure evaluationMetric is valid, default to 'pnl'
@@ -115,159 +188,149 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
       entryPrice: number;
       type: 'long' | 'short';
     }
+    
+    let bestOverallParams: Record<string, any> | null = null; // To store optimized params for the chosen strategy
 
     for (const candidateStrategy of candidateStrategies) {
-      let simulatedPnl = 0;
-      let simulatedTrades = 0;
-      let profitableSimulatedTrades = 0;
-      const periodReturns: number[] = [];
-      let currentSimulatedPosition: SimulatedPosition | null = null;
-      let lastPrice = evaluationData.length > 0 ? evaluationData[0].close : 0;
+      let bestParamsForCandidate: Record<string, any> | null = null;
+      let bestMetricScoreForCandidate = -Infinity;
 
+      const paramSetsToSimulate: Array<Record<string, any>> = [];
 
-      // Prepare default parameters for the candidate strategy
-      const candidateParams: { [key: string]: any } = {};
-      for (const paramName in candidateStrategy.parameters) {
-        candidateParams[paramName] = candidateStrategy.parameters[paramName].defaultValue;
-      }
-
-      logger.verbose(`AISelectorStrategy for ${symbol}: Simulating candidate ${candidateStrategy.id} with params: ${JSON.stringify(candidateParams)}`);
-
-      // Simulate over the evaluationData
-      for (let i = 0; i < evaluationData.length; i++) {
-        const currentBar = evaluationData[i];
-        if (!currentBar) continue; 
-
-        const currentPrice = currentBar.close;
-        const previousPrice = (i > 0) ? evaluationData[i-1].close : currentPrice;
-
-
-        const simulationContext: StrategyContext<any> = {
-          symbol: context.symbol,
-          historicalData: evaluationData,
-          currentIndex: i,
-          parameters: candidateParams,
-          portfolio: { 
-            getCash: () => 100000,
-            getPosition: () => {
-              if (currentSimulatedPosition) {
-                return { 
-                  quantity: currentSimulatedPosition.type === 'long' ? 1 : -1, 
-                  averagePrice: currentSimulatedPosition.entryPrice 
-                };
-              }
-              return { quantity: 0, averagePrice: 0 };
-            },
-            getTrades: () => [], recordTrade: () => {}, getMarketValue: () => 0, getHistoricalPnl: () => [],
-          } as unknown as Portfolio,
-          trades: [], currentSignal: StrategySignal.HOLD, signalHistory: [],
-        };
-
-        const signalResult = await candidateStrategy.execute(simulationContext);
-        const signalAction = typeof signalResult === 'string' ? signalResult : signalResult.action;
-
-
-        // P&L and Win Rate Calculation Update
-        if (signalAction === StrategySignal.BUY) {
-          if (!currentSimulatedPosition) { // Open long
-            currentSimulatedPosition = { entryPrice: currentPrice, type: 'long' };
-            simulatedTrades++;
-            logger.silly(`AISelectorStrategy Sim (${candidateStrategy.id}) for ${symbol}: Opened LONG at ${currentPrice} on bar ${i}`);
-          } else if (currentSimulatedPosition.type === 'short') { // Close short
-            const pnlFromTrade = currentSimulatedPosition.entryPrice - currentPrice;
-            simulatedPnl += pnlFromTrade;
-            if (pnlFromTrade > 0) profitableSimulatedTrades++;
-            logger.silly(`AISelectorStrategy Sim (${candidateStrategy.id}) for ${symbol}: Closed SHORT at ${currentPrice} (Entry: ${currentSimulatedPosition.entryPrice}). P&L: ${pnlFromTrade.toFixed(2)} on bar ${i}`);
-            currentSimulatedPosition = null;
-          }
-        } else if (signalAction === StrategySignal.SELL) {
-          if (!currentSimulatedPosition) { // Open short
-            currentSimulatedPosition = { entryPrice: currentPrice, type: 'short' };
-            simulatedTrades++;
-            logger.silly(`AISelectorStrategy Sim (${candidateStrategy.id}) for ${symbol}: Opened SHORT at ${currentPrice} on bar ${i}`);
-          } else if (currentSimulatedPosition.type === 'long') { // Close long
-            const pnlFromTrade = currentPrice - currentSimulatedPosition.entryPrice;
-            simulatedPnl += pnlFromTrade;
-            if (pnlFromTrade > 0) profitableSimulatedTrades++;
-            logger.silly(`AISelectorStrategy Sim (${candidateStrategy.id}) for ${symbol}: Closed LONG at ${currentPrice} (Entry: ${currentSimulatedPosition.entryPrice}). P&L: ${pnlFromTrade.toFixed(2)} on bar ${i}`);
-            currentSimulatedPosition = null;
-          }
-        }
-
-        // Sharpe Ratio - Per-Candle Returns
-        let candleReturn = 0;
-        if (currentSimulatedPosition) { // Based on the position held *during* the candle (i.e., before this signal might close it)
-                                      // or more accurately, position held at the *start* of this candle.
-                                      // For simplicity, let's use the position status *after* the above BUY/SELL logic, assuming signal acts on current bar's open/close.
-                                      // This means the return is for the period the position was held leading *up to* the currentPrice.
-          if (currentSimulatedPosition.type === 'long') {
-            candleReturn = previousPrice > 0 ? (currentPrice - previousPrice) / previousPrice : 0;
-          } else if (currentSimulatedPosition.type === 'short') {
-            candleReturn = previousPrice > 0 ? (previousPrice - currentPrice) / previousPrice : 0;
-          }
-        }
-        periodReturns.push(candleReturn);
-        lastPrice = currentPrice;
-      }
-
-      // Finalize P&L for any open position
-      if (currentSimulatedPosition && evaluationData.length > 0) {
-        // lastPrice is already updated from the loop
-        if (currentSimulatedPosition.type === 'long') {
-          const pnlFromTrade = lastPrice - currentSimulatedPosition.entryPrice;
-          simulatedPnl += pnlFromTrade;
-          if (pnlFromTrade > 0) profitableSimulatedTrades++; // Count it if the "close" is profitable
-          logger.silly(`AISelectorStrategy Sim (${candidateStrategy.id}) for ${symbol}: Auto-closed LONG at ${lastPrice} (Entry: ${currentSimulatedPosition.entryPrice}). P&L: ${pnlFromTrade.toFixed(2)} at end of eval.`);
-        } else if (currentSimulatedPosition.type === 'short') {
-          const pnlFromTrade = currentSimulatedPosition.entryPrice - lastPrice;
-          simulatedPnl += pnlFromTrade;
-          if (pnlFromTrade > 0) profitableSimulatedTrades++;
-          logger.silly(`AISelectorStrategy Sim (${candidateStrategy.id}) for ${symbol}: Auto-closed SHORT at ${lastPrice} (Entry: ${currentSimulatedPosition.entryPrice}). P&L: ${pnlFromTrade.toFixed(2)} at end of eval.`);
-        }
-        currentSimulatedPosition = null;
-      }
-      
-      // Calculate Final Metrics
-      const pnlScore = simulatedPnl;
-      const winRateScore = simulatedTrades > 0 ? profitableSimulatedTrades / simulatedTrades : 0;
-      
-      let sharpeScore = 0;
-      if (periodReturns.length >= 2) { // Need at least 2 returns for standard deviation
-        const averageReturn = periodReturns.reduce((a, b) => a + b, 0) / periodReturns.length;
-        const stdDev = Math.sqrt(periodReturns.map(x => Math.pow(x - averageReturn, 2)).reduce((a, b) => a + b, 0) / (periodReturns.length -1)); // Sample std dev
+      if (optimizeParameters) {
+        const optimizableParams = candidateStrategy.parameters.filter(
+          p => p.type === 'number' && p.min !== undefined && p.max !== undefined && p.step !== undefined && p.min <= p.max && p.step > 0
+        ).map(p => ({ name: p.name, min: p.min!, max: p.max!, step: p.step! }));
         
-        // Assuming risk-free rate of 0 for simplicity.
-        // Handle stdDev = 0: If avg return is positive, very high Sharpe; negative, very low; zero, zero.
-        if (stdDev === 0) {
-          sharpeScore = averageReturn > 0 ? 1000 : (averageReturn < 0 ? -1000 : 0); // Arbitrary large numbers for effectively infinite Sharpe
-        } else {
-          sharpeScore = averageReturn / stdDev;
-        }
-        // Annualize Sharpe: (Daily Sharpe) * sqrt(252 trading days). Assuming daily data for now.
-        // This requires knowing the interval of evaluationData. For now, let's skip annualization here.
-        // sharpeScore = sharpeScore * Math.sqrt(252); // Example if daily data
-      }
+        const defaultParams: Record<string, any> = {};
+        candidateStrategy.parameters.forEach(p => defaultParams[p.name] = p.defaultValue);
 
-      let calculatedMetricValue = 0;
-      switch (metric) {
-        case 'pnl':
-          calculatedMetricValue = pnlScore;
-          break;
-        case 'winRate':
-          calculatedMetricValue = winRateScore;
-          break;
-        case 'sharpe':
-          calculatedMetricValue = sharpeScore;
-          break;
-        default: // Should not happen due to earlier validation
-          calculatedMetricValue = pnlScore;
+        if (optimizableParams.length > 0) {
+          const combinations = generateParameterCombinations(optimizableParams, defaultParams);
+          if (combinations.length > 1000) { // Warning for excessive combinations
+            logger.warn(`[AISelectorStrategy] Candidate ${candidateStrategy.id} has ${combinations.length} param combinations. This may be slow.`);
+          }
+          paramSetsToSimulate.push(...combinations);
+        } else {
+          paramSetsToSimulate.push(defaultParams); // No optimizable params, use defaults
+        }
+      } else {
+        // Use only default parameters if not optimizing
+        const defaultParams: Record<string, any> = {};
+        candidateStrategy.parameters.forEach(p => defaultParams[p.name] = p.defaultValue);
+        paramSetsToSimulate.push(defaultParams);
       }
       
-      logger.verbose(`AISelectorStrategy for ${symbol}: Candidate ${candidateStrategy.id} - P&L: ${pnlScore.toFixed(2)}, WinRate: ${winRateScore.toFixed(2)}, Sharpe: ${sharpeScore.toFixed(2)}. Chosen metric (${metric}) value: ${calculatedMetricValue.toFixed(2)}`);
+      logger.verbose(`[AISelectorStrategy] Simulating ${candidateStrategy.id} with ${paramSetsToSimulate.length} param sets.`);
 
-      if (calculatedMetricValue > currentBestMetricValue) {
-        currentBestMetricValue = calculatedMetricValue;
+      for (const currentCandidateParams of paramSetsToSimulate) {
+        // --- Start of single simulation run with currentCandidateParams ---
+        let simulatedPnl = 0;
+        let simulatedTrades = 0;
+        let profitableSimulatedTrades = 0;
+        const periodReturns: number[] = [];
+        let currentSimulatedPosition: SimulatedPosition | null = null;
+        let lastPrice = evaluationData.length > 0 ? evaluationData[0].close : 0;
+
+        // Simulate over the evaluationData
+        for (let i = 0; i < evaluationData.length; i++) {
+          const currentBar = evaluationData[i];
+          if (!currentBar) continue; 
+
+          const currentPrice = currentBar.close;
+          const previousPrice = (i > 0) ? evaluationData[i-1].close : currentPrice;
+
+          const simulationContext: StrategyContext<any> = {
+            symbol: context.symbol,
+            historicalData: evaluationData,
+            currentIndex: i,
+            parameters: currentCandidateParams, // Use current combination or defaults
+            portfolio: { 
+              getCash: () => 100000,
+              getPosition: () => currentSimulatedPosition ? { quantity: currentSimulatedPosition.type === 'long' ? 1 : -1, averagePrice: currentSimulatedPosition.entryPrice } : { quantity: 0, averagePrice: 0 },
+              getTrades: () => [], recordTrade: () => {}, getMarketValue: () => 0, getHistoricalPnl: () => [],
+            } as unknown as Portfolio,
+            trades: [], currentSignal: StrategySignal.HOLD, signalHistory: [],
+          };
+
+          const signalResult = await candidateStrategy.execute(simulationContext);
+          const signalAction = typeof signalResult === 'string' ? signalResult : signalResult.action;
+
+          if (signalAction === StrategySignal.BUY) {
+            if (!currentSimulatedPosition) {
+              currentSimulatedPosition = { entryPrice: currentPrice, type: 'long' };
+              simulatedTrades++;
+            } else if (currentSimulatedPosition.type === 'short') {
+              const pnlFromTrade = currentSimulatedPosition.entryPrice - currentPrice;
+              simulatedPnl += pnlFromTrade;
+              if (pnlFromTrade > 0) profitableSimulatedTrades++;
+              currentSimulatedPosition = null;
+            }
+          } else if (signalAction === StrategySignal.SELL) {
+            if (!currentSimulatedPosition) {
+              currentSimulatedPosition = { entryPrice: currentPrice, type: 'short' };
+              simulatedTrades++;
+            } else if (currentSimulatedPosition.type === 'long') {
+              const pnlFromTrade = currentPrice - currentSimulatedPosition.entryPrice;
+              simulatedPnl += pnlFromTrade;
+              if (pnlFromTrade > 0) profitableSimulatedTrades++;
+              currentSimulatedPosition = null;
+            }
+          }
+
+          let candleReturn = 0;
+          if (currentSimulatedPosition) {
+            if (currentSimulatedPosition.type === 'long') candleReturn = previousPrice > 0 ? (currentPrice - previousPrice) / previousPrice : 0;
+            else candleReturn = previousPrice > 0 ? (previousPrice - currentPrice) / previousPrice : 0;
+          }
+          periodReturns.push(candleReturn);
+          lastPrice = currentPrice;
+        }
+
+        if (currentSimulatedPosition && evaluationData.length > 0) {
+          if (currentSimulatedPosition.type === 'long') {
+            const pnlFromTrade = lastPrice - currentSimulatedPosition.entryPrice;
+            simulatedPnl += pnlFromTrade;
+            if (pnlFromTrade > 0) profitableSimulatedTrades++;
+          } else {
+            const pnlFromTrade = currentSimulatedPosition.entryPrice - lastPrice;
+            simulatedPnl += pnlFromTrade;
+            if (pnlFromTrade > 0) profitableSimulatedTrades++;
+          }
+        }
+        
+        const pnlScore = simulatedPnl;
+        const winRateScore = simulatedTrades > 0 ? profitableSimulatedTrades / simulatedTrades : 0;
+        let sharpeScore = 0;
+        if (periodReturns.length >= 2) {
+          const averageReturn = periodReturns.reduce((a, b) => a + b, 0) / periodReturns.length;
+          const stdDev = Math.sqrt(periodReturns.map(x => Math.pow(x - averageReturn, 2)).reduce((a, b) => a + b, 0) / (periodReturns.length -1));
+          if (stdDev === 0) sharpeScore = averageReturn > 0 ? 1000 : (averageReturn < 0 ? -1000 : 0);
+          else sharpeScore = averageReturn / stdDev;
+        }
+
+        let currentCombinationScore = 0;
+        switch (metric) {
+          case 'pnl': currentCombinationScore = pnlScore; break;
+          case 'winRate': currentCombinationScore = winRateScore; break;
+          case 'sharpe': currentCombinationScore = sharpeScore; break;
+          default: currentCombinationScore = pnlScore;
+        }
+        // --- End of single simulation run ---
+
+        if (currentCombinationScore > bestMetricScoreForCandidate) {
+          bestMetricScoreForCandidate = currentCombinationScore;
+          bestParamsForCandidate = { ...currentCandidateParams }; 
+        }
+      } // End of loop over paramSetsToSimulate
+
+      const calculatedMetricValueForCandidate = bestMetricScoreForCandidate;
+      logger.verbose(`AISelectorStrategy for ${symbol}: Candidate ${candidateStrategy.id} best score using metric '${metric}': ${calculatedMetricValueForCandidate.toFixed(4)}. Optimized Params: ${optimizeParameters ? JSON.stringify(bestParamsForCandidate) : "N/A"}`);
+      
+      if (calculatedMetricValueForCandidate > currentBestMetricValue) {
+        currentBestMetricValue = calculatedMetricValueForCandidate;
         bestStrategyId = candidateStrategy.id;
+        bestOverallParams = bestParamsForCandidate; // Store the best params found for the currently best strategy
       }
     }
 
@@ -277,25 +340,118 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
     }
 
     logger.info(`AISelectorStrategy for ${symbol}: Chose strategy ${bestStrategyId} using metric '${metric}' with score ${currentBestMetricValue.toFixed(4)}.`);
-    (this as any).currentChoicesBySymbol.set(symbol, bestStrategyId);
+    (this as any).currentChoicesBySymbol.set(symbol, bestStrategyId); 
+    if (bestStrategyId && bestOverallParams && Object.keys(bestOverallParams).length > 0) { // Ensure bestOverallParams is not empty
+        (this as any).optimizedParamsForChoice.set(symbol, { strategyId: bestStrategyId, params: bestOverallParams });
+        logger.info(`AISelectorStrategy for ${symbol}: Stored optimized params for ${bestStrategyId}: ${JSON.stringify(bestOverallParams)}`);
+    } else if (bestStrategyId) {
+        // If optimization was off or no better params found, ensure any old optimized params for this symbol are cleared.
+        // And store the default params used for this choice.
+        const defaultParamsForChosenStrategy: Record<string, any> = {};
+        const tempStrategy = StrategyManager.getStrategy(bestStrategyId);
+        if (tempStrategy) {
+            tempStrategy.parameters.forEach(p => defaultParamsForChosenStrategy[p.name] = p.defaultValue);
+        }
+        (this as any).optimizedParamsForChoice.set(symbol, { strategyId: bestStrategyId, params: defaultParamsForChosenStrategy });
+        logger.info(`AISelectorStrategy for ${symbol}: Stored default params for ${bestStrategyId} as optimization was off or yielded no improvement.`);
+    }
+
 
     const finalSelectedStrategy = StrategyManager.getStrategy(bestStrategyId);
     if (!finalSelectedStrategy) {
       logger.error(`AISelectorStrategy for ${symbol}: Failed to retrieve chosen strategy ${bestStrategyId} from manager. Holding.`);
       return StrategySignal.HOLD;
     }
+    
+    // Prepare context for final execution
+    const strategyContextForExecution: StrategyContext<any> = {
+        ...context, // Clone original context
+        parameters: {}, // Will be populated below
+    };
 
-    logger.info(`AISelectorStrategy for ${symbol}: Executing chosen strategy ${finalSelectedStrategy.name} (${finalSelectedStrategy.id})`);
-    return finalSelectedStrategy.execute(context); // Execute with the original context
+    // Get default parameters for the selected strategy
+    const defaultSelectedStrategyParams: Record<string, any> = {};
+    finalSelectedStrategy.parameters.forEach(p => {
+        defaultSelectedStrategyParams[p.name] = p.defaultValue;
+    });
+
+    if (optimizeParameters && bestOverallParams && Object.keys(bestOverallParams).length > 0) {
+        // Merge defaults with optimized parameters
+        strategyContextForExecution.parameters = {
+            ...defaultSelectedStrategyParams,
+            ...bestOverallParams 
+        };
+        logger.info(`AISelectorStrategy for ${symbol}: Executing ${finalSelectedStrategy.id} with OPTIMIZED parameters: ${JSON.stringify(strategyContextForExecution.parameters)}`);
+    } else {
+        // Execute with default parameters of the chosen strategy
+        strategyContextForExecution.parameters = defaultSelectedStrategyParams;
+        logger.info(`AISelectorStrategy for ${symbol}: Executing ${finalSelectedStrategy.id} with DEFAULT parameters: ${JSON.stringify(strategyContextForExecution.parameters)}`);
+    }
+    
+    return finalSelectedStrategy.execute(strategyContextForExecution); 
   }
 };
 
-// Initialize the static-like property here if needed, or handle it within the execute method's scope
-// For true static behavior accessible from elsewhere, this might need to be a class or a separate export.
-// For now, let's assume it's a property of this specific strategy object.
+// Initialize the static-like properties
 (aiSelectorStrategy as any).currentChoicesBySymbol = new Map<string, string>();
+// Stores: symbol -> { strategyId: string, params: Record<string, any> }
+(aiSelectorStrategy as any).optimizedParamsForChoice = new Map<string, { strategyId: string, params: Record<string, any> }>();
 
-// Optional: Helper to get the static cache if needed by other parts of the system
-export function getAISelectorChoices(): Map<string, string> {
-  return (aiSelectorStrategy as any).currentChoicesBySymbol;
+
+// Helper function for API to get current AI choice and its parameters
+export interface AISelectorChoiceState {
+    chosenStrategyId: string | null;
+    chosenStrategyName: string | null;
+    parametersUsed: Record<string, any> | null;
+    message?: string; // Optional message, e.g., if no choice made yet
 }
+
+export function getAISelectorActiveState(symbol: string): AISelectorChoiceState {
+    const choiceData = (aiSelectorStrategy as any).optimizedParamsForChoice.get(symbol);
+    
+    if (choiceData && choiceData.strategyId) {
+        const strategyDetails = StrategyManager.getStrategy(choiceData.strategyId);
+        return {
+            chosenStrategyId: choiceData.strategyId,
+            chosenStrategyName: strategyDetails ? strategyDetails.name : "Unknown Strategy",
+            parametersUsed: choiceData.params,
+        };
+    }
+    
+    // Fallback if no entry in optimizedParamsForChoice, but there might be an ID in currentChoicesBySymbol (e.g. from older version or error)
+    const chosenStrategyId = (aiSelectorStrategy as any).currentChoicesBySymbol.get(symbol);
+    if (chosenStrategyId) {
+        const strategyDetails = StrategyManager.getStrategy(chosenStrategyId);
+        // Attempt to provide default params if specific params for this choice weren't stored
+        let params: Record<string, any> | null = null;
+        if (strategyDetails) {
+            params = {};
+            strategyDetails.parameters.forEach(p => params![p.name] = p.defaultValue);
+        }
+        return {
+            chosenStrategyId: chosenStrategyId,
+            chosenStrategyName: strategyDetails ? strategyDetails.name : "Unknown Strategy",
+            parametersUsed: params,
+            message: "Parameters used are defaults; specific optimized/selected params not found in current state."
+        };
+    }
+
+    return {
+        chosenStrategyId: null,
+        chosenStrategyName: null,
+        parametersUsed: null,
+        message: "No strategy choice has been made for this symbol yet."
+    };
+}
+
+// Deprecated or to be reviewed:
+// export function getAISelectorChoices(): Map<string, string> {
+//   return (aiSelectorStrategy as any).currentChoicesBySymbol;
+// }
+// export function getAISelectorOptimizedParams(strategyId: string, symbol: string): Record<string, any> | undefined {
+//     const choice = (aiSelectorStrategy as any).optimizedParamsForChoice.get(symbol);
+//     if (choice && choice.strategyId === strategyId) {
+//         return choice.params;
+//     }
+//     return undefined;
+// }

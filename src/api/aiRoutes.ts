@@ -1,41 +1,44 @@
 import { Router, Request, Response } from 'express';
-import { getAISelectorChoices } from '../strategies/implementations/aiSelectorStrategy';
-import { StrategyManager } from '../strategies/strategyManager';
+// Import the new helper function and its return type
+import { getAISelectorActiveState, AISelectorChoiceState } from '../strategies/implementations/aiSelectorStrategy';
+import { StrategyManager } from '../strategies/strategyManager'; // StrategyManager is likely already imported
 import { logger } from '../utils/logger';
 
 const router = Router();
 
 router.get('/current-strategy/:symbol', (req: Request, res: Response) => {
   const { symbol } = req.params;
+  const upperSymbol = symbol ? symbol.toUpperCase() : "";
 
-  if (!symbol) {
+  if (!upperSymbol) {
     return res.status(400).json({ message: "Symbol parameter is required." });
   }
 
   try {
-    const choicesMap = getAISelectorChoices(); // This gets the whole map
-    const chosenStrategyId = choicesMap.get(symbol.toUpperCase());
+    const aiState: AISelectorChoiceState = getAISelectorActiveState(upperSymbol);
 
-    if (chosenStrategyId) {
-      const strategyDetails = StrategyManager.getStrategy(chosenStrategyId);
-      const strategyName = strategyDetails ? strategyDetails.name : "Unknown Strategy";
-
+    if (aiState.chosenStrategyId && aiState.chosenStrategyName) {
+      // chosenStrategyName is already provided by getAISelectorActiveState
+      const message = `AI is currently using ${aiState.chosenStrategyName} (ID: ${aiState.chosenStrategyId})${aiState.parametersUsed ? ' with specified parameters' : ' with default parameters'} for ${upperSymbol}.`;
+      
       return res.status(200).json({
-        symbol: symbol.toUpperCase(),
-        chosenStrategyId: chosenStrategyId,
-        chosenStrategyName: strategyName,
-        message: `AI is currently using ${strategyName} (ID: ${chosenStrategyId}) for ${symbol.toUpperCase()}.`
+        symbol: upperSymbol,
+        chosenStrategyId: aiState.chosenStrategyId,
+        chosenStrategyName: aiState.chosenStrategyName,
+        chosenParameters: aiState.parametersUsed,
+        message: message
       });
     } else {
+      // Use message from aiState if available (e.g., "No strategy choice has been made...")
       return res.status(404).json({
-        symbol: symbol.toUpperCase(),
-        message: `AI choice not available for symbol ${symbol.toUpperCase()}. AISelectorStrategy may not have been executed for this symbol yet.`
+        symbol: upperSymbol,
+        message: aiState.message || `AI choice not available for symbol ${upperSymbol}.`
       });
     }
   } catch (error) {
-    logger.error(`Error fetching AI choice for symbol ${symbol}:`, error);
+    logger.error(`Error fetching AI choice for symbol ${upperSymbol}:`, error);
     return res.status(500).json({
-        symbol: symbol.toUpperCase(),
+        symbol: upperSymbol,
         message: "Internal server error while fetching AI strategy choice."
     });
   }

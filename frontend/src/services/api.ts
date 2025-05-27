@@ -121,8 +121,9 @@ export const deleteApiKey = async (id: string): Promise<void> => {
 
 export interface AIChoiceResponse {
   symbol: string;
-  chosenStrategyId?: string; // Optional because it might not be found
-  chosenStrategyName?: string; // Optional
+  chosenStrategyId?: string | null; // Can be null if no choice
+  chosenStrategyName?: string | null; // Can be null
+  chosenParameters?: Record<string, any> | null; // New field for chosen parameters
   message: string;
 }
 

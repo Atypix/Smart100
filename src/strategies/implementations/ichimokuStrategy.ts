@@ -134,12 +134,61 @@ function calculateIchimokuComponents(
 // --- Ichimoku Cloud Strategy Definition ---
 
 const ichimokuStrategyParameters: StrategyParameterDefinition[] = [
-  { name: 'tenkanPeriod', label: 'Tenkan-sen Period', type: 'number', defaultValue: 9 },
-  { name: 'kijunPeriod', label: 'Kijun-sen Period', type: 'number', defaultValue: 26 },
-  { name: 'senkouSpanBPeriod', label: 'Senkou Span B Period', type: 'number', defaultValue: 52 },
-  { name: 'chikouLaggingPeriod', label: 'Chikou Span Lag Period', type: 'number', defaultValue: 26 },
-  { name: 'senkouCloudDisplacement', label: 'Cloud Displacement', type: 'number', defaultValue: 26 },
-  { name: 'tradeAmount', label: 'Trade Amount', type: 'number', defaultValue: 1, description: 'Number of shares to trade or units of asset.'}
+  { 
+    name: 'tenkanPeriod', 
+    label: 'Tenkan-sen Period', 
+    type: 'number', 
+    defaultValue: 9,
+    min: 5,
+    max: 20,
+    step: 1
+  },
+  { 
+    name: 'kijunPeriod', 
+    label: 'Kijun-sen Period', 
+    type: 'number', 
+    defaultValue: 26,
+    min: 15,
+    max: 40,
+    step: 1
+  },
+  { 
+    name: 'senkouSpanBPeriod', 
+    label: 'Senkou Span B Period', 
+    type: 'number', 
+    defaultValue: 52,
+    min: 30,
+    max: 70,
+    step: 5
+  },
+  { 
+    name: 'chikouLaggingPeriod', 
+    label: 'Chikou Span Lag Period', 
+    type: 'number', 
+    defaultValue: 26,
+    min: 15,
+    max: 40,
+    step: 1
+  },
+  { 
+    name: 'senkouCloudDisplacement', 
+    label: 'Cloud Displacement', 
+    type: 'number', 
+    defaultValue: 26,
+    min: 15,
+    max: 40,
+    step: 1
+  },
+  { 
+    name: 'tradeAmount', 
+    label: 'Trade Amount', 
+    type: 'number', 
+    defaultValue: 1, 
+    description: 'Number of shares to trade or units of asset.',
+    min: 0.1,
+    max: 100,
+    step: 0.1
+  }
 ];
 
 export const ichimokuCloudStrategy: TradingStrategy = {

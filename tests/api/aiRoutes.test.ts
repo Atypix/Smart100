@@ -1,12 +1,13 @@
 import request from 'supertest';
 import express, { Express } from 'express';
-import mainRouter from '../../src/api/index'; // Assuming this is your main router
-import { getAISelectorChoices } from '../../src/strategies/implementations/aiSelectorStrategy';
+import mainRouter from '../../src/api/index';
+// Import the new helper and its type
+import { getAISelectorActiveState, AISelectorChoiceState } from '../../src/strategies/implementations/aiSelectorStrategy';
 import { StrategyManager } from '../../src/strategies/strategyManager';
-import { TradingStrategy, StrategySignal, StrategyParameterDefinition } from '../../src/strategies/strategy.types'; // For dummy strategy type
-import { logger } from '../../src/utils/logger'; // To potentially silence it during tests
+import { TradingStrategy, StrategySignal, StrategyParameterDefinition } from '../../src/strategies/strategy.types';
+import { logger } from '../../src/utils/logger';
 
-// Mock logger to prevent console output during tests
+// Mock logger
 jest.mock('../../src/utils/logger', () => ({
   logger: {
     info: jest.fn(),
@@ -21,110 +22,109 @@ jest.mock('../../src/utils/logger', () => ({
 // Mock StrategyManager
 jest.mock('../../src/strategies/strategyManager');
 
-// Mock the actual getAISelectorChoices from aiSelectorStrategy
-// We are testing the route, so we need to control what this function returns.
-// The actual implementation of aiSelectorStrategy is tested in its own unit tests.
-jest.mock('../../src/strategies/implementations/aiSelectorStrategy', () => ({
-  ...jest.requireActual('../../src/strategies/implementations/aiSelectorStrategy'), // Import and retain default exports
-  getAISelectorChoices: jest.fn(),
-}));
-
+// Mock the getAISelectorActiveState function from aiSelectorStrategy.ts
+jest.mock('../../src/strategies/implementations/aiSelectorStrategy', () => {
+  const originalModule = jest.requireActual('../../src/strategies/implementations/aiSelectorStrategy');
+  return {
+    ...originalModule, // Retain other exports like AISelectorStrategyParams, etc.
+    getAISelectorActiveState: jest.fn(), // Mock this specific function
+  };
+});
 
 const app: Express = express();
 app.use(express.json());
-// Mount the main router which should include /api/ai routes
-// If your mainRouter is directly the one with /ai, then app.use('/api', mainRouter) might be needed
-// depending on how mainRouter is structured.
-// Given current setup: mainRouter -> aiRoutes (mounted at /ai)
-// So, if mainRouter is used directly at root, then /ai/...
-// If mainRouter is typically mounted at /api, then /api/ai/...
-// The backend setup is app.use('/api', mainRouter); so request path will be /api/ai/...
 app.use('/api', mainRouter);
 
-
 describe('GET /api/ai/current-strategy/:symbol', () => {
-  const mockChoicesMap = new Map<string, string>();
-  
-  const dummyStrategy: TradingStrategy = {
-    id: 'dummyStrat',
-    name: 'Dummy Strategy',
-    description: 'A dummy strategy for testing',
-    parameters: {},
-    execute: jest.fn().mockResolvedValue(StrategySignal.HOLD),
-  };
+  // Define a type for our mock to ensure it's used correctly
+  let mockGetAISelectorActiveState: jest.MockedFunction<typeof getAISelectorActiveState>;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockChoicesMap.clear();
-    (getAISelectorChoices as jest.Mock).mockReturnValue(mockChoicesMap);
+    // Assign the mock to the typed variable
+    mockGetAISelectorActiveState = getAISelectorActiveState as jest.MockedFunction<typeof getAISelectorActiveState>;
   });
 
-  test('Test Case 1: Valid Symbol with AI Choice', async () => {
-    mockChoicesMap.set('TESTSYM', 'dummyStrat');
-    (StrategyManager.getStrategy as jest.Mock).mockReturnValue(dummyStrategy);
+  test('Test Case 1: Valid Symbol with AI Choice (Optimized Parameters)', async () => {
+    const mockOptimizedParams = { period: 10, threshold: 55 };
+    const mockAiState: AISelectorChoiceState = {
+      chosenStrategyId: 'optimizedStrat',
+      chosenStrategyName: 'Optimized Strategy',
+      parametersUsed: mockOptimizedParams,
+      message: 'AI is using Optimized Strategy with specified parameters.' // Optional, can be constructed by API
+    };
+    mockGetAISelectorActiveState.mockReturnValue(mockAiState);
 
-    const response = await request(app).get('/api/ai/current-strategy/TESTSYM');
+    const response = await request(app).get('/api/ai/current-strategy/TESTSYM_OPT');
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
-      symbol: 'TESTSYM',
-      chosenStrategyId: 'dummyStrat',
-      chosenStrategyName: 'Dummy Strategy',
-      message: 'AI is currently using Dummy Strategy (ID: dummyStrat) for TESTSYM.',
+      symbol: 'TESTSYM_OPT',
+      chosenStrategyId: 'optimizedStrat',
+      chosenStrategyName: 'Optimized Strategy',
+      chosenParameters: mockOptimizedParams,
+      message: `AI is currently using Optimized Strategy (ID: optimizedStrat) with specified parameters for TESTSYM_OPT.`,
     });
-    expect(getAISelectorChoices).toHaveBeenCalled();
-    expect(StrategyManager.getStrategy).toHaveBeenCalledWith('dummyStrat');
+    expect(mockGetAISelectorActiveState).toHaveBeenCalledWith('TESTSYM_OPT');
   });
 
   test('Test Case 2: Valid Symbol without AI Choice', async () => {
-    // mockChoicesMap is empty by default or after clear
+    const mockAiStateNoChoice: AISelectorChoiceState = {
+      chosenStrategyId: null,
+      chosenStrategyName: null,
+      parametersUsed: null,
+      message: 'No strategy choice has been made for this symbol yet.',
+    };
+    mockGetAISelectorActiveState.mockReturnValue(mockAiStateNoChoice);
+
     const response = await request(app).get('/api/ai/current-strategy/TESTSYM_NOCHOICE');
 
     expect(response.status).toBe(404);
     expect(response.body).toEqual({
       symbol: 'TESTSYM_NOCHOICE',
-      message: 'AI choice not available for symbol TESTSYM_NOCHOICE. AISelectorStrategy may not have been executed for this symbol yet.',
+      message: 'No strategy choice has been made for this symbol yet.',
     });
-    expect(getAISelectorChoices).toHaveBeenCalled();
-    expect(StrategyManager.getStrategy).not.toHaveBeenCalled();
+    expect(mockGetAISelectorActiveState).toHaveBeenCalledWith('TESTSYM_NOCHOICE');
+  });
+
+  test('Test Case 3: AI Choice with Default Parameters (Optimization Off/Failed)', async () => {
+    const mockDefaultParams = { rsiPeriod: 14, rsiOverbought: 70 };
+    const mockAiStateDefault: AISelectorChoiceState = {
+      chosenStrategyId: 'defaultParamStrat',
+      chosenStrategyName: 'Default Param Strategy',
+      parametersUsed: mockDefaultParams, // These are the defaults for 'defaultParamStrat'
+      message: 'AI is using Default Param Strategy with default parameters.' // Optional
+    };
+    mockGetAISelectorActiveState.mockReturnValue(mockAiStateDefault);
+
+    const response = await request(app).get('/api/ai/current-strategy/TESTSYM_DEF');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      symbol: 'TESTSYM_DEF',
+      chosenStrategyId: 'defaultParamStrat',
+      chosenStrategyName: 'Default Param Strategy',
+      chosenParameters: mockDefaultParams,
+      message: `AI is currently using Default Param Strategy (ID: defaultParamStrat) with specified parameters for TESTSYM_DEF.`,
+    });
+    expect(mockGetAISelectorActiveState).toHaveBeenCalledWith('TESTSYM_DEF');
   });
   
-  test('Test Case 3: Invalid Strategy ID stored (Internal Error Scenario - strategy not found by manager)', async () => {
-    mockChoicesMap.set('TESTSYM_ERR', 'nonExistentStrat');
-    (StrategyManager.getStrategy as jest.Mock).mockReturnValue(undefined); // StrategyManager can't find this strategy
-
-    const response = await request(app).get('/api/ai/current-strategy/TESTSYM_ERR');
-    
-    // The current implementation in aiRoutes.ts returns the ID but "Unknown Strategy" for the name.
-    // This is a graceful handling rather than a 500.
-    // To get a 500, getAISelectorChoices itself would need to throw, or StrategyManager.getStrategy would.
-    // Let's adjust based on current behavior:
-    expect(response.status).toBe(200); // It's handled gracefully by setting name to "Unknown Strategy"
-    expect(response.body).toEqual({
-        symbol: 'TESTSYM_ERR',
-        chosenStrategyId: 'nonExistentStrat',
-        chosenStrategyName: 'Unknown Strategy', // This is how the route handles it
-        message: 'AI is currently using Unknown Strategy (ID: nonExistentStrat) for TESTSYM_ERR.'
-    });
-    // If we want to test a 500, we'd need getAISelectorChoices to throw an error.
-  });
-
-  test('Test Case 3b: Internal Error Scenario - getAISelectorChoices throws error', async () => {
-    (getAISelectorChoices as jest.Mock).mockImplementation(() => {
-      throw new Error("Failed to retrieve choices map");
+  test('Test Case 4: Internal Error Scenario - getAISelectorActiveState throws error', async () => {
+    mockGetAISelectorActiveState.mockImplementation(() => {
+      throw new Error("Internal state error");
     });
 
-    const response = await request(app).get('/api/ai/current-strategy/ANY_SYMBOL');
+    const response = await request(app).get('/api/ai/current-strategy/ANY_SYMBOL_ERR');
 
     expect(response.status).toBe(500);
     expect(response.body).toEqual({
-        symbol: 'ANY_SYMBOL',
+        symbol: 'ANY_SYMBOL_ERR',
         message: "Internal server error while fetching AI strategy choice."
     });
   });
 
-
-  test('Test Case 4: Symbol parameter is missing (Express route handling)', async () => {
+  test('Test Case 5: Symbol parameter is missing', async () => {
     // This tests if the route is even matched if symbol is not there.
     // Depending on Express's strict routing, /api/ai/current-strategy/ (trailing slash) might be different.
     // Typically, a missing param like this would result in a 404 from the router if no other route matches.

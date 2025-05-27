@@ -168,17 +168,39 @@ const BacktestRunnerPage: React.FC = () => {
             {aiChoiceError && <p style={{ color: 'red' }}>Error: {aiChoiceError}</p>}
             {aiChosenStrategyInfo && !isFetchingAIChoice && !aiChoiceError && (
               <div>
-                <p><strong>AI Selector Information for {currentBacktestSettings.symbol}:</strong></p>
+                <p><strong>AI Selector Information for {currentBacktestSettings.symbol || "N/A"}:</strong></p>
                 {aiChosenStrategyInfo.chosenStrategyName ? (
-                  <p>Currently selected: <strong>{aiChosenStrategyInfo.chosenStrategyName}</strong> (ID: {aiChosenStrategyInfo.chosenStrategyId})</p>
+                  <p>Recommended Strategy: <strong>{aiChosenStrategyInfo.chosenStrategyName}</strong> (ID: {aiChosenStrategyInfo.chosenStrategyId})</p>
                 ) : (
-                  <p>{aiChosenStrategyInfo.message}</p> 
+                  // This part might be redundant if aiState.message covers it, but good as a fallback.
+                  <p>{aiChosenStrategyInfo.message || "No strategy recommendation available."}</p> 
                 )}
-                {/* Display the message from backend if it's informative, e.g., "AI choice not available..." */}
-                {aiChosenStrategyInfo.chosenStrategyName && aiChosenStrategyInfo.message && !aiChosenStrategyInfo.message.includes(aiChosenStrategyInfo.chosenStrategyName) && (
-                    <p><em>{aiChosenStrategyInfo.message}</em></p>
+
+                {/* Display Chosen Parameters */}
+                {aiChosenStrategyInfo.chosenParameters && Object.keys(aiChosenStrategyInfo.chosenParameters).length > 0 && (
+                  <div style={{ marginTop: '8px', paddingLeft: '15px' }}>
+                    <p style={{ fontWeight: '600', marginBottom: '4px' }}>Using Parameters:</p>
+                    <ul style={{ listStyleType: 'disc', paddingLeft: '20px', margin: '0' }}>
+                      {Object.entries(aiChosenStrategyInfo.chosenParameters).map(([key, value]) => (
+                        <li key={key} style={{ fontSize: '0.9em' }}>
+                          <code>{key}</code>: {String(value)}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                
+                {/* Display the main message from backend, which might confirm optimization status */}
+                {aiChosenStrategyInfo.message && (
+                    <p style={{ marginTop: '8px', fontStyle: 'italic', fontSize: '0.9em' }}>{aiChosenStrategyInfo.message}</p>
                 )}
               </div>
+            )}
+            {!isFetchingAIChoice && !aiChoiceError && !aiChosenStrategyInfo && currentBacktestSettings.symbol && (
+                 <p><em>No specific recommendation available, or still initializing for {currentBacktestSettings.symbol}.</em></p>
+            )}
+            {!isFetchingAIChoice && !aiChoiceError && !aiChosenStrategyInfo && !currentBacktestSettings.symbol && (
+              <p><em>Enter a symbol to see AI's recommendation.</em></p>
             )}
           </div>
         )}
