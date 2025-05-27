@@ -44,3 +44,14 @@ export interface TradingStrategy {
   // Optional: Function to calculate and return any indicators the strategy might expose for plotting/logging
   // getIndicators?: (context: StrategyContext) => Record<string, number | null>;
 }
+
+export interface AIDecision {
+  timestamp: number;
+  date: string; // Assuming date is stored as string in historical data
+  chosenStrategyId: string | null;
+  chosenStrategyName: string | null;
+  parametersUsed: Record<string, any> | null;
+  evaluationScore: number | null;
+  evaluationMetricUsed: string | null;
+  // Optionally, add other details like P&L of all candidates, etc.
+}

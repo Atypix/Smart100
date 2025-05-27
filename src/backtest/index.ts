@@ -2,10 +2,11 @@ import { fetchHistoricalDataFromDB, HistoricalDataPoint } from '../services/data
 import logger from '../utils/logger'; // Corrected import
 import { 
   TradingStrategy, 
+  TradingStrategy, 
   StrategyContext, 
   StrategySignal, 
   StrategyParameterDefinition,
-  StrategyAction // Already defined locally, but can be imported for consistency
+  AIDecision // Import the new AIDecision interface
 } from '../strategies';
 
 // --- 1. Define Interfaces & Types (Local to backtest, some might be deprecated by strategy.types.ts) ---
@@ -53,6 +54,7 @@ export interface BacktestResult {
   dataPointsProcessed: number; // Added for clarity
   historicalDataUsed?: HistoricalDataPoint[];
   portfolioHistory?: { timestamp: number; value: number }[]; // Added for equity curve
+  aiDecisionLog?: AIDecision[]; // Add the AI decision log
 }
 
 
@@ -163,6 +165,7 @@ export async function runBacktest(
   };
 
   const tradeHistory: Trade[] = [];
+  const aiDecisionLog: AIDecision[] = []; // Initialize AI decision log
 
   const historicalData = await fetchHistoricalDataFromDB(symbol, startDate, endDate, sourceApi, interval);
 
@@ -251,6 +254,27 @@ export async function runBacktest(
     // Update current portfolio value after any potential trade
     portfolio.currentValue = portfolio.cash + portfolio.shares * currentPrice;
     portfolioHistoryTimeline.push({ timestamp: historicalData[i].timestamp, value: portfolio.currentValue });
+
+    // Collect AI Decision Log if applicable
+    if (selectedStrategy.id === 'ai-selector' && (selectedStrategy as any).lastAIDecision) {
+        const decisionToLog = (selectedStrategy as any).lastAIDecision as AIDecision;
+        // Ensure the decision timestamp matches the current bar's timestamp for consistency in the log
+        if (decisionToLog.timestamp === historicalData[i].timestamp) {
+            aiDecisionLog.push({ ...decisionToLog });
+        } else {
+            // This case might occur if AI selector's execute doesn't make a decision for every bar
+            // or if its internal timestamping logic differs. Log with a warning or adjust as needed.
+            logger.debug(`[runBacktest] AI decision timestamp mismatch. Logged decision for ${new Date(decisionToLog.timestamp).toISOString()} at bar ${new Date(historicalData[i].timestamp).toISOString()}`);
+            aiDecisionLog.push({ 
+                ...decisionToLog, 
+                // Override timestamp/date to match current processing point if strictly desired,
+                // but original timestamp from decision is usually more accurate to when decision was made.
+                // For now, keep original decision timestamp.
+            });
+        }
+        // Reset for next potential decision by AI selector on a subsequent bar
+        (selectedStrategy as any).lastAIDecision = null; 
+    }
   }
 
   const finalPortfolioValue = portfolio.currentValue;
@@ -272,6 +296,7 @@ export async function runBacktest(
     dataPointsProcessed: historicalData.length,
     historicalDataUsed: historicalData, // Include the historical data
     portfolioHistory: portfolioHistoryTimeline, // Include portfolio history
+    aiDecisionLog: aiDecisionLog.length > 0 ? aiDecisionLog : undefined, // Add AI decision log
   };
 
   logger.info(`Backtest completed for ${symbol} using strategy ${selectedStrategy.name}`, {

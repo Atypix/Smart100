@@ -73,7 +73,7 @@ describe('Strategy API Endpoints', () => {
     const mockSuccessResult: BacktestResult = {
       symbol: 'BTCUSDT',
       startDate: new Date('2023-01-01').toISOString(),
-      endDate: new Date('2023-03-31').toISOString(),
+      endDate: new Date('2023-03-31').toISOString(), // Ensure this is a string
       initialPortfolioValue: 10000,
       finalPortfolioValue: 12000,
       totalProfitOrLoss: 2000,
@@ -81,6 +81,7 @@ describe('Strategy API Endpoints', () => {
       trades: [],
       totalTrades: 0,
       dataPointsProcessed: 90,
+      // aiDecisionLog is optional, so not included in this general mock result
     };
 
     it('should return 200 and backtest results for a successful backtest', async () => {
@@ -152,6 +153,55 @@ describe('Strategy API Endpoints', () => {
       expect(response.status).toBe(500);
       expect(response.body.message).toBe('Error running backtest');
       expect(response.body.error).toBe('Unexpected backtesting engine failure');
+    });
+
+    it('should return 200 and backtest results including aiDecisionLog when AISelectorStrategy is used', async () => {
+      const mockAIDecisionLog = [
+        {
+          timestamp: 1672531200, // Example timestamp
+          date: '2023-01-01',
+          chosenStrategyId: 'candidateStrat1',
+          chosenStrategyName: 'Candidate Strat 1',
+          parametersUsed: { paramA: 10 },
+          evaluationScore: 0.75,
+          evaluationMetricUsed: 'pnl',
+        },
+      ];
+      const mockAIResult: BacktestResult = {
+        ...mockSuccessResult, // Use base success result
+        symbol: 'AI_TEST_SYM',
+        strategyId: 'ai-selector', // Assuming the request would specify this
+        aiDecisionLog: mockAIDecisionLog,
+      };
+      mockRunBacktest.mockResolvedValue(mockAIResult);
+
+      const aiBacktestBody = {
+        ...validBacktestBody,
+        strategyId: 'ai-selector', // Crucial part for this test
+        symbol: 'AI_TEST_SYM',
+      };
+
+      const response = await request(app)
+        .post('/api/backtest')
+        .send(aiBacktestBody);
+
+      expect(response.status).toBe(200);
+      expect(response.body.symbol).toBe('AI_TEST_SYM');
+      expect(response.body.aiDecisionLog).toBeDefined();
+      expect(Array.isArray(response.body.aiDecisionLog)).toBe(true);
+      expect(response.body.aiDecisionLog.length).toBe(1);
+      expect(response.body.aiDecisionLog[0]).toEqual(mockAIDecisionLog[0]);
+      
+      expect(mockRunBacktest).toHaveBeenCalledWith(
+        aiBacktestBody.symbol,
+        new Date(aiBacktestBody.startDate),
+        new Date(aiBacktestBody.endDate),
+        aiBacktestBody.initialCash,
+        aiBacktestBody.strategyId, // Should be 'ai-selector'
+        aiBacktestBody.strategyParams, // These would be params for AISelector itself
+        aiBacktestBody.sourceApi,
+        aiBacktestBody.interval
+      );
     });
   });
 });

@@ -305,6 +305,90 @@ describe('Backtesting Module Tests', () => {
     });
   });
 
+  describe('runBacktest with AISelectorStrategy', () => {
+    const aiSelectorStrategyId = 'ai-selector';
+    let mockAISelectorStrategy: any; // Use 'any' for flexible mocking of instance properties
+    let mockCandidateStrategy: any;
+
+    const aiTestData: HistoricalDataPoint[] = [
+        createDataPoint(new Date('2023-01-01'), 100),
+        createDataPoint(new Date('2023-01-02'), 105),
+        createDataPoint(new Date('2023-01-03'), 110),
+    ];
+
+    beforeEach(() => {
+        // Mock the AI Selector Strategy and its candidate
+        mockCandidateStrategy = {
+            id: 'candidateA',
+            name: 'Candidate A',
+            parameters: [{ name: 'dummyParam', type: 'number', defaultValue: 1 }],
+            execute: jest.fn().mockReturnValue({ action: 'HOLD' })
+        };
+        
+        mockAISelectorStrategy = {
+            id: aiSelectorStrategyId,
+            name: 'AI Strategy Selector',
+            parameters: [
+                { name: 'evaluationLookbackPeriod', type: 'number', defaultValue: 2 },
+                { name: 'evaluationMetric', type: 'string', defaultValue: 'pnl' },
+                { name: 'optimizeParameters', type: 'boolean', defaultValue: false },
+            ],
+            // Mock the execute method and the lastAIDecision property
+            execute: jest.fn().mockImplementation(async (context: StrategyContext) => {
+                // Simulate AI making a decision and setting lastAIDecision
+                // This is a simplified mock; the actual AI selector has complex logic
+                const decisionTimestamp = context.historicalData[context.currentIndex].timestamp;
+                const decisionDate = context.historicalData[context.currentIndex].date?.toISOString().split('T')[0] || new Date(decisionTimestamp * 1000).toISOString().split('T')[0];
+                
+                mockAISelectorStrategy.lastAIDecision = {
+                    timestamp: decisionTimestamp,
+                    date: decisionDate,
+                    chosenStrategyId: 'candidateA',
+                    chosenStrategyName: 'Candidate A',
+                    parametersUsed: { dummyParam: 1 },
+                    evaluationScore: 10, // Example score
+                    evaluationMetricUsed: context.parameters.evaluationMetric || 'pnl',
+                };
+                // Simulate the chosen strategy's action (e.g., HOLD for simplicity here)
+                return { action: 'HOLD' };
+            }),
+            lastAIDecision: null,
+            // Mock other properties if needed by StrategyManager or runBacktest
+            description: 'Mock AI Selector',
+            optimizedParamsForChoice: new Map(), // Add this if getAISelectorActiveState relies on it
+        };
+
+        (mockGetStrategy as jest.Mock).mockImplementation((id: string) => {
+            if (id === aiSelectorStrategyId) return mockAISelectorStrategy;
+            if (id === 'candidateA') return mockCandidateStrategy;
+            return undefined;
+        });
+    });
+
+    test('should include aiDecisionLog in BacktestResult when AISelectorStrategy is used', async () => {
+        (mockFetchHistoricalDataFromDB as jest.Mock).mockResolvedValue(aiTestData);
+        const aiSelectorParams = { evaluationLookbackPeriod: 2, evaluationMetric: 'pnl', optimizeParameters: false };
+
+        const result = await runBacktest(symbol, startDate, endDate, initialCash, aiSelectorStrategyId, aiSelectorParams);
+
+        expect(result.aiDecisionLog).toBeDefined();
+        expect(Array.isArray(result.aiDecisionLog)).toBe(true);
+        expect(result.aiDecisionLog!.length).toBe(aiTestData.length);
+
+        // Spot-check the first decision log entry
+        if (result.aiDecisionLog && result.aiDecisionLog.length > 0) {
+            const firstDecision = result.aiDecisionLog[0];
+            expect(firstDecision.timestamp).toBe(aiTestData[0].timestamp);
+            expect(firstDecision.chosenStrategyId).toBe('candidateA');
+            expect(firstDecision.chosenStrategyName).toBe('Candidate A');
+            expect(firstDecision.parametersUsed).toEqual({ dummyParam: 1 });
+            expect(firstDecision.evaluationScore).toBe(10);
+            expect(firstDecision.evaluationMetricUsed).toBe('pnl');
+        }
+    });
+  });
+
+
   describe('runBacktest with Invalid Strategy ID', () => {
     test('should handle invalid strategy ID gracefully', async () => {
       const dummyData: HistoricalDataPoint[] = []; // Define dummy data for this test scope

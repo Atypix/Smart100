@@ -18,13 +18,172 @@ import { HistoricalDataPoint } from '../../../src/services/dataService'; // Adju
 import { Trade } from '../../../src/backtest'; // Adjust path if needed
 import { formatDateForChart, formatCurrency, formatDateTimeForChart } from '../utils/formatters'; // Import centralized formatters
 
+import { AIDecision } from '../types'; // Import AIDecision
+import { Customized } from 'recharts'; // Import Customized
+
 // Props for the component
 interface TradesOnPriceChartProps {
-  priceData: ReadonlyArray<HistoricalDataPoint>; // Using HistoricalDataPoint which has { timestamp, close, ... }
-  tradesData: ReadonlyArray<Trade>; // Using Trade from backtest which has { timestamp, price, action, ... }
+  priceData: ReadonlyArray<HistoricalDataPoint>; 
+  tradesData: ReadonlyArray<Trade>; 
+  aiDecisionLog?: ReadonlyArray<AIDecision>; // New prop for AI decision log
 }
 
-const TradesOnPriceChart: React.FC<TradesOnPriceChartProps> = ({ priceData, tradesData }) => {
+interface AIStrategySegment {
+  startTimestamp: number;
+  endTimestamp: number;
+  chosenStrategyId: string | null;
+  chosenStrategyName: string | null;
+  parametersUsed: Record<string, any> | null; // Keep for potential detailed display later
+}
+
+// Custom component to render AI decision annotations
+const AIDecisionAnnotations: React.FC<any> = (props) => {
+  const { data, xAxisMap, yAxisMap, width, height, segments } = props;
+
+  if (!segments || segments.length === 0 || !xAxisMap || !xAxisMap[0] || !yAxisMap || !yAxisMap[0] || !data || data.length === 0) {
+    return null;
+  }
+  
+  const chartTopMargin = props.offset?.top || 5; 
+  const yPosition = chartTopMargin + 10; 
+
+  const colors = ["#FFDDC1", "#C2F0C2", "#BDE0FE", "#FFFACD", "#E6E6FA", "#FFCCF9", "#D4A5A5", "#FDFD96", "#C1E1C5", "#BED3F3"];
+  let colorIndex = 0;
+  const strategyColorMap = new Map<string, string>();
+
+  return (
+    <g>
+      {segments.map((segment: AIStrategySegment, index: number) => {
+        if (!segment.chosenStrategyId) return null;
+
+        const startX = xAxisMap[0].apply(segment.startTimestamp, { bandAware: true });
+        let endX = xAxisMap[0].apply(segment.endTimestamp, { bandAware: true });
+        
+        // Ensure endX is at least startX (can happen if segment is for a single data point)
+        if (endX < startX) endX = startX + 1; // Make it a minimal visible line/area
+
+        const segmentWidth = Math.max(0, endX - startX);
+
+        if (startX < 0 && (startX + segmentWidth) < 0) return null; 
+        if (startX > width) return null;
+
+        let color = strategyColorMap.get(segment.chosenStrategyId);
+        if (!color) {
+            color = colors[colorIndex % colors.length];
+            strategyColorMap.set(segment.chosenStrategyId, color);
+            colorIndex++;
+        }
+        
+        const clipPathId = `clip-segment-${index}`;
+        const visibleStartX = Math.max(0, startX);
+        const visibleWidth = Math.min(segmentWidth, width - visibleStartX);
+
+        if (visibleWidth <=0) return null; // Nothing to render if not visible
+
+        return (
+          <React.Fragment key={`segment-${index}`}>
+            <defs>
+              <clipPath id={clipPathId}>
+                <rect x={visibleStartX} y={chartTopMargin} width={visibleWidth} height={20} />
+              </clipPath>
+            </defs>
+            <rect
+              x={visibleStartX}
+              y={chartTopMargin}
+              width={visibleWidth}
+              height={20} 
+              fill={color}
+              opacity={0.25} 
+            />
+            <text
+              x={visibleStartX + visibleWidth / 2}
+              y={yPosition + 7} // Adjusted for better vertical centering in a 20px band
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fill="#333" 
+              fontSize="10"
+              fontWeight="bold"
+              clipPath={`url(#${clipPathId})`}
+            >
+              {segment.chosenStrategyName || segment.chosenStrategyId || 'N/A'}
+            </text>
+          </React.Fragment>
+        );
+      })}
+    </g>
+  );
+};
+
+
+const TradesOnPriceChart: React.FC<TradesOnPriceChartProps> = ({ priceData, tradesData, aiDecisionLog }) => {
+  const [aiDecisionSegments, setAiDecisionSegments] = React.useState<AIStrategySegment[]>([]);
+
+  React.useEffect(() => {
+    if (aiDecisionLog && aiDecisionLog.length > 0 && priceData && priceData.length > 0) {
+      const segments: AIStrategySegment[] = [];
+      let currentSegment: AIStrategySegment | null = null;
+
+      for (let i = 0; i < priceData.length; i++) {
+        const currentDataPoint = priceData[i];
+        const currentTimestamp = currentDataPoint.timestamp;
+
+        // Find the latest AI decision that occurred at or before the current data point's timestamp
+        const relevantAIDecision = [...aiDecisionLog] // Create a copy to sort without mutating prop
+            .sort((a, b) => b.timestamp - a.timestamp) // Sort descending by timestamp
+            .find(d => d.timestamp <= currentTimestamp);
+
+        const activeStrategyId = relevantAIDecision?.chosenStrategyId || null;
+        const activeStrategyName = relevantAIDecision?.chosenStrategyName || null;
+        const activeParameters = relevantAIDecision?.parametersUsed || null;
+
+        if (!currentSegment) {
+          if (activeStrategyId) { // Start a new segment if there's an active strategy
+            currentSegment = {
+              startTimestamp: currentTimestamp,
+              endTimestamp: currentTimestamp, // Will be updated
+              chosenStrategyId: activeStrategyId,
+              chosenStrategyName: activeStrategyName,
+              parametersUsed: activeParameters,
+            };
+          }
+        } else {
+          // Check if strategy or its parameters changed
+          const paramsChanged = JSON.stringify(currentSegment.parametersUsed) !== JSON.stringify(activeParameters);
+          if (currentSegment.chosenStrategyId !== activeStrategyId || (activeStrategyId && paramsChanged)) {
+            // Strategy or params changed, finalize previous segment
+            currentSegment.endTimestamp = priceData[i-1].timestamp; // Ends at the previous data point
+            segments.push(currentSegment);
+            
+            if (activeStrategyId) { // Start a new segment
+              currentSegment = {
+                startTimestamp: currentTimestamp,
+                endTimestamp: currentTimestamp,
+                chosenStrategyId: activeStrategyId,
+                chosenStrategyName: activeStrategyName,
+                parametersUsed: activeParameters,
+              };
+            } else {
+              currentSegment = null; // No strategy active for this new period
+            }
+          } else {
+            // Strategy is the same, just extend the endTimestamp
+            currentSegment.endTimestamp = currentTimestamp;
+          }
+        }
+      }
+
+      // Finalize the last segment after the loop
+      if (currentSegment) {
+        currentSegment.endTimestamp = priceData[priceData.length - 1].timestamp;
+        segments.push(currentSegment);
+      }
+      setAiDecisionSegments(segments);
+    } else {
+      setAiDecisionSegments([]);
+    }
+  }, [aiDecisionLog, priceData]);
+
+
   if (!priceData || priceData.length === 0) {
     return <p>No price data available to display the chart.</p>;
   }
@@ -102,6 +261,11 @@ const TradesOnPriceChart: React.FC<TradesOnPriceChartProps> = ({ priceData, trad
           />
           <Legend verticalAlign="top" height={36}/>
           
+          {/* AI Decision Annotations */}
+          {aiDecisionSegments.length > 0 && (
+            <Customized component={(props: any) => <AIDecisionAnnotations {...props} segments={aiDecisionSegments} />} />
+          )}
+
           {/* Price Line */}
           <Line
             type="monotone"

@@ -264,6 +264,7 @@ Key directories and files, including recent additions:
         *   This command uses `concurrently` to start both the backend API server (via `npm run dev`) and the frontend development server.
         *   The application now features user registration and login. On first visit, you'll be directed to the login page. If you don't have an account, you can navigate to the registration page.
         *   The UI now also displays the currently recommended strategy by the `AI Strategy Selector` when it is selected, providing real-time insight into its choice for a given symbol before running a full backtest.
+        *   The backtesting results interface has been enhanced to display annotations on the price chart when using the `AISelectorStrategy`. These annotations show the active underlying strategy chosen by the AI for different segments of the backtest period.
         *   **Note**: If you encounter issues with `concurrently` in your specific environment (e.g., "command not found" errors for `ts-node` or `concurrently` itself), you can run the backend and frontend in separate terminals:
             *   Terminal 1 (Root Directory): `npm run dev` (for backend)
             *   Terminal 2 (Root Directory): `npm run frontend:dev` (for frontend)
@@ -312,7 +313,37 @@ All backend endpoints are prefixed with `/api`. The backend provides the followi
           "interval": "string"       // Optional: Data interval (e.g., "1d")
         }
         ```
-    *   **Response Body (Success: 200 OK):** A `BacktestResult` object containing detailed results of the backtest (e.g., `finalPortfolioValue`, `totalProfitOrLoss`, `trades` array, etc.).
+    *   **Response Body (Success: 200 OK):** A `BacktestResult` object containing detailed results of the backtest. This object includes fields like `finalPortfolioValue`, `totalProfitOrLoss`, `trades` array, and potentially `aiDecisionLog` if the `AISelectorStrategy` was used.
+        *   **Example `BacktestResult` structure with `aiDecisionLog`**:
+            ```json
+            {
+              "symbol": "BTCUSDT",
+              "startDate": "2023-01-01T00:00:00.000Z",
+              "endDate": "2023-03-31T00:00:00.000Z",
+              "initialPortfolioValue": 10000,
+              "finalPortfolioValue": 12500,
+              "totalProfitOrLoss": 2500,
+              "profitOrLossPercentage": 25,
+              "trades": [ /* ... array of trade objects ... */ ],
+              "totalTrades": 5,
+              "dataPointsProcessed": 90,
+              "historicalDataUsed": [ /* ... array of historical data points ... */ ],
+              "portfolioHistory": [ /* ... array of portfolio history points ... */ ],
+              "aiDecisionLog": [ // Optional: Present if AISelectorStrategy was used
+                {
+                  "timestamp": 1672531200, // Unix timestamp (seconds)
+                  "date": "2023-01-01", // Date string
+                  "chosenStrategyId": "ichimoku-cloud",
+                  "chosenStrategyName": "Ichimoku Cloud Strategy",
+                  "parametersUsed": { "tenkanPeriod": 9, "kijunPeriod": 26 },
+                  "evaluationScore": 0.75,
+                  "evaluationMetricUsed": "sharpe"
+                }
+                // ... more decision objects
+              ]
+            }
+            ```
+        *   `aiDecisionLog` (Array<AIDecision>, optional): A log of decisions made by the `AISelectorStrategy` during the backtest, if it was the strategy used. Each entry details the chosen underlying strategy, parameters, and evaluation metrics for a specific time point.
     *   **Response Body (Error):**
         *   **400 Bad Request:** If input validation fails (e.g., missing fields, invalid date format, `endDate` not after `startDate`). Response includes a `message` field detailing the error.
         *   **404 Not Found:** If the specified `strategyId` is not found. Response includes a `message` field.
@@ -375,27 +406,31 @@ All backend endpoints are prefixed with `/api`. The backend provides the followi
 
 *   **AI Endpoints**
     *   **`GET /api/ai/current-strategy/:symbol`**
-        *   **Description**: Retrieves the trading strategy currently selected by the AI Strategy Selector for the given trading symbol, based on its last evaluation.
+        *   **Description**: Retrieves the trading strategy currently selected by the AI Strategy Selector for the given trading symbol, based on its last evaluation. This includes the parameters (optimized or default) that the AI has chosen for the strategy.
         *   **URL Parameters**:
             *   `symbol` (string): The trading symbol (e.g., "BTCUSDT").
         *   **Response Body (Success: 200 OK)**:
             ```json
             {
-              "symbol": "string",
-              "chosenStrategyId": "string",
-              "chosenStrategyName": "string",
-              "message": "string"
+              "symbol": "BTCUSDT",
+              "chosenStrategyId": "ichimoku-cloud",
+              "chosenStrategyName": "Ichimoku Cloud Strategy",
+              "chosenParameters": { "tenkanPeriod": 10, "kijunPeriod": 25 },
+              "message": "AI is currently using Ichimoku Cloud Strategy for BTCUSDT with specified parameters."
             }
             ```
-            (Example: `{"symbol": "BTCUSDT", "chosenStrategyId": "ichimoku-cloud", "chosenStrategyName": "Ichimoku Cloud Strategy", "message": "AI is currently using Ichimoku Cloud Strategy for BTCUSDT."}`)
-        *   **Response Body (Error: 404 Not Found)**: If no choice is currently available for the symbol (e.g., AISelectorStrategy hasn't run for this symbol yet, or no suitable candidate was found).
+            *   `chosenParameters` (object | null): An object containing the parameters (either optimized or default) that will be used for the `chosenStrategyId`. Will be `null` or empty if no specific parameters were determined beyond defaults or if no strategy was chosen.
+        *   **Response Body (Error: 404 Not Found)**: If no choice is currently available for the symbol.
             ```json
             {
               "symbol": "string",
-              "message": "string"
+              "message": "string",
+              "chosenStrategyId": null,
+              "chosenStrategyName": null,
+              "chosenParameters": null
             }
             ```
-            (Example: `{"symbol": "XYZUSDT", "message": "AI choice not available for symbol XYZUSDT. AISelectorStrategy may not have been executed for this symbol yet."}`)
+            (Example: `{"symbol": "XYZUSDT", "message": "AI choice not available for symbol XYZUSDT.", "chosenStrategyId": null, "chosenStrategyName": null, "chosenParameters": null}`)
         *   **Response Body (Error: 500 Internal Server Error)**: For other server-side issues during retrieval.
 
 ## 8. Available Trading Strategies
@@ -468,6 +503,7 @@ The following strategies are currently implemented and can be used in `backtestC
             *   **Note on Optimization**: When `optimizeParameters` is true, the AI evaluates strategies by searching for the best parameter combinations within predefined ranges (`min`, `max`, `step` which must be set in the individual strategy definitions for numerical parameters).
             *   **Performance Warning**: Enabling `optimizeParameters` can be computationally intensive and may significantly slow down backtests or decision-making processes, especially with many candidate strategies, multiple optimizable parameters per strategy, or wide parameter ranges with small steps.
     *   **Defining Optimizable Strategy Parameters**: For a strategy's parameters to be optimizable by the `AISelectorStrategy`, its numerical parameter definitions within its implementation file (e.g., `src/strategies/implementations/ichimokuStrategy.ts`) must include `min`, `max`, and `step` attributes to define the search space for the Grid Search.
+    *   **Visualization**: When backtesting with `AISelectorStrategy`, the sequence of strategies it chooses (and any optimized parameters) is logged and displayed as annotations on the price chart in the backtest results, providing insight into its decision-making process.
 
 ## 9. Adding a New Strategy
 
