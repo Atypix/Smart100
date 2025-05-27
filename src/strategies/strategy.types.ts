@@ -24,6 +24,7 @@ export interface StrategyContext<T_Params extends Record<string, any> = Record<s
   portfolio: Portfolio;
   tradeHistory: Trade[];
   parameters: T_Params; // Strategy-specific parameters
+  signalHistory?: StrategySignal[]; // Added
 }
 
 export type StrategyAction = 'BUY' | 'SELL' | 'HOLD';

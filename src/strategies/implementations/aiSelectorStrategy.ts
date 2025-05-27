@@ -1,7 +1,7 @@
-import { TradingStrategy, StrategyContext, StrategySignal, StrategyParameterDefinition } from '../strategy.types';
+import { TradingStrategy, StrategyContext, StrategySignal, StrategyParameterDefinition, AIDecision } from '../strategy.types'; // Added AIDecision import
 import * as StrategyManagerModule from '../strategyManager'; // Corrected StrategyManager import
 import logger from '../../utils/logger'; // Corrected logger import
-// import { Portfolio } from '../../portfolio/portfolio'; // Commented out
+import { Portfolio } from '../../backtest'; // Uncommented and corrected Portfolio import path
 // import { Trade } from '../../portfolio/trade'; // Commented out
 // TechnicalIndicators might not be directly needed if strategies encapsulate their own indicator use.
 
@@ -10,15 +10,7 @@ let currentChoicesBySymbol = new Map<string, string>();
 let optimizedParamsForChoice = new Map<string, { strategyId: string, params: Record<string, any> }>();
 let lastAIDecision: AIDecision | null = null;
 
-interface AIDecision {
-  timestamp: number;
-  date: string;
-  chosenStrategyId: string | null;
-  chosenStrategyName: string | null;
-  parametersUsed: Record<string, any> | null;
-  evaluationScore: number | null;
-  evaluationMetricUsed: string;
-}
+// Removed local AIDecision interface
 
 interface AISelectorStrategyParams {
   evaluationLookbackPeriod: number;
@@ -117,7 +109,8 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
     
     // Ensure evaluationMetric is valid, default to 'pnl'
     const validMetrics = ['pnl', 'sharpe', 'winRate'];
-    const metric = validMetrics.includes(rawEvaluationMetric || '') ? rawEvaluationMetric : 'pnl';
+    const definedRawMetric = rawEvaluationMetric || 'pnl'; // Ensure it's a string
+    const metric = validMetrics.includes(definedRawMetric) ? definedRawMetric : 'pnl'; // Ensure it's a valid metric or default
 
     logger.info(`AISelectorStrategy: Starting execution for symbol ${symbol} at index ${context.currentIndex}. Evaluation Metric: ${metric}`);
 
@@ -239,8 +232,8 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
               getCash: () => 100000,
               getPosition: () => currentSimulatedPosition ? { quantity: currentSimulatedPosition.type === 'long' ? 1 : -1, averagePrice: currentSimulatedPosition.entryPrice } : { quantity: 0, averagePrice: 0 },
               getTrades: () => [], recordTrade: () => {}, getMarketValue: () => 0, getHistoricalPnl: () => [],
-            } as unknown as Portfolio, // Portfolio import is commented out, this will cause an error
-            tradeHistory: [], currentSignal: { action: 'HOLD' }, signalHistory: [], // Corrected mock context
+            } as unknown as Portfolio, 
+            tradeHistory: [], signalHistory: [], // Removed currentSignal from mock context
           };
 
           const signalResult = await candidateStrategy.execute(simulationContext);
@@ -331,7 +324,7 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
       const currentBarForDecision = context.historicalData[context.currentIndex];
       lastAIDecision = { // Use module-scoped variable
         timestamp: currentBarForDecision.timestamp,
-        date: currentBarForDecision.date || new Date(currentBarForDecision.timestamp).toISOString().split('T')[0],
+        date: currentBarForDecision.date ? (typeof currentBarForDecision.date === 'string' ? currentBarForDecision.date : new Date(currentBarForDecision.date).toISOString().split('T')[0]) : new Date(currentBarForDecision.timestamp).toISOString().split('T')[0],
         chosenStrategyId: null,
         chosenStrategyName: null,
         parametersUsed: null,
@@ -349,7 +342,7 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
       const currentBarForDecision = context.historicalData[context.currentIndex];
       lastAIDecision = { // Use module-scoped variable
         timestamp: currentBarForDecision.timestamp,
-        date: currentBarForDecision.date || new Date(currentBarForDecision.timestamp).toISOString().split('T')[0],
+        date: currentBarForDecision.date ? (typeof currentBarForDecision.date === 'string' ? currentBarForDecision.date : new Date(currentBarForDecision.date).toISOString().split('T')[0]) : new Date(currentBarForDecision.timestamp).toISOString().split('T')[0],
         chosenStrategyId: bestStrategyId, // We know the ID, but not the name or params
         chosenStrategyName: "Error: Strategy not found in manager",
         parametersUsed: bestOverallParams, // Could be null if optimization was off/failed for this ID
@@ -381,7 +374,7 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
     const currentBarForDecision = context.historicalData[context.currentIndex];
     lastAIDecision = { // Use module-scoped variable
       timestamp: currentBarForDecision.timestamp,
-      date: currentBarForDecision.date || new Date(currentBarForDecision.timestamp).toISOString().split('T')[0],
+      date: currentBarForDecision.date ? (typeof currentBarForDecision.date === 'string' ? currentBarForDecision.date : new Date(currentBarForDecision.date).toISOString().split('T')[0]) : new Date(currentBarForDecision.timestamp).toISOString().split('T')[0],
       chosenStrategyId: bestStrategyId,
       chosenStrategyName: finalSelectedStrategy.name,
       parametersUsed: paramsToStoreAndExecuteWith,
