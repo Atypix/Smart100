@@ -1,55 +1,126 @@
 /* frontend/src/index.css */
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
+  line-height: 1.6; /* Increased for better readability */
   font-weight: 400;
 
-  color-scheme: light dark; /* Allow browser to handle light/dark based on user preference */
+  color-scheme: light dark;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Theme Colors - Light Mode */
+  --primary-accent-light: #007bff;
+  --text-color-light: #212529;
+  --bg-color-light: #ffffff;
+  --section-bg-color-light: #f8f9fa;
+  --border-color-light: #dee2e6;
+  --heading-color-light: #343a40; /* Darker gray for headings */
+  --link-color-light: var(--primary-accent-light);
+  --button-bg-light: var(--primary-accent-light);
+  --button-text-light: #ffffff;
+  --input-bg-light: #ffffff;
+  --input-border-light: #ced4da;
+  --input-text-light: #495057;
+
+
+  /* Theme Colors - Dark Mode */
+  --primary-accent-dark: #007bff; /* Can adjust if too vibrant, e.g., #3399ff */
+  --text-color-dark: #e0e0e0;
+  --bg-color-dark: #121212;
+  --section-bg-color-dark: #1e1e1e;
+  --border-color-dark: #343a40;
+  --heading-color-dark: #f8f9fa; /* Light gray/white for headings */
+  --link-color-dark: var(--primary-accent-dark);
+  --button-bg-dark: var(--primary-accent-dark);
+  --button-text-dark: #ffffff; /* Or #121212 if accent is light enough */
+  --input-bg-dark: #2a2a2a;
+  --input-border-dark: #444;
+  --input-text-dark: var(--text-color-dark);
+
+  /* Default to light mode variables */
+  --primary-accent: var(--primary-accent-light);
+  --text-color: var(--text-color-light);
+  --bg-color: var(--bg-color-light);
+  --section-bg-color: var(--section-bg-color-light);
+  --border-color: var(--border-color-light);
+  --heading-color: var(--heading-color-light);
+  --link-color: var(--link-color-light);
+  --button-bg: var(--button-bg-light);
+  --button-text: var(--button-text-light);
+  --input-bg: var(--input-bg-light);
+  --input-border: var(--input-border-light);
+  --input-text: var(--input-text-light);
+  
+  --border-radius: 0.3rem; /* Slightly larger border radius */
 }
 
-/* Default to light mode styles, dark mode styles are below */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary-accent: var(--primary-accent-dark);
+    --text-color: var(--text-color-dark);
+    --bg-color: var(--bg-color-dark);
+    --section-bg-color: var(--section-bg-color-dark);
+    --border-color: var(--border-color-dark);
+    --heading-color: var(--heading-color-dark);
+    --link-color: var(--link-color-dark);
+    --button-bg: var(--button-bg-dark);
+    --button-text: var(--button-text-dark);
+    --input-bg: var(--input-bg-dark);
+    --input-border: var(--input-border-dark);
+    --input-text: var(--input-text-dark);
+  }
+}
+
 body {
   margin: 0;
-  background-color: #f4f7f6; /* Light gray background */
-  color: #333; /* Darker text for readability */
-  display: flex; /* Keep this if you want overall centering for the app like Vite default */
-  justify-content: center; /* Center .App if it has a max-width */
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  display: flex;
+  justify-content: center;
   min-height: 100vh;
+  font-size: 16px; /* Base font size */
 }
 
 .App { /* This class is on the main div in App.tsx */
   width: 100%;
-  max-width: 1200px; /* Max width for the content area */
-  padding: 1rem;
-  box-sizing: border-box; /* Include padding and border in the element's total width and height */
+  max-width: 1200px;
+  padding: 1.5rem; /* Increased padding for more white space */
+  box-sizing: border-box;
 }
-
 
 h1, h2, h3, h4, h5, h6 {
   margin-top: 0;
-  color: #1a535c; /* A teal/dark cyan for headings in light mode */
+  margin-bottom: 0.75rem; /* Consistent bottom margin */
+  color: var(--heading-color);
+  font-weight: 600; /* Consistent weight */
 }
+
+h1 { font-size: 2.25rem; }
+h2 { font-size: 1.75rem; }
+h3 { font-size: 1.5rem; }
+h4 { font-size: 1.25rem; }
+h5 { font-size: 1.1rem; }
+h6 { font-size: 1rem; }
 
 a {
   font-weight: 500;
-  color: #1a535c;
-  text-decoration: inherit;
+  color: var(--link-color);
+  text-decoration: none; /* Cleaner look */
 }
 a:hover {
-  color: #4ecdc4; /* Lighter teal for hover */
+  text-decoration: underline;
+  filter: brightness(85%); /* Standard way to darken/lighten accent on hover */
 }
 
 /* Form Elements Styling */
 label {
   display: block;
-  margin-bottom: 0.3rem;
-  font-weight: 600;
-  color: #495057; /* Dark gray for labels */
+  margin-bottom: 0.5rem; /* Increased spacing */
+  font-weight: 500; /* Slightly less bold */
+  color: var(--text-color); /* Use main text color, or a slightly muted version */
 }
 
 input[type="text"],
@@ -57,225 +128,186 @@ input[type="number"],
 input[type="date"],
 select {
   width: 100%;
-  padding: 0.5rem 0.75rem;
-  margin-bottom: 0.75rem;
+  padding: 0.6rem 0.8rem; /* Slightly more padding */
+  margin-bottom: 1rem; /* Increased spacing */
   font-size: 1rem;
   line-height: 1.5;
-  color: #495057;
-  background-color: #fff;
-  background-clip: padding-box;
-  border: 1px solid #ced4da;
-  border-radius: 0.25rem;
-  box-sizing: border-box; /* Ensure padding doesn't expand width */
+  color: var(--input-text);
+  background-color: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: var(--border-radius);
+  box-sizing: border-box;
   transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
 }
 
 input[type="checkbox"] {
   margin-right: 0.5rem;
   vertical-align: middle;
+  accent-color: var(--primary-accent); /* Modern way to style checkbox color */
 }
 
 input:focus,
 select:focus {
-  border-color: #4ecdc4;
+  border-color: var(--primary-accent);
   outline: 0;
-  box-shadow: 0 0 0 0.2rem rgba(78, 205, 196, 0.25);
+  box-shadow: 0 0 0 0.2rem rgba(var(--primary-accent-rgb, 0, 123, 255), 0.25); /* Needs RGB version of accent */
 }
+/* Helper for box-shadow - assuming --primary-accent is #007bff (0, 123, 255) */
+@media (prefers-color-scheme: light) { :root { --primary-accent-rgb: 0, 123, 255; }}
+@media (prefers-color-scheme: dark) { :root { --primary-accent-rgb: 0, 123, 255; }} /* Adjust if dark accent is different RGB */
 
-button {
+
+button, .button { /* Added .button class for non-button elements needing button styles */
   display: inline-block;
   font-weight: 600;
-  color: #fff;
+  color: var(--button-text);
   text-align: center;
   vertical-align: middle;
   cursor: pointer;
-  background-color: #1a535c; /* Teal button */
-  border: 1px solid #1a535c;
-  padding: 0.5rem 1rem;
+  background-color: var(--button-bg);
+  border: 1px solid var(--button-bg); /* Border same as bg for solid look */
+  padding: 0.6rem 1.2rem; /* Slightly more padding */
   font-size: 1rem;
   line-height: 1.5;
-  border-radius: 0.25rem;
-  transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+  border-radius: var(--border-radius);
+  transition: filter 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
 }
 
-button:hover {
-  background-color: #16454b;
-  border-color: #133c40;
+button:hover, .button:hover {
+  filter: brightness(90%);
+}
+button:focus, .button:focus {
+  outline: 0;
+  box-shadow: 0 0 0 0.2rem rgba(var(--primary-accent-rgb, 0, 123, 255), 0.35);
 }
 
-button:disabled {
-  background-color: #6c757d;
+
+button:disabled, .button:disabled {
+  background-color: #6c757d; /* Neutral disabled color */
   border-color: #6c757d;
+  color: #ffffff;
   cursor: not-allowed;
   opacity: 0.65;
+  filter: none;
 }
 
-/* Table Styling */
+/* Table Styling - Minimalist */
 table {
   width: 100%;
-  margin-bottom: 1rem;
-  color: #333;
-  border-collapse: collapse; /* Remove double borders */
+  margin-bottom: 1.5rem; /* Increased spacing */
+  color: var(--text-color);
+  border-collapse: collapse;
+  font-size: 0.95rem; /* Slightly smaller table text for dense data */
 }
 
 th, td {
-  padding: 0.75rem;
+  padding: 0.75rem 0.5rem; /* Adjust padding */
   vertical-align: top;
-  border-top: 1px solid #dee2e6; /* Light gray border for rows */
+  border-top: 1px solid var(--border-color);
+  text-align: left;
 }
 
 thead th {
   vertical-align: bottom;
-  border-bottom: 2px solid #dee2e6; /* Heavier border for header bottom */
-  background-color: #e9ecef; /* Light gray background for header */
-  color: #495057;
-  text-align: left;
+  border-bottom: 2px solid var(--border-color); /* Heavier border for header bottom */
+  background-color: transparent; /* No background for minimalist header */
+  font-weight: 600; /* Ensure header text is bold */
+  color: var(--heading-color);
 }
 
 tbody tr:nth-of-type(odd) {
-  /* background-color: rgba(0, 0, 0, 0.02); */ /* Very subtle striping for light mode */
+  background-color: transparent; /* No striping for minimalist look */
 }
+tbody tr:hover {
+  background-color: rgba(var(--primary-accent-rgb, 0, 123, 255), 0.05); /* Subtle hover for rows */
+}
+
 
 /* Utility Classes */
 .error-message {
-  color: #d9534f; /* Bootstrap danger red */
+  color: #721c24; /* Darker red text for better contrast on light bg */
   background-color: #f8d7da;
   border: 1px solid #f5c6cb;
   padding: 0.75rem 1.25rem;
   margin-top: 1rem;
   margin-bottom: 1rem;
-  border-radius: 0.25rem;
+  border-radius: var(--border-radius);
 }
 
 .loading-message {
-  color: #004085; /* Bootstrap info blue */
+  color: #004085;
   background-color: #cce5ff;
   border: 1px solid #b8daff;
   padding: 0.75rem 1.25rem;
   margin-top: 1rem;
   margin-bottom: 1rem;
-  border-radius: 0.25rem;
+  border-radius: var(--border-radius);
 }
 
-/* Dark Mode Styles */
 @media (prefers-color-scheme: dark) {
-  body {
-    background-color: #1e1e1e; /* Darker background */
-    color: #e0e0e0; /* Lighter text */
-  }
-
-  h1, h2, h3, h4, h5, h6 {
-    color: #66fcf1; /* Bright cyan for headings in dark mode */
-  }
-
-  a {
-    color: #66fcf1;
-  }
-  a:hover {
-    color: #45a29e; /* Darker cyan for hover */
-  }
-
-  input[type="text"],
-  input[type="number"],
-  input[type="date"],
-  select {
-    color: #e0e0e0;
-    background-color: #2a2a2a; /* Dark input background */
-    border: 1px solid #444; /* Darker border */
-  }
-
-  input:focus,
-  select:focus {
-    border-color: #66fcf1;
-    box-shadow: 0 0 0 0.2rem rgba(102, 252, 241, 0.25);
-  }
-  
-  label {
-    color: #c5c6c7; /* Lighter gray for labels */
-  }
-
-  button {
-    background-color: #66fcf1;
-    border-color: #66fcf1;
-    color: #1e1e1e; /* Dark text on bright button */
-  }
-
-  button:hover {
-    background-color: #45a29e;
-    border-color: #3ba09a;
-  }
-
-  button:disabled {
-    background-color: #4a4a4a;
-    border-color: #4a4a4a;
-    color: #888;
-  }
-
-  table {
-    color: #e0e0e0;
-  }
-
-  th, td {
-    border-top: 1px solid #444;
-  }
-
-  thead th {
-    border-bottom: 2px solid #444;
-    background-color: #2a2a2a; /* Dark header background */
-    color: #c5c6c7;
-  }
-
-  tbody tr:nth-of-type(odd) {
-    /* background-color: rgba(255, 255, 255, 0.03); */ /* Subtle striping for dark mode */
-  }
-  
   .error-message {
-    color: #f8d7da;
-    background-color: #721c24; /* Darker red background */
-    border-color: #f5c6cb;
+    color: #f8d7da; /* Lighter red text on dark bg */
+    background-color: #491217; /* Darker red background */
+    border-color: #f5c6cb; /* Keep border light for visibility */
   }
 
   .loading-message {
     color: #cce5ff;
-    background-color: #004085; /* Darker blue background */
+    background-color: #002752; /* Darker blue background */
     border-color: #b8daff;
   }
 }
 
-/* Specific component structure helpers */
+/* Specific component structure helpers from old index.css - may or may not be used */
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); /* Responsive grid */
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem; /* Increased gap */
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
-  margin-bottom: 1rem; /* For items not in a grid */
+  margin-bottom: 1rem; 
 }
 
-.form-group label {
-  margin-bottom: 0.3rem;
+.form-group label { /* Already styled above */
+  /* margin-bottom: 0.5rem; */
 }
 
-/* Ensure App.css styles for .backtest-section use these theme variables too */
-:root {
-  --section-bg-color-light: #f9f9f9;
-  --section-border-color-light: #ddd;
-  --section-bg-color-dark: #2f2f2f;
-  --section-border-color-dark: #444;
+/* Append to frontend/src/index.css */
+
+/* Utility classes for text styling (e.g., in ResultsDisplay) */
+.profit {
+  color: #28a745; /* Green for profit */
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    --section-bg-color: var(--section-bg-color-light);
-    --section-border-color: var(--section-border-color-light);
-  }
+.loss {
+  color: #dc3545; /* Red for loss */
 }
+
+.info-message {
+  color: var(--text-color); /* Use standard text color or a slightly muted one */
+  background-color: rgba(var(--primary-accent-rgb, 0, 123, 255), 0.1); /* Light accent background */
+  border: 1px solid rgba(var(--primary-accent-rgb, 0, 123, 255), 0.2);
+  padding: 0.75rem 1.25rem;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  border-radius: var(--border-radius);
+  text-align: center;
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
-    --section-bg-color: var(--section-bg-color-dark);
-    --section-border-color: var(--section-border-color-dark);
+  .profit {
+    color: #20c997; /* Brighter Green for profit in dark mode */
+  }
+
+  .loss {
+    color: #ff6b6b; /* Brighter Red for loss in dark mode */
+  }
+  
+  .info-message {
+    background-color: rgba(var(--primary-accent-rgb, 0, 123, 255), 0.15);
+    border-color: rgba(var(--primary-accent-rgb, 0, 123, 255), 0.3);
   }
 }
