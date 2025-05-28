@@ -72,8 +72,8 @@ describe('Strategy API Endpoints', () => {
 
     const mockSuccessResult: BacktestResult = {
       symbol: 'BTCUSDT',
-      startDate: new Date('2023-01-01').toISOString(),
-      endDate: new Date('2023-03-31').toISOString(), // Ensure this is a string
+      startDate: new Date('2023-01-01'), // Changed to Date object
+      endDate: new Date('2023-03-31'),   // Changed to Date object
       initialPortfolioValue: 10000,
       finalPortfolioValue: 12000,
       totalProfitOrLoss: 2000,
@@ -158,7 +158,7 @@ describe('Strategy API Endpoints', () => {
     it('should return 200 and backtest results including aiDecisionLog when AISelectorStrategy is used', async () => {
       const mockAIDecisionLog = [
         {
-          timestamp: 1672531200, // Example timestamp
+          timestamp: 1672531200, 
           date: '2023-01-01',
           chosenStrategyId: 'candidateStrat1',
           chosenStrategyName: 'Candidate Strat 1',
@@ -167,10 +167,9 @@ describe('Strategy API Endpoints', () => {
           evaluationMetricUsed: 'pnl',
         },
       ];
-      const mockAIResult: BacktestResult = {
-        ...mockSuccessResult, // Use base success result
+      const mockAIResult: BacktestResult = { // Removed strategyId from here
+        ...mockSuccessResult, 
         symbol: 'AI_TEST_SYM',
-        strategyId: 'ai-selector', // Assuming the request would specify this
         aiDecisionLog: mockAIDecisionLog,
       };
       mockRunBacktest.mockResolvedValue(mockAIResult);

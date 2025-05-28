@@ -1,7 +1,6 @@
 import { macdStrategy } from '../../src/strategies/implementations/macdStrategy';
-// Removed StrategyParameters from import as it's unused and not exported
-import { StrategyContext, StrategySignal } from '../../src/strategies/strategy.types'; // Portfolio removed
-import { Portfolio } from '../../src/backtest'; // Portfolio imported from backtest
+import { StrategyContext, StrategySignal } from '../../src/strategies/strategy.types';
+import { Portfolio } from '../../src/backtest';
 import { HistoricalDataPoint } from '../../src/services/dataService';
 import { calculateMACD } from '../../src/utils/technicalIndicators';
 
@@ -12,7 +11,7 @@ jest.mock('../../src/utils/technicalIndicators');
 const mockedCalculateMACD = calculateMACD as jest.MockedFunction<typeof calculateMACD>;
 
 describe('MACD Crossover Strategy', () => {
-  let baseContext: StrategyContext;
+  let baseContext: StrategyContext<any>; // Use 'any' for parameters if not strictly typed for test
   const defaultParams = {
     shortPeriod: 12,
     longPeriod: 26,
@@ -43,18 +42,25 @@ describe('MACD Crossover Strategy', () => {
     mockedCalculateMACD.mockReset();
 
     baseContext = {
-      historicalData: createMockHistoricalData(50, 100), // Default price 100
+      symbol: 'MOCK', // Added symbol
+      historicalData: createMockHistoricalData(50, 100), 
       currentIndex: 49,
       portfolio: { 
         cash: 1000, 
         shares: 10, 
-        initialValue: 1000, // Changed initialCash to initialValue
-        currentValue: 1000 + 10 * 100 // Assuming current price is 100 for initial setup
-        // trades: [] was removed as it's not part of Portfolio type
-      },
+        initialValue: 1000, 
+        currentValue: 1000 + 10 * 100,
+        // Mock necessary methods if Portfolio is a class with methods
+        getCash: () => baseContext.portfolio.cash,
+        getPosition: () => ({ quantity: baseContext.portfolio.shares, averagePrice: 100 }), // Example
+        getTrades: () => [],
+        recordTrade: jest.fn(),
+        getMarketValue: () => baseContext.portfolio.currentValue,
+        getHistoricalPnl: () => [],
+      } as unknown as Portfolio, // Cast for simplicity, or create a full mock
       parameters: { ...defaultParams },
-      tradeHistory: [], 
-      // Removed getAvailableStrategies and getStrategy as they are not part of StrategyContext
+      tradeHistory: [],
+      signalHistory: [], // Added signalHistory
     };
   });
 
@@ -81,12 +87,12 @@ describe('MACD Crossover Strategy', () => {
     // previousMACD (8) < previousSignal (9)
     // currentMACD (12) > currentSignal (10) -- Bullish Crossover
 
-    const signal = await Promise.resolve(macdStrategy.execute(context)); // Added await Promise.resolve
-    expect(signal.action).toBe('BUY');
-    expect(signal.amount).toBe(defaultParams.tradeAmount);
+    const result = await Promise.resolve(macdStrategy.execute(context));
+    expect(result.action).toBe('BUY');
+    expect(result.amount).toBe(defaultParams.tradeAmount);
   });
 
-  it('should generate a SELL signal when MACD crosses below Signal line', async () => { // Made async
+  it('should generate a SELL signal when MACD crosses below Signal line', async () => {
     const context = { ...baseContext };
     context.portfolio.shares = defaultParams.tradeAmount + 5; // Ensure enough shares
 
@@ -106,12 +112,12 @@ describe('MACD Crossover Strategy', () => {
     // previousMACD (12) > previousSignal (10)
     // currentMACD (8) < currentSignal (9) -- Bearish Crossover
 
-    const signal = await Promise.resolve(macdStrategy.execute(context)); // Added await Promise.resolve
-    expect(signal.action).toBe('SELL');
-    expect(signal.amount).toBe(defaultParams.tradeAmount);
+    const result = await Promise.resolve(macdStrategy.execute(context));
+    expect(result.action).toBe('SELL');
+    expect(result.amount).toBe(defaultParams.tradeAmount);
   });
 
-  it('should generate a HOLD signal if MACD lines are converging but no crossover', async () => { // Made async
+  it('should generate a HOLD signal if MACD lines are converging but no crossover', async () => {
     const context = { ...baseContext };
     mockedCalculateMACD.mockReturnValue({
       macdLine:   Array(context.historicalData.length).fill(NaN).map((_, i) => {
@@ -129,11 +135,11 @@ describe('MACD Crossover Strategy', () => {
     // previousMACD (10) < previousSignal (12)
     // currentMACD (11) < currentSignal (11.5) -- Still below, no crossover
 
-    const signal = await Promise.resolve(macdStrategy.execute(context)); // Added await Promise.resolve
-    expect(signal.action).toBe('HOLD');
+    const result = await Promise.resolve(macdStrategy.execute(context));
+    expect(result.action).toBe('HOLD');
   });
   
-  it('should generate a HOLD signal if MACD lines are diverging (already crossed over previously)', async () => { // Made async
+  it('should generate a HOLD signal if MACD lines are diverging (already crossed over previously)', async () => {
     const context = { ...baseContext };
     mockedCalculateMACD.mockReturnValue({
       macdLine:   Array(context.historicalData.length).fill(NaN).map((_, i) => {
@@ -151,11 +157,11 @@ describe('MACD Crossover Strategy', () => {
     // previousMACD (12) > previousSignal (10) -- was already crossed
     // currentMACD (13) > currentSignal (9) -- still above, diverging
 
-    const signal = await Promise.resolve(macdStrategy.execute(context)); // Added await Promise.resolve
-    expect(signal.action).toBe('HOLD');
+    const result = await Promise.resolve(macdStrategy.execute(context));
+    expect(result.action).toBe('HOLD');
   });
 
-  it('should generate a HOLD signal if currentMACD is NaN', async () => { // Made async
+  it('should generate a HOLD signal if currentMACD is NaN', async () => {
     const context = { ...baseContext };
     mockedCalculateMACD.mockReturnValue({
       macdLine:   Array(context.historicalData.length).fill(NaN).map((_, i) => {
@@ -170,11 +176,11 @@ describe('MACD Crossover Strategy', () => {
       }),
       histogram: Array(context.historicalData.length).fill(NaN),
     });
-    const signal = await Promise.resolve(macdStrategy.execute(context)); // Added await Promise.resolve
-    expect(signal.action).toBe('HOLD');
+    const result = await Promise.resolve(macdStrategy.execute(context));
+    expect(result.action).toBe('HOLD');
   });
 
-  it('should generate a HOLD signal if previousSignal is NaN', async () => { // Made async
+  it('should generate a HOLD signal if previousSignal is NaN', async () => {
     const context = { ...baseContext };
     mockedCalculateMACD.mockReturnValue({
       macdLine:   Array(context.historicalData.length).fill(NaN).map((_, i) => {
@@ -189,18 +195,18 @@ describe('MACD Crossover Strategy', () => {
       }),
       histogram: Array(context.historicalData.length).fill(NaN),
     });
-    const signal = await Promise.resolve(macdStrategy.execute(context)); // Added await Promise.resolve
-    expect(signal.action).toBe('HOLD');
+    const result = await Promise.resolve(macdStrategy.execute(context));
+    expect(result.action).toBe('HOLD');
   });
   
-  it('should generate a HOLD signal if currentIndex < 1', async () => { // Made async
+  it('should generate a HOLD signal if currentIndex < 1', async () => {
     const context = { ...baseContext, currentIndex: 0 };
     // No need to mock calculateMACD as the strategy should return HOLD before calling it.
-    const signal = await Promise.resolve(macdStrategy.execute(context)); // Added await Promise.resolve
-    expect(signal.action).toBe('HOLD');
+    const result = await Promise.resolve(macdStrategy.execute(context));
+    expect(result.action).toBe('HOLD');
   });
 
-  it('should generate a HOLD signal for BUY if insufficient cash', async () => { // Made async
+  it('should generate a HOLD signal for BUY if insufficient cash', async () => {
     const context = { ...baseContext };
     const currentPrice = context.historicalData[context.currentIndex].close;
     context.portfolio.cash = currentPrice * defaultParams.tradeAmount - 1; // Insufficient cash
@@ -211,11 +217,11 @@ describe('MACD Crossover Strategy', () => {
       histogram: Array(context.historicalData.length).fill(NaN),
     });
     
-    const signal = await Promise.resolve(macdStrategy.execute(context)); // Added await Promise.resolve
-    expect(signal.action).toBe('HOLD');
+    const result = await Promise.resolve(macdStrategy.execute(context));
+    expect(result.action).toBe('HOLD');
   });
 
-  it('should generate a HOLD signal for SELL if insufficient shares', async () => { // Made async
+  it('should generate a HOLD signal for SELL if insufficient shares', async () => {
     const context = { ...baseContext };
     context.portfolio.shares = defaultParams.tradeAmount - 0.1; // Insufficient shares (assuming tradeAmount can be > shares)
      if (defaultParams.tradeAmount === 0) context.portfolio.shares = -1; // Ensure it's less if tradeAmount is 0
@@ -226,17 +232,17 @@ describe('MACD Crossover Strategy', () => {
       histogram: Array(context.historicalData.length).fill(NaN),
     });
 
-    const signal = await Promise.resolve(macdStrategy.execute(context)); // Added await Promise.resolve
-    expect(signal.action).toBe('HOLD');
+    const result = await Promise.resolve(macdStrategy.execute(context));
+    expect(result.action).toBe('HOLD');
   });
   
-   it('should generate HOLD if longPeriod is not greater than shortPeriod', async () => { // Made async
+   it('should generate HOLD if longPeriod is not greater than shortPeriod', async () => {
     const context = { ...baseContext };
     context.parameters.longPeriod = context.parameters.shortPeriod; // Invalid params
 
     // No need to mock calculateMACD, strategy should return HOLD due to param validation
-    const signal = await Promise.resolve(macdStrategy.execute(context)); // Added await Promise.resolve
-    expect(signal.action).toBe('HOLD');
+    const result = await Promise.resolve(macdStrategy.execute(context));
+    expect(result.action).toBe('HOLD');
   });
 
 });

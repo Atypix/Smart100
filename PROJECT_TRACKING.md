@@ -138,3 +138,18 @@ This document tracks the progress and future direction of the project to impleme
 ## IV. Technical Debt / Issues
 
 *   **Address widespread TypeScript compilation errors in the test suite:** Current tests (`npm test`) are largely failing due to numerous TS compilation errors, preventing effective automated testing. This requires a dedicated effort to fix type definitions, imports, and related issues across most test files.
+
+## V. Recent Fixes & Progress
+
+*   **TypeScript Compilation Errors (Test Suite):** A significant number of initial TypeScript compilation errors throughout the test suite have been resolved, particularly in strategy-related test files (`aiSelectorStrategy.test.ts`, `ichimokuStrategy.test.ts`, `macdStrategy.test.ts`, `aiPricePredictionStrategy.test.ts`, `rsiBollingerStrategy.test.ts`) and related files like `backtest.test.ts`, `strategyApi.test.ts`, and `aiRoutes.test.ts`. This has improved overall testability. (Primary focus of Batch 1 & 2 of recent work).
+*   **`tests/services/userService.test.ts` Fixed:** This test suite now passes. Issues related to timestamp comparisons for `createdAt` and `updatedAt` fields in user objects have been resolved by making the assertions more robust (checking for greater-than-or-equal and a small time difference). (Addressed in Batch 3 & confirmed in Batch 5).
+*   **`tests/api/auth.test.ts` Auth Routes Fixed:** Tests for `/api/auth/register` and `/api/auth/login` now pass. The 404 errors for these routes were resolved by correcting the request paths in the test file to include the `/api` prefix (e.g., `/api/auth/register`). The `/api/protected/data` route tests still 404 as the route is not defined. (Addressed in Batch 4).
+*   **Ongoing Issue with `apiKeyService.ts` Environment Variable:**
+    *   `tests/services/apiKeyService.test.ts` is still blocked (though the service itself was modified to not `process.exit(1)` in test mode). The root cause is that `src/services/apiKeyService.ts` consistently fails to recognize the `API_ENCRYPTION_KEY_HEX` environment variable when its top-level code runs during Jest test execution.
+    *   Multiple methods to set this variable for the test environment have been attempted:
+        1.  Setting `process.env.API_ENCRYPTION_KEY_HEX` at the top of the test file `tests/services/apiKeyService.test.ts`.
+        2.  Prepending `API_ENCRYPTION_KEY_HEX=...` to the `npm test` script in `package.json`.
+        3.  Using `dotenv.config()` in a Jest `setupFiles` script (`tests/setupEnv.ts`).
+        4.  Using `dotenv.config({ path: explicitPathToDotEnv })` in the `setupFiles` script.
+    *   None of these methods successfully made the variable available to `src/services/apiKeyService.ts` at module import time during tests within the sandboxed environment.
+    *   The workaround in `src/services/apiKeyService.ts` (using a dummy key if `NODE_ENV === 'test'` and the key is missing) allows tests that import this service to run without crashing the test runner, but it means the actual encryption/decryption logic using the intended environment key isn't fully tested in those scenarios. The SQLite UNIQUE constraint errors previously seen in `apiKeyService.test.ts` were likely symptoms of tests not completing due to the `process.exit(1)` issue, preventing proper cleanup. With the workaround, these specific DB errors are now resolved when `apiKeyService.test.ts` is run directly.
