@@ -3,7 +3,8 @@ module.exports = {
   rootDir: '.', // Explicitly set rootDir
   preset: 'ts-jest',
   testEnvironment: 'node',
-  setupFiles: ['<rootDir>/tests/setupEnv.ts'], // Added this line
+  setupFiles: ['<rootDir>/tests/setupEnv.ts'], 
+  setupFilesAfterEnv: ['<rootDir>/tests/setupMocks.ts'], // Added this line
   testMatch: [
     '<rootDir>/tests/**/*.test.ts',
     '<rootDir>/tests/**/*.spec.ts',
