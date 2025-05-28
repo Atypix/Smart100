@@ -1,63 +1,93 @@
 /* frontend/src/App.css */
 
-/* Basic App Layout */
+/* Basic App Layout - Relies more on index.css for defaults */
 .App {
+  /* .App class is styled in index.css for max-width, padding, etc. */
+  /* This file will style specific layout components within .App */
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  max-width: 1200px; /* Limit max width for very wide screens */
-  margin: 0 auto;    /* Center the app content */
-  padding: 0 1rem;   /* Add some horizontal padding */
 }
 
 .App-header {
-  background-color: #282c34; /* Darker header */
-  padding: 20px;
-  color: white;
+  background-color: var(--bg-color); /* Use body background for minimalist header */
+  color: var(--heading-color);
+  padding: 1.5rem 0; /* Vertical padding, horizontal padding from .App */
   text-align: center;
-  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border-color); /* Subtle separator */
+  margin-bottom: 2rem; /* Space below header */
 }
 
 .App-header h1 {
   margin: 0;
-  font-size: 2em; /* Adjust as needed */
+  font-size: 1.75rem; /* Slightly smaller, more refined h1 for app title */
+  font-weight: 600;
 }
 
 .App main {
   flex-grow: 1;
-  padding-bottom: 20px; /* Space for footer */
+  width: 100%; /* Ensure main content takes available width within .App */
 }
 
 .App-footer {
-  background-color: #333; /* Dark footer */
-  padding: 10px;
-  color: #ccc;
+  background-color: var(--bg-color); /* Match body background */
+  padding: 1.5rem 0; /* Vertical padding */
+  color: var(--text-color); /* Use standard text color, perhaps slightly muted */
+  opacity: 0.7; /* Mute footer slightly */
   text-align: center;
   font-size: 0.9em;
+  border-top: 1px solid var(--border-color); /* Subtle separator */
+  margin-top: 3rem; /* Space above footer */
 }
 
-/* Component specific styles can be added here or in their own files if they grow complex */
-/* For now, keeping it simple */
-
-/* Example: Style for sections within BacktestRunnerPage */
+/* Styling for sections within the application */
 .backtest-section {
-  background-color: var(--section-bg-color, #2f2f2f); /* Use CSS var for theme compatibility */
-  padding: 15px;
-  margin-bottom: 20px;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Subtle shadow */
+  background-color: var(--section-bg-color);
+  padding: 1.5rem; /* Consistent padding */
+  margin-bottom: 1.5rem; /* Consistent spacing between sections */
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color); /* Use border for separation */
+  box-shadow: none; /* Remove box-shadow for a flatter, minimalist look */
 }
 
-/* Override default Vite dark mode for inputs if needed for better visibility */
-@media (prefers-color-scheme: dark) {
-  .backtest-section {
-     background-color: #2f2f2f; /* Ensure dark sections in dark mode */
-     border: 1px solid #444;
-  }
+/* Add a class for the overall configuration area if needed */
+.config-area {
+  margin-bottom: 2rem;
 }
-@media (prefers-color-scheme: light) {
-  .backtest-section {
-     background-color: #f9f9f9; /* Lighter sections in light mode */
-     border: 1px solid #ddd;
-  }
+
+/* Specific layout for BacktestRunnerPage if it has distinct columns/areas */
+.backtest-runner-layout {
+  /* Example if you want two columns for settings and params
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+  */
+}
+
+/* Class for individual form containers or groups within sections */
+.form-container {
+  /* Styles for individual form groupings if .backtest-section is too broad */
+}
+
+/* Ensure charts have a clean container if not already styled */
+.charts-section {
+  margin-top: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem; /* Space between charts */
+}
+
+.chart-container { /* Wrap individual charts in this if they need specific styling */
+  background-color: var(--section-bg-color);
+  padding: 1rem;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+}
+
+.chart-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--heading-color);
+  margin-bottom: 1rem;
+  text-align: center;
 }
