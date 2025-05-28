@@ -5,13 +5,23 @@ import crypto from 'crypto';
 import { ApiKey, ApiKeyStored, CreateApiKeyInput, UpdateApiKeyInput } from '../models/apiKey.types';
 
 // Environment variable for encryption key
-const API_ENCRYPTION_KEY_HEX = process.env.API_ENCRYPTION_KEY;
-if (!API_ENCRYPTION_KEY_HEX || API_ENCRYPTION_KEY_HEX.length !== 64) { // 32 bytes = 64 hex characters
-  console.error('FATAL ERROR: API_ENCRYPTION_KEY is not set or is not a 32-byte hex string (64 characters). Please set it in your .env file.');
-  process.exit(1); // Exit if the key is not suitable for AES-256
+const API_ENCRYPTION_KEY_HEX_RAW = process.env.API_ENCRYPTION_KEY_HEX;
+let API_ENCRYPTION_KEY: Buffer;
+
+if (!API_ENCRYPTION_KEY_HEX_RAW || API_ENCRYPTION_KEY_HEX_RAW.length !== 64) { 
+  if (process.env.NODE_ENV !== 'test') {
+    console.error('FATAL ERROR: API_ENCRYPTION_KEY_HEX is not set or is not a 32-byte hex string (64 characters). Please set it in your .env file. Exiting.');
+    process.exit(1);
+  } else {
+    console.warn('Warning: API_ENCRYPTION_KEY_HEX is not defined or invalid during test. Using a default dummy key for test environment only. Ensure it is set in .env and loaded by setupEnv.ts for tests requiring real encryption.');
+    // Use a default dummy key for test environment if not set, to allow module loading & test execution
+    // This key should NOT be used for any real encryption/decryption validation in tests if actual crypto is tested.
+    API_ENCRYPTION_KEY = Buffer.from('0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef', 'hex');
+  }
+} else {
+  API_ENCRYPTION_KEY = Buffer.from(API_ENCRYPTION_KEY_HEX_RAW, 'hex');
 }
 
-const API_ENCRYPTION_KEY = Buffer.from(API_ENCRYPTION_KEY_HEX, 'hex');
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12; // 96 bits is recommended for GCM
 const AUTH_TAG_LENGTH = 16; // GCM auth tag is 128 bits (16 bytes)

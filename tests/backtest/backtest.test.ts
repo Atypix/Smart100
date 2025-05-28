@@ -4,8 +4,8 @@ jest.mock('../../src/services/dataService', () => ({
   fetchHistoricalDataFromDB: jest.fn(),
 }));
 jest.mock('../../src/utils/logger', () => ({
-  __esModule: true, // Added for proper ES Module default export mocking
-  default: { 
+  __esModule: true,
+  default: { // Mock the default export
     info: jest.fn(),
     warn: jest.fn(),
     error: jest.fn(),
@@ -24,8 +24,6 @@ import {
   // StrategyFunction, // Replaced by TradingStrategy
   Portfolio,
   Trade,
-  // StrategyInput, // Replaced by StrategyContext
-  // StrategyOutput, // Replaced by StrategySignal
   BacktestResult,
 } from '../../src/backtest'; // Adjust path as necessary
 import { fetchHistoricalDataFromDB as mockFetchHistoricalDataFromDB } from '../../src/services/dataService'; // Mocked function
@@ -33,6 +31,7 @@ import { HistoricalDataPoint } from '../../src/services/dataService'; // Actual 
 import logger from '../../src/utils/logger'; // Corrected import, Mocked logger
 import { getStrategy as mockGetStrategy } from '../../src/strategies/strategyManager'; // Mocked getStrategy
 import { adaptedSimpleThresholdStrategy } from '../../src/strategies/implementations/simpleThresholdStrategy'; // Import actual strategy for mock return
+import { StrategyContext } from '../../src/strategies/strategy.types'; // Import StrategyContext
 
 
 // --- Test Setup ---
@@ -247,6 +246,7 @@ describe('Backtesting Module Tests', () => {
         expect(executeSpy).toHaveBeenCalledTimes(singleDataPoint.length);
         // Check the context for the first call
         const expectedContext = {
+            symbol: symbol, // Added symbol to expected context
             historicalData: singleDataPoint,
             currentIndex: 0,
             portfolio: expect.objectContaining({ cash: initialCash, shares: 0 }),
@@ -337,8 +337,12 @@ describe('Backtesting Module Tests', () => {
             execute: jest.fn().mockImplementation(async (context: StrategyContext) => {
                 // Simulate AI making a decision and setting lastAIDecision
                 // This is a simplified mock; the actual AI selector has complex logic
-                const decisionTimestamp = context.historicalData[context.currentIndex].timestamp;
-                const decisionDate = context.historicalData[context.currentIndex].date?.toISOString().split('T')[0] || new Date(decisionTimestamp * 1000).toISOString().split('T')[0];
+                const currentDataPoint = context.historicalData[context.currentIndex];
+                const decisionTimestamp = currentDataPoint.timestamp;
+                // Ensure date is a string, as it might be a Date object from createDataPoint
+                const decisionDate = typeof currentDataPoint.date === 'string' 
+                    ? currentDataPoint.date 
+                    : (currentDataPoint.date?.toISOString().split('T')[0] || new Date(decisionTimestamp * 1000).toISOString().split('T')[0]);
                 
                 mockAISelectorStrategy.lastAIDecision = {
                     timestamp: decisionTimestamp,
