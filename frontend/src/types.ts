@@ -38,7 +38,7 @@ export interface BacktestSettings {
 // This should align with what the backend's dataService.HistoricalDataPoint provides
 export interface HistoricalDataPoint {
   timestamp: number; // Unix timestamp in seconds
-  date?: string | Date; // Date string or Date object (frontend might receive string)
+  date?: string;      // Date string (frontend will receive string from API)
   open: number;
   high: number;
   low: number;

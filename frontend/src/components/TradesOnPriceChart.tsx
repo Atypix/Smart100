@@ -10,20 +10,18 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  ReferenceDot, // For individual markers if needed, but Scatter is better for series
-  ZAxis, // Needed if scatter point sizes vary, not strictly needed here
 } from 'recharts';
-import { HistoricalDataPoint } from '../../../src/services/dataService'; // Adjust path if needed
-import { Trade } from '../../../src/backtest'; // Adjust path if needed
+import type { HistoricalDataPoint as FrontendHistoricalDataPoint } from '../types'; // Adjust path if needed
+import type { Trade as FrontendTrade } from '../types'; // Adjust path if needed
 import { formatDateForChart, formatCurrency, formatDateTimeForChart } from '../utils/formatters'; // Import centralized formatters
 
-import { AIDecision } from '../types'; // Import AIDecision
+import type { AIDecision } from '../types'; // Import AIDecision
 import { Customized } from 'recharts'; // Import Customized
 
 // Props for the component
 interface TradesOnPriceChartProps {
-  priceData: ReadonlyArray<HistoricalDataPoint>; 
-  tradesData: ReadonlyArray<Trade>; 
+  priceData: ReadonlyArray<FrontendHistoricalDataPoint>; 
+  tradesData: ReadonlyArray<FrontendTrade>; 
   aiDecisionLog?: ReadonlyArray<AIDecision>; // New prop for AI decision log
 }
 
@@ -37,7 +35,7 @@ interface AIStrategySegment {
 
 // Custom component to render AI decision annotations
 const AIDecisionAnnotations: React.FC<any> = (props) => {
-  const { data, xAxisMap, yAxisMap, width, height, segments } = props;
+  const { data, xAxisMap, yAxisMap, width, segments } = props; // Removed height
 
   if (!segments || segments.length === 0 || !xAxisMap || !xAxisMap[0] || !yAxisMap || !yAxisMap[0] || !data || data.length === 0) {
     return null;
@@ -219,7 +217,7 @@ const TradesOnPriceChart: React.FC<TradesOnPriceChartProps> = ({ priceData, trad
       <h4>Price Chart with Trades</h4>
       <ResponsiveContainer>
         <ComposedChart
-          data={priceData} // Main data for X-axis and price line
+          data={[...priceData]} // Main data for X-axis and price line, spread into new array
           margin={{
             top: 5,
             right: 30,
@@ -294,7 +292,6 @@ const TradesOnPriceChart: React.FC<TradesOnPriceChartProps> = ({ priceData, trad
             name="Sell Orders"
             data={sellTrades}
             fill="red"
-            shape="triangle" // Use inverted triangle or different shape if possible via custom shape prop
                             // Recharts built-in shapes: 'circle' (default), 'cross', 'diamond', 'square', 'star', 'triangle', 'wye'.
                             // For inverted triangle, a custom SVG shape would be needed. Let's use 'cross' for differentiation for now.
             shape="cross" 

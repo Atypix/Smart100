@@ -1,6 +1,6 @@
 // frontend/src/components/BacktestSettingsForm.tsx
 import React, { useState, useEffect } from 'react';
-import { BacktestSettings } from '../types';
+import type { BacktestSettings } from '../types';
 import { logger } from '../utils/logger';
 
 interface BacktestSettingsFormProps {

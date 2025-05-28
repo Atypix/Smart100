@@ -1,5 +1,5 @@
 // frontend/src/services/api.ts
-import { ApiKey, ApiKeyFormData } from '../types';
+import type { ApiKey, ApiKeyFormData } from '../types';
 
 const API_BASE_URL = '/api'; // Adjust if your API is hosted elsewhere
 
