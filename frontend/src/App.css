@@ -1,93 +1,148 @@
 /* frontend/src/App.css */
 
-/* Basic App Layout - Relies more on index.css for defaults */
+/* .App class itself is mostly styled in index.css (max-width, base padding) */
 .App {
-  /* .App class is styled in index.css for max-width, padding, etc. */
-  /* This file will style specific layout components within .App */
   display: flex;
   flex-direction: column;
   min-height: 100vh;
 }
 
 .App-header {
-  background-color: var(--bg-color); /* Use body background for minimalist header */
-  color: var(--heading-color);
-  padding: 1.5rem 0; /* Vertical padding, horizontal padding from .App */
-  text-align: center;
-  border-bottom: 1px solid var(--border-color); /* Subtle separator */
-  margin-bottom: 2rem; /* Space below header */
+  background-color: var(--primary-dark-lm); /* Use the primary dark color from the new theme */
+  color: var(--primary-light-dm); /* Light text on dark background */
+  padding: 1rem 2rem; /* Adjust padding as needed, using .App's horizontal padding too */
+  text-align: center; /* Or left-align for a more typical app header */
+  /* box-shadow: 0 2px 4px rgba(0,0,0,0.1); */ /* Optional: subtle shadow if desired */
+  margin-bottom: 2.5rem; /* Increased space below header */
 }
+
+/* Apply dark theme variables specifically for header if body is light, and vice-versa */
+@media (prefers-color-scheme: light) {
+  .App-header {
+    background-color: var(--primary-dark-lm); /* #1a202c */
+    color: var(--primary-light-dm); /* #e2e8f0 */
+  }
+  .App-header h1 {
+    color: var(--primary-light-dm); /* Ensure h1 inside dark header is light */
+  }
+}
+@media (prefers-color-scheme: dark) {
+  /* If main dark theme bg is very dark, header might be slightly lighter dark or use accent border */
+  .App-header {
+    background-color: var(--section-bg-dm); /* e.g., #2d3748, slightly lighter than body #121212 */
+    color: var(--primary-light-dm);
+    border-bottom: 1px solid var(--border-color); /* Add a subtle border if bg is similar to body */
+  }
+   .App-header h1 {
+    color: var(--primary-light-dm);
+  }
+}
+
 
 .App-header h1 {
   margin: 0;
-  font-size: 1.75rem; /* Slightly smaller, more refined h1 for app title */
+  font-size: 1.5rem; /* Professional app title size */
   font-weight: 600;
 }
 
 .App main {
   flex-grow: 1;
-  width: 100%; /* Ensure main content takes available width within .App */
+  width: 100%;
 }
 
 .App-footer {
-  background-color: var(--bg-color); /* Match body background */
-  padding: 1.5rem 0; /* Vertical padding */
-  color: var(--text-color); /* Use standard text color, perhaps slightly muted */
-  opacity: 0.7; /* Mute footer slightly */
+  background-color: var(--bg-color); /* Match body background or use a section background */
+  padding: 2rem 2rem;
+  color: var(--muted-text-color); /* Muted text for footer */
   text-align: center;
-  font-size: 0.9em;
-  border-top: 1px solid var(--border-color); /* Subtle separator */
-  margin-top: 3rem; /* Space above footer */
+  font-size: 0.875em;
+  border-top: 1px solid var(--border-color);
+  margin-top: 4rem; /* Generous space above footer */
 }
 
-/* Styling for sections within the application */
+/* Styling for sections within the application - Alpaca style (clean, defined blocks) */
 .backtest-section {
   background-color: var(--section-bg-color);
-  padding: 1.5rem; /* Consistent padding */
-  margin-bottom: 1.5rem; /* Consistent spacing between sections */
-  border-radius: var(--border-radius);
-  border: 1px solid var(--border-color); /* Use border for separation */
-  box-shadow: none; /* Remove box-shadow for a flatter, minimalist look */
-}
-
-/* Add a class for the overall configuration area if needed */
-.config-area {
-  margin-bottom: 2rem;
-}
-
-/* Specific layout for BacktestRunnerPage if it has distinct columns/areas */
-.backtest-runner-layout {
-  /* Example if you want two columns for settings and params
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 1.5rem;
-  */
-}
-
-/* Class for individual form containers or groups within sections */
-.form-container {
-  /* Styles for individual form groupings if .backtest-section is too broad */
-}
-
-/* Ensure charts have a clean container if not already styled */
-.charts-section {
-  margin-top: 2rem;
-  display: flex;
-  flex-direction: column;
-  gap: 2rem; /* Space between charts */
-}
-
-.chart-container { /* Wrap individual charts in this if they need specific styling */
-  background-color: var(--section-bg-color);
-  padding: 1rem;
+  padding: 2rem; /* More padding for a spacious feel inside sections */
+  margin-bottom: 2rem; /* Consistent spacing */
   border-radius: var(--border-radius);
   border: 1px solid var(--border-color);
+  /* box-shadow: var(--box-shadow-subtle); */ /* Optional: Add subtle shadow if it fits the desired Alpaca look */
+}
+
+/* If some sections need to stand out more, e.g., results */
+.results-display.backtest-section { /* Making results more prominent if needed */
+  /* background-color: var(--bg-color); */ /* Could be same as main bg to make it feel less boxed */
+  /* border: 1px solid var(--border-color); */
+}
+
+
+.config-area {
+  margin-bottom: 2.5rem;
+}
+
+/* Layout for form sections - can use .form-grid from index.css within these */
+.settings-section, .parameters-section, .selector-section {
+  /* These are just conceptual if you need to group .form-group elements */
+}
+
+
+/* Chart area styling */
+.charts-section {
+  margin-top: 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem; 
+}
+
+.chart-container {
+  background-color: var(--section-bg-color); /* Or --bg-color if charts should be on main bg */
+  padding: 1.5rem;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+  /* box-shadow: var(--box-shadow-subtle); */ /* Optional subtle shadow */
 }
 
 .chart-title {
-  font-size: 1.25rem;
+  font-size: 1.25rem; /* h4 equivalent */
   font-weight: 600;
   color: var(--heading-color);
-  margin-bottom: 1rem;
-  text-align: center;
+  margin-bottom: 1.5rem;
+  text-align: left; /* Or center, depending on preference */
+}
+
+/* Append to frontend/src/App.css */
+
+.info-box-styled {
+  background-color: var(--section-bg-color); /* Or var(--bg-color) if it should blend more with page background */
+  padding: 1rem 1.5rem; /* Consistent padding */
+  margin-top: 1rem; /* Space from elements above */
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  /* box-shadow: var(--box-shadow-subtle); */ /* Optional: if cards/boxes have subtle shadows */
+}
+
+.info-box-styled p {
+  margin-bottom: 0.5rem; /* Spacing for paragraphs within the box */
+  line-height: 1.5; /* Ensure good readability */
+}
+.info-box-styled p:last-child {
+  margin-bottom: 0;
+}
+
+.info-box-styled strong {
+  color: var(--heading-color); /* Make strong text use heading color for emphasis */
+}
+
+.info-box-styled ul {
+  margin-top: 0.5rem;
+  padding-left: 1.5rem; /* Indent list */
+}
+
+.info-box-styled code {
+  background-color: rgba(var(--accent-color-rgb, 0, 123, 255), 0.1);
+  color: var(--accent-color);
+  padding: 0.15em 0.3em;
+  border-radius: 0.2em;
+  font-size: 0.9em;
 }

@@ -1,76 +1,77 @@
 /* frontend/src/index.css */
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.6; /* Increased for better readability */
+  line-height: 1.6;
   font-weight: 400;
 
-  color-scheme: light dark;
+  color-scheme: light dark; /* Assuming we still support both based on user preference */
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  /* Theme Colors - Light Mode */
-  --primary-accent-light: #007bff;
-  --text-color-light: #212529;
-  --bg-color-light: #ffffff;
-  --section-bg-color-light: #f8f9fa;
-  --border-color-light: #dee2e6;
-  --heading-color-light: #343a40; /* Darker gray for headings */
-  --link-color-light: var(--primary-accent-light);
-  --button-bg-light: var(--primary-accent-light);
-  --button-text-light: #ffffff;
-  --input-bg-light: #ffffff;
-  --input-border-light: #ced4da;
-  --input-text-light: #495057;
+  /* Alpaca-Inspired Theme Colors - Light Mode */
+  --primary-dark-lm: #1a202c;    /* Dark Charcoal/Navy for text, headers */
+  --primary-light-lm: #ffffff;   /* White background */
+  --accent-color-lm: #007bff;   /* Vibrant Blue for CTAs, links */
+  --text-color-lm: #2d3748;     /* Slightly softer dark gray for body text */
+  --muted-text-color-lm: #718096; /* Medium gray for subtext, placeholders */
+  --section-bg-lm: #f7fafc;     /* Very subtle off-white for sections/cards */
+  --border-color-lm: #cbd5e0;   /* Light gray for borders */
+  --input-bg-lm: #ffffff;
+  --input-border-lm: var(--border-color-lm);
+  --button-text-lm: #ffffff;
 
-
-  /* Theme Colors - Dark Mode */
-  --primary-accent-dark: #007bff; /* Can adjust if too vibrant, e.g., #3399ff */
-  --text-color-dark: #e0e0e0;
-  --bg-color-dark: #121212;
-  --section-bg-color-dark: #1e1e1e;
-  --border-color-dark: #343a40;
-  --heading-color-dark: #f8f9fa; /* Light gray/white for headings */
-  --link-color-dark: var(--primary-accent-dark);
-  --button-bg-dark: var(--primary-accent-dark);
-  --button-text-dark: #ffffff; /* Or #121212 if accent is light enough */
-  --input-bg-dark: #2a2a2a;
-  --input-border-dark: #444;
-  --input-text-dark: var(--text-color-dark);
+  /* Alpaca-Inspired Theme Colors - Dark Mode */
+  --primary-dark-dm: #1a202c;    /* Base dark bg for dark mode */
+  --primary-light-dm: #e2e8f0;   /* Light gray/off-white for text on dark */
+  --accent-color-dm: #007bff;   /* Blue accent can often work on dark too, or use a lighter variant like #3399ff */
+  --text-color-dm: var(--primary-light-dm);
+  --muted-text-color-dm: #a0aec0; /* Lighter gray for subtext in dark mode */
+  --section-bg-dm: #2d3748;     /* Darker section background */
+  --border-color-dm: #4a5568;   /* Medium-dark gray for borders */
+  --input-bg-dm: #1a202c;       /* Inputs same as dark bg or slightly lighter */
+  --input-border-dm: var(--border-color-dm);
+  --button-text-dm: #ffffff;
 
   /* Default to light mode variables */
-  --primary-accent: var(--primary-accent-light);
-  --text-color: var(--text-color-light);
-  --bg-color: var(--bg-color-light);
-  --section-bg-color: var(--section-bg-color-light);
-  --border-color: var(--border-color-light);
-  --heading-color: var(--heading-color-light);
-  --link-color: var(--link-color-light);
-  --button-bg: var(--button-bg-light);
-  --button-text: var(--button-text-light);
-  --input-bg: var(--input-bg-light);
-  --input-border: var(--input-border-light);
-  --input-text: var(--input-text-light);
+  --bg-color: var(--primary-light-lm);
+  --text-color: var(--text-color-lm);
+  --heading-color: var(--primary-dark-lm);
+  --accent-color: var(--accent-color-lm);
+  --muted-text-color: var(--muted-text-color-lm);
+  --section-bg-color: var(--section-bg-lm);
+  --border-color: var(--border-color-lm);
+  --input-bg: var(--input-bg-lm);
+  --input-border: var(--input-border-lm);
+  --button-bg: var(--accent-color-lm);
+  --button-text-color: var(--button-text-lm);
   
-  --border-radius: 0.3rem; /* Slightly larger border radius */
+  --border-radius: 0.375rem; /* 6px */
+  --box-shadow-subtle: 0 1px 3px 0 rgba(0, 0, 0, 0.07), 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+  --box-shadow-focus: 0 0 0 3px rgba(var(--accent-color-rgb, 0, 123, 255), 0.25);
 }
+
+/* Helper for box-shadow - assuming --accent-color is #007bff (0, 123, 255) */
+:root { --accent-color-rgb: 0, 123, 255; }
+
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --primary-accent: var(--primary-accent-dark);
-    --text-color: var(--text-color-dark);
-    --bg-color: var(--bg-color-dark);
-    --section-bg-color: var(--section-bg-color-dark);
-    --border-color: var(--border-color-dark);
-    --heading-color: var(--heading-color-dark);
-    --link-color: var(--link-color-dark);
-    --button-bg: var(--button-bg-dark);
-    --button-text: var(--button-text-dark);
-    --input-bg: var(--input-bg-dark);
-    --input-border: var(--input-border-dark);
-    --input-text: var(--input-text-dark);
+    --bg-color: var(--primary-dark-dm);
+    --text-color: var(--text-color-dm);
+    --heading-color: var(--primary-light-dm);
+    --accent-color: var(--accent-color-dm);
+    --muted-text-color: var(--muted-text-color-dm);
+    --section-bg-color: var(--section-bg-dm);
+    --border-color: var(--border-color-dm);
+    --input-bg: var(--input-bg-dm);
+    --input-border: var(--input-border-dm);
+    --button-bg: var(--accent-color-dm);
+    --button-text-color: var(--button-text-dm);
+    /* Update RGB for dark mode if accent color changes significantly */
+    /* --accent-color-rgb: 51, 153, 255; */ /* Example if using #3399ff for dark accent */
   }
 }
 
@@ -81,46 +82,44 @@ body {
   display: flex;
   justify-content: center;
   min-height: 100vh;
-  font-size: 16px; /* Base font size */
+  font-size: 16px;
 }
 
-.App { /* This class is on the main div in App.tsx */
+.App {
   width: 100%;
-  max-width: 1200px;
-  padding: 1.5rem; /* Increased padding for more white space */
+  max-width: 1200px; /* Or whatever max-width is desired */
+  padding: 2rem; /* More generous padding */
   box-sizing: border-box;
 }
 
 h1, h2, h3, h4, h5, h6 {
   margin-top: 0;
-  margin-bottom: 0.75rem; /* Consistent bottom margin */
+  margin-bottom: 1rem; /* Consistent bottom margin */
   color: var(--heading-color);
-  font-weight: 600; /* Consistent weight */
+  line-height: 1.3; /* Tighter line height for headings */
 }
 
-h1 { font-size: 2.25rem; }
-h2 { font-size: 1.75rem; }
-h3 { font-size: 1.5rem; }
-h4 { font-size: 1.25rem; }
-h5 { font-size: 1.1rem; }
-h6 { font-size: 1rem; }
+h1 { font-size: 2rem; font-weight: 700; }
+h2 { font-size: 1.75rem; font-weight: 700; }
+h3 { font-size: 1.375rem; font-weight: 600; }
+h4 { font-size: 1.125rem; font-weight: 600; }
 
 a {
   font-weight: 500;
-  color: var(--link-color);
-  text-decoration: none; /* Cleaner look */
+  color: var(--accent-color);
+  text-decoration: none;
 }
 a:hover {
   text-decoration: underline;
-  filter: brightness(85%); /* Standard way to darken/lighten accent on hover */
+  filter: brightness(85%);
 }
 
-/* Form Elements Styling */
+/* Form Elements Styling - Alpaca Inspired (Clean, Professional) */
 label {
   display: block;
-  margin-bottom: 0.5rem; /* Increased spacing */
-  font-weight: 500; /* Slightly less bold */
-  color: var(--text-color); /* Use main text color, or a slightly muted version */
+  margin-bottom: 0.5rem;
+  font-weight: 500; /* Slightly bolder than default p */
+  color: var(--heading-color); /* Labels can be same color as headings for emphasis */
 }
 
 input[type="text"],
@@ -128,117 +127,124 @@ input[type="number"],
 input[type="date"],
 select {
   width: 100%;
-  padding: 0.6rem 0.8rem; /* Slightly more padding */
-  margin-bottom: 1rem; /* Increased spacing */
+  padding: 0.75rem 1rem; /* Generous padding */
+  margin-bottom: 1rem;
   font-size: 1rem;
   line-height: 1.5;
-  color: var(--input-text);
+  color: var(--text-color);
   background-color: var(--input-bg);
   border: 1px solid var(--input-border);
   border-radius: var(--border-radius);
   box-sizing: border-box;
   transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
 }
+input[type="text"]::placeholder,
+input[type="number"]::placeholder,
+input[type="date"]::placeholder {
+  color: var(--muted-text-color);
+  opacity: 0.8;
+}
+
 
 input[type="checkbox"] {
   margin-right: 0.5rem;
   vertical-align: middle;
-  accent-color: var(--primary-accent); /* Modern way to style checkbox color */
+  accent-color: var(--accent-color);
+  border-radius: 0.2em; /* Softer checkbox edges if browser supports */
+  border: 1px solid var(--input-border); /* Needed for some browsers */
+  width: 1.15em;
+  height: 1.15em;
 }
 
 input:focus,
 select:focus {
-  border-color: var(--primary-accent);
+  border-color: var(--accent-color);
   outline: 0;
-  box-shadow: 0 0 0 0.2rem rgba(var(--primary-accent-rgb, 0, 123, 255), 0.25); /* Needs RGB version of accent */
+  box-shadow: var(--box-shadow-focus);
 }
-/* Helper for box-shadow - assuming --primary-accent is #007bff (0, 123, 255) */
-@media (prefers-color-scheme: light) { :root { --primary-accent-rgb: 0, 123, 255; }}
-@media (prefers-color-scheme: dark) { :root { --primary-accent-rgb: 0, 123, 255; }} /* Adjust if dark accent is different RGB */
 
-
-button, .button { /* Added .button class for non-button elements needing button styles */
+button, .button {
   display: inline-block;
   font-weight: 600;
-  color: var(--button-text);
+  color: var(--button-text-color);
   text-align: center;
   vertical-align: middle;
   cursor: pointer;
   background-color: var(--button-bg);
-  border: 1px solid var(--button-bg); /* Border same as bg for solid look */
-  padding: 0.6rem 1.2rem; /* Slightly more padding */
+  border: 1px solid var(--button-bg);
+  padding: 0.75rem 1.5rem; /* Professional button padding */
   font-size: 1rem;
   line-height: 1.5;
   border-radius: var(--border-radius);
-  transition: filter 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
+  transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, filter 0.15s ease-in-out;
+  text-decoration: none; /* For .button used on <a> tags */
 }
 
 button:hover, .button:hover {
   filter: brightness(90%);
+  text-decoration: none;
 }
 button:focus, .button:focus {
   outline: 0;
-  box-shadow: 0 0 0 0.2rem rgba(var(--primary-accent-rgb, 0, 123, 255), 0.35);
+  box-shadow: var(--box-shadow-focus);
 }
 
-
 button:disabled, .button:disabled {
-  background-color: #6c757d; /* Neutral disabled color */
-  border-color: #6c757d;
+  background-color: #adb5bd; /* Muted gray for disabled */
+  border-color: #adb5bd;
   color: #ffffff;
   cursor: not-allowed;
-  opacity: 0.65;
+  opacity: 0.7;
   filter: none;
 }
 
-/* Table Styling - Minimalist */
+/* Table Styling - Professional & Clean */
 table {
   width: 100%;
-  margin-bottom: 1.5rem; /* Increased spacing */
+  margin-bottom: 1.5rem;
   color: var(--text-color);
   border-collapse: collapse;
-  font-size: 0.95rem; /* Slightly smaller table text for dense data */
+  font-size: 0.9rem; /* Slightly smaller for data density */
 }
 
 th, td {
-  padding: 0.75rem 0.5rem; /* Adjust padding */
-  vertical-align: top;
-  border-top: 1px solid var(--border-color);
+  padding: 0.75rem 1rem; /* Consistent padding */
+  vertical-align: middle; /* Align text vertically in cells */
+  border-bottom: 1px solid var(--border-color); /* Horizontal lines only */
   text-align: left;
 }
+/* Remove top border from first row, bottom from last for cleaner look if desired */
+/* thead tr:first-child th, tbody tr:first-child td { border-top: none; } */
+/* tbody tr:last-child th, tbody tr:last-child td { border-bottom: none; } */
+
 
 thead th {
-  vertical-align: bottom;
-  border-bottom: 2px solid var(--border-color); /* Heavier border for header bottom */
-  background-color: transparent; /* No background for minimalist header */
-  font-weight: 600; /* Ensure header text is bold */
+  font-weight: 600; /* Bolder header text */
   color: var(--heading-color);
+  border-bottom-width: 2px; /* Thicker line under header */
+  background-color: transparent; /* No specific background for header cells */
 }
 
-tbody tr:nth-of-type(odd) {
-  background-color: transparent; /* No striping for minimalist look */
-}
 tbody tr:hover {
-  background-color: rgba(var(--primary-accent-rgb, 0, 123, 255), 0.05); /* Subtle hover for rows */
+  background-color: rgba(var(--accent-color-rgb, 0, 123, 255), 0.075); /* Subtle hover */
 }
 
-
-/* Utility Classes */
+/* Utility Classes (some from previous theme, ensure they fit) */
 .error-message {
-  color: #721c24; /* Darker red text for better contrast on light bg */
+  color: #721c24; 
   background-color: #f8d7da;
   border: 1px solid #f5c6cb;
-  padding: 0.75rem 1.25rem;
+  padding: 1rem;
   margin-top: 1rem;
   margin-bottom: 1rem;
   border-radius: var(--border-radius);
 }
 
-.loading-message {
+.loading-message, .info-message { /* Combine for similar styling */
   color: #004085;
   background-color: #cce5ff;
   border: 1px solid #b8daff;
-  padding: 0.75rem 1.25rem;
+  padding: 1rem;
   margin-top: 1rem;
   margin-bottom: 1rem;
   border-radius: var(--border-radius);
@@ -246,68 +252,40 @@ tbody tr:hover {
 
 @media (prefers-color-scheme: dark) {
   .error-message {
-    color: #f8d7da; /* Lighter red text on dark bg */
-    background-color: #491217; /* Darker red background */
-    border-color: #f5c6cb; /* Keep border light for visibility */
+    color: #f8d7da;
+    background-color: #491217;
+    border-color: #f5c6cb;
   }
-
-  .loading-message {
+  .loading-message, .info-message {
     color: #cce5ff;
-    background-color: #002752; /* Darker blue background */
+    background-color: #002752; 
     border-color: #b8daff;
+  }
+  .profit { /* Ensure these are still visible if used */
+    color: #20c997; 
+  }
+  .loss {
+    color: #ff6b6b;
   }
 }
 
-/* Specific component structure helpers from old index.css - may or may not be used */
+/* Profit/Loss from previous theme, ensure they fit or adapt */
+.profit {
+  color: #28a745; 
+}
+.loss {
+  color: #dc3545;
+}
+
+/* Specific component structure helpers - can be kept if App.css still uses them */
 .form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1.5rem; /* Increased gap */
+  gap: 1.5rem;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
   margin-bottom: 1rem; 
-}
-
-.form-group label { /* Already styled above */
-  /* margin-bottom: 0.5rem; */
-}
-
-/* Append to frontend/src/index.css */
-
-/* Utility classes for text styling (e.g., in ResultsDisplay) */
-.profit {
-  color: #28a745; /* Green for profit */
-}
-
-.loss {
-  color: #dc3545; /* Red for loss */
-}
-
-.info-message {
-  color: var(--text-color); /* Use standard text color or a slightly muted one */
-  background-color: rgba(var(--primary-accent-rgb, 0, 123, 255), 0.1); /* Light accent background */
-  border: 1px solid rgba(var(--primary-accent-rgb, 0, 123, 255), 0.2);
-  padding: 0.75rem 1.25rem;
-  margin-top: 1rem;
-  margin-bottom: 1rem;
-  border-radius: var(--border-radius);
-  text-align: center;
-}
-
-@media (prefers-color-scheme: dark) {
-  .profit {
-    color: #20c997; /* Brighter Green for profit in dark mode */
-  }
-
-  .loss {
-    color: #ff6b6b; /* Brighter Red for loss in dark mode */
-  }
-  
-  .info-message {
-    background-color: rgba(var(--primary-accent-rgb, 0, 123, 255), 0.15);
-    border-color: rgba(var(--primary-accent-rgb, 0, 123, 255), 0.3);
-  }
 }

@@ -163,7 +163,7 @@ const BacktestRunnerPage: React.FC = () => {
         />
         {/* Display AI Chosen Strategy Info */}
         {selectedStrategy?.id === 'ai-selector' && (
-          <div className="ai-choice-info" style={{ marginTop: '10px', padding: '10px', border: '1px solid #eee', borderRadius: '4px' }}>
+          <div className="ai-choice-info info-box-styled">
             {isFetchingAIChoice && <p>Fetching AI choice for {currentBacktestSettings.symbol}...</p>}
             {aiChoiceError && <p style={{ color: 'red' }}>Error: {aiChoiceError}</p>}
             {aiChosenStrategyInfo && !isFetchingAIChoice && !aiChoiceError && (
@@ -226,28 +226,34 @@ const BacktestRunnerPage: React.FC = () => {
         
         {/* Render charts if results are available */}
         {backtestResult && !error && (
-          <div className="charts-section" style={{ marginTop: '20px' }}>
+          <div className="charts-section"> {/* Removed inline style, rely on App.css */}
             {/* Equity Chart */}
             {backtestResult.portfolioHistory && backtestResult.portfolioHistory.length > 0 && (
-              <EquityChart 
-                data={backtestResult.portfolioHistory} 
-              />
+              <div className="chart-container">
+                <h4 className="chart-title">Portfolio Equity</h4>
+                <EquityChart 
+                  data={backtestResult.portfolioHistory} 
+                />
+              </div>
             )}
 
             {/* Trades on Price Chart */}
             {backtestResult.historicalDataUsed && backtestResult.historicalDataUsed.length > 0 && backtestResult.trades && (
-              <TradesOnPriceChart 
-                priceData={backtestResult.historicalDataUsed as ReadonlyArray<FrontendHistoricalDataPoint>} 
-                tradesData={backtestResult.trades.map((trade: Trade) => ({ 
-                  timestamp: trade.timestamp, 
-                  date: trade.date,
-                  action: trade.action,
-                  price: trade.price,
-                  sharesTraded: trade.sharesTraded,
-                  cashAfterTrade: trade.cashAfterTrade
-                }))}
-                aiDecisionLog={backtestResult.aiDecisionLog} // Pass the AI decision log
-              />
+              <div className="chart-container">
+                <h4 className="chart-title">Price Chart & Trades</h4>
+                <TradesOnPriceChart 
+                  priceData={backtestResult.historicalDataUsed as ReadonlyArray<FrontendHistoricalDataPoint>} 
+                  tradesData={backtestResult.trades.map((trade: Trade) => ({ 
+                    timestamp: trade.timestamp, 
+                    date: trade.date, // Ensure this is string as expected by FrontendTrade
+                    action: trade.action,
+                    price: trade.price,
+                    sharesTraded: trade.sharesTraded,
+                    cashAfterTrade: trade.cashAfterTrade
+                  }))}
+                  aiDecisionLog={backtestResult.aiDecisionLog} // Pass the AI decision log
+                />
+              </div>
             )}
           </div>
         )}
