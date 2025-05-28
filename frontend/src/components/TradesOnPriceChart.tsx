@@ -12,7 +12,6 @@ import {
   ResponsiveContainer,
   ReferenceDot, // For individual markers if needed, but Scatter is better for series
   ZAxis, // Needed if scatter point sizes vary, not strictly needed here
-  ZAxis, // Needed if scatter point sizes vary, not strictly needed here
 } from 'recharts';
 import { HistoricalDataPoint } from '../../../src/services/dataService'; // Adjust path if needed
 import { Trade } from '../../../src/backtest'; // Adjust path if needed
