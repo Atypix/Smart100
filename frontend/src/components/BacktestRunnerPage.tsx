@@ -18,7 +18,7 @@ import ResultsDisplay from './ResultsDisplay';
 import EquityChart from './EquityChart'; // Import EquityChart
 import TradesOnPriceChart from './TradesOnPriceChart';
 import { logger } from '../utils/logger';
-import { getAICurrentStrategy, AIChoiceResponse } from '../services/api'; // Import AI choice function and type
+import { getAICurrentStrategy, type AIChoiceResponse } from '../services/api'; // Import AI choice function and type
 
 const BacktestRunnerPage: React.FC = () => {
   const [selectedStrategy, setSelectedStrategy] = useState<TradingStrategy | null>(null);
@@ -40,7 +40,7 @@ const BacktestRunnerPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   // State for AI Selector Strategy Choice
-  const [aiChosenStrategyInfo, setAiChosenStrategyInfo] = useState<AIChoiceResponse | null>(null);
+  const [aiChosenStrategyInfo, setAiChosenStrategyInfo] = useState<AIChoiceResponse | null>(null); // No change needed here, type usage
   const [isFetchingAIChoice, setIsFetchingAIChoice] = useState<boolean>(false);
   const [aiChoiceError, setAiChoiceError] = useState<string | null>(null);
 
