@@ -8,12 +8,16 @@ const router = Router();
 
 router.get('/current-strategy/:symbol', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const { symbol } = req.params;
-  const upperSymbol = symbol ? symbol.toUpperCase() : "";
 
-  if (!upperSymbol) {
+  // Explicit check for the presence of the symbol parameter in the path as per Option A
+  // Also check if it's an empty string after trimming, as Express might pass an empty segment as ""
+  if (!req.params.symbol || req.params.symbol.trim() === "") { 
     res.status(400).json({ message: "Symbol parameter is required." });
     return;
   }
+  
+  // If req.params.symbol exists and is not empty, then symbol variable will also be valid.
+  const upperSymbol = symbol.toUpperCase(); 
 
   try {
     const aiState: AISelectorChoiceState = getAISelectorActiveState(upperSymbol);

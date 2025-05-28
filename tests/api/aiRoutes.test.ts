@@ -6,19 +6,10 @@ import { getAISelectorActiveState, AISelectorChoiceState } from '../../src/strat
 // Removed StrategyManager import as it's not directly used and caused issues with mocking
 // import { StrategyManager } from '../../src/strategies/strategyManager'; 
 import { TradingStrategy, StrategySignal, StrategyParameterDefinition } from '../../src/strategies/strategy.types';
-import logger from '../../src/utils/logger'; // Corrected logger import
+// The local import of logger might still be here but the mock is removed.
+// The global mock from setupMocks.ts should take precedence.
+import logger from '../../src/utils/logger'; 
 
-// Mock logger
-jest.mock('../../src/utils/logger', () => ({
-  default: { // Mock the default export
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    debug: jest.fn(),
-    verbose: jest.fn(),
-    silly: jest.fn(),
-  }
-}));
 
 // Mock StrategyManager - mock individual functions if needed by the tested routes
 jest.mock('../../src/strategies/strategyManager', () => ({
