@@ -28,8 +28,14 @@ const ApiKeyManager: React.FC = () => {
       const keys = await api.fetchApiKeys();
       setApiKeys(keys);
     } catch (err: any) {
-      setError(err.message || 'Failed to fetch API keys.');
-      console.error(err);
+      console.error('ApiKeyManager Error in fetchKeys:', err); // Log the original error
+      if (err instanceof api.AuthError) {
+        console.warn('Authentication/Authorization error in fetchKeys:', err.message, `Status: ${err.status}`);
+        setError('Your session may have expired or you do not have permission to access API keys. Please try logging out and logging in again.');
+        // Optionally, trigger global logout if available: globalLogoutFunction();
+      } else {
+        setError(err.message || 'Failed to fetch API keys.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -79,8 +85,13 @@ const ApiKeyManager: React.FC = () => {
       setIsEditing(null);
       fetchKeys(); // Refresh list
     } catch (err: any) {
-      setError(err.message || `Failed to ${isEditing ? 'update' : 'add'} API key.`);
-      console.error(err);
+      console.error('ApiKeyManager Error in handleSubmit:', err); // Log the original error
+      if (err instanceof api.AuthError) {
+        console.warn(`Authentication/Authorization error during ${isEditing ? 'update' : 'add'} API key:`, err.message, `Status: ${err.status}`);
+        setError(`Your session may have expired or you do not have permission to ${isEditing ? 'update' : 'add'} API keys. Please try logging out and logging in again.`);
+      } else {
+        setError(err.message || `Failed to ${isEditing ? 'update' : 'add'} API key.`);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -105,8 +116,13 @@ const ApiKeyManager: React.FC = () => {
       await api.deleteApiKey(id);
       fetchKeys(); // Refresh list
     } catch (err: any) {
-      setError(err.message || 'Failed to delete API key.');
-      console.error(err);
+      console.error('ApiKeyManager Error in handleDelete:', err); // Log the original error
+      if (err instanceof api.AuthError) {
+        console.warn('Authentication/Authorization error during delete API key:', err.message, `Status: ${err.status}`);
+        setError('Your session may have expired or you do not have permission to delete API keys. Please try logging out and logging in again.');
+      } else {
+        setError(err.message || 'Failed to delete API key.');
+      }
     } finally {
       setIsLoading(false);
     }

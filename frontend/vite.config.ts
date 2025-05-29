@@ -23,7 +23,7 @@ export default defineConfig({
       'aws-crt', // Adding this as it's often a transitive dependency of aws-sdk causing issues
       'better-sqlite3',
       '@tensorflow/tfjs-node',
-      'axios', // If used only by backend, otherwise needs careful handling
+      // 'axios', // Removed as it's used in the frontend
       'yahoo-finance2',
       'winston'
     ]
@@ -41,7 +41,7 @@ export default defineConfig({
       // axios, yahoo-finance2, winston are trickier if they *could* be used by frontend utility code
       // that is not part of the main app but gets included by tsc.
       // For now, let's assume they are backend only based on errors.
-      'axios': path.resolve(__dirname, 'src/utils/empty-module.js'),
+      // 'axios': path.resolve(__dirname, 'src/utils/empty-module.js'), // Removed to allow proper Axios import
       'yahoo-finance2': path.resolve(__dirname, 'src/utils/empty-module.js'),
       'winston': path.resolve(__dirname, 'src/utils/empty-module.js'),
     }
