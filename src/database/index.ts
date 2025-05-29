@@ -2,10 +2,15 @@ import Database from 'better-sqlite3';
 
 // Initialize database connection
 let db: Database.Database;
+const dbFilePath = process.env.NODE_ENV === 'test' ? ':memory:' : 'trading_data.db';
 
 try {
-  db = new Database('trading_data.db');
-  console.log('Connected to the SQLite database.');
+  db = new Database(dbFilePath);
+  if (process.env.NODE_ENV === 'test') {
+    console.log('Connected to in-memory SQLite database for testing.');
+  } else {
+    console.log('Connected to the SQLite database (trading_data.db).');
+  }
 } catch (error) {
   console.error('Error connecting to the database:', error);
   // Depending on the application's needs, you might want to exit the process

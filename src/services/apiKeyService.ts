@@ -4,23 +4,21 @@ import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
 import { ApiKey, ApiKeyStored, CreateApiKeyInput, UpdateApiKeyInput } from '../models/apiKey.types';
 
-// Environment variable for encryption key
-const API_ENCRYPTION_KEY_HEX_RAW = process.env.API_ENCRYPTION_KEY_HEX;
-let API_ENCRYPTION_KEY: Buffer;
+let API_ENCRYPTION_KEY: Buffer; // Module-level variable
 
-if (!API_ENCRYPTION_KEY_HEX_RAW || API_ENCRYPTION_KEY_HEX_RAW.length !== 64) { 
-  if (process.env.NODE_ENV !== 'test') {
-    console.error('FATAL ERROR: API_ENCRYPTION_KEY_HEX is not set or is not a 32-byte hex string (64 characters). Please set it in your .env file. Exiting.');
-    process.exit(1);
-  } else {
-    console.warn('Warning: API_ENCRYPTION_KEY_HEX is not defined or invalid during test. Using a default dummy key for test environment only. Ensure it is set in .env and loaded by setupEnv.ts for tests requiring real encryption.');
-    // Use a default dummy key for test environment if not set, to allow module loading & test execution
-    // This key should NOT be used for any real encryption/decryption validation in tests if actual crypto is tested.
-    API_ENCRYPTION_KEY = Buffer.from('0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef', 'hex');
+// Environment variable for encryption key (original line can be removed or commented)
+// const API_ENCRYPTION_KEY_HEX_RAW = process.env.API_ENCRYPTION_KEY_HEX;
+
+export const initializeApiKeyService = () => {
+  const API_ENCRYPTION_KEY_HEX_RAW = process.env.API_ENCRYPTION_KEY_HEX;
+  if (!API_ENCRYPTION_KEY_HEX_RAW || API_ENCRYPTION_KEY_HEX_RAW.length !== 64) {
+    // console.error('FATAL ERROR: API_ENCRYPTION_KEY_HEX is not set or is not a 32-byte hex string (64 characters). Please set it in your .env file. Exiting.');
+    // process.exit(1); // Removing process.exit for better testability, throw error instead
+    throw new Error('FATAL ERROR: API_ENCRYPTION_KEY_HEX is not set or is not a 32-byte hex string (64 characters). Please set it in your .env file.');
   }
-} else {
   API_ENCRYPTION_KEY = Buffer.from(API_ENCRYPTION_KEY_HEX_RAW, 'hex');
-}
+  console.log('ApiKeyService initialized with key from env var.'); // For verification
+};
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12; // 96 bits is recommended for GCM
@@ -230,3 +228,7 @@ export const deleteApiKey = (apiKeyId: string, userId: string): boolean => {
     throw new Error('Failed to delete API key.');
   }
 };
+
+// Initialization should be handled by the application entry point (e.g., src/index.ts)
+// and by tests/setupEnv.ts for test environments.
+// initializeApiKeyService(); 
