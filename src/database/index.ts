@@ -107,6 +107,10 @@ export interface FinancialData {
 
 // Function to insert multiple financial data records
 function insertData(records: FinancialData[]): void {
+  if (!db) {
+    console.error('[DATABASE CRITICAL] insertData called but db instance is not available!');
+    throw new Error('[DATABASE CRITICAL] db instance is not available in insertData.');
+  }
   const insert = db.prepare(`
     INSERT INTO financial_data (symbol, timestamp, open, high, low, close, volume, source_api, fetched_at, interval)
     VALUES (@symbol, @timestamp, @open, @high, @low, @close, @volume, @source_api, @fetched_at, @interval)
@@ -126,6 +130,10 @@ function insertData(records: FinancialData[]): void {
 
 // Function to get recent financial data
 function getRecentData(symbol: string, source_api: string, interval: string, threshold_seconds: number): FinancialData[] {
+  if (!db) {
+    console.error('[DATABASE CRITICAL] getRecentData called but db instance is not available!');
+    throw new Error('[DATABASE CRITICAL] db instance is not available in getRecentData.');
+  }
   const stmt = db.prepare(`
     SELECT * FROM financial_data
     WHERE symbol = @symbol
@@ -146,37 +154,44 @@ function getRecentData(symbol: string, source_api: string, interval: string, thr
 
 // Function to get the most recent fallback data
 function getFallbackData(symbol: string, source_api: string, interval: string): FinancialData[] {
-  const stmt = db.prepare(`
-    SELECT * FROM financial_data
-    WHERE symbol = @symbol
-      AND source_api = @source_api
-      AND interval = @interval
-    ORDER BY fetched_at DESC, timestamp DESC 
-    LIMIT 100;  -- Limit to a reasonable number of records for fallback
-  `); // Assuming we want the most recent set of data, so order by fetched_at first.
+  if (!db) {
+    // console.error('[DATABASE CRITICAL] getFallbackData called but db instance is not available!');
+    // throw new Error('[DATABASE CRITICAL] db instance is not available in getFallbackData.');
+  // }
+  // try {
+  //   const stmt = db.prepare(`
+  //     SELECT * FROM financial_data
+  //     WHERE symbol = @symbol
+  //       AND source_api = @source_api
+  //       AND interval = @interval
+  //     ORDER BY fetched_at DESC, timestamp DESC 
+  //     LIMIT 100;
+  //   `);
 
-  try {
-    // This might return data from different fetched_at if the latest fetch didn't get all timestamps
-    // A more sophisticated approach might be needed if strict consistency of a single fetch batch is required.
-    const results = stmt.all({ symbol, source_api, interval }) as FinancialData[]; // Cast to FinancialData[]
-    if (results.length > 0) {
-        // If we have results, we want all records from the MOST RECENT `fetched_at` timestamp available
-        const mostRecentFetchedAt = results[0].fetched_at; // Now results[0] is FinancialData
-        const finalResults = db.prepare(`
-            SELECT * FROM financial_data
-            WHERE symbol = @symbol
-              AND source_api = @source_api
-              AND interval = @interval
-              AND fetched_at = @mostRecentFetchedAt
-            ORDER BY timestamp DESC
-        `).all({symbol, source_api, interval, mostRecentFetchedAt}) as FinancialData[]; // Cast to FinancialData[]
-        return finalResults;
-    }
-    return [];
-  } catch (error) {
-    console.error('Error fetching fallback data from financial_data:', error);
-    return [];
-  }
+  //   const results = stmt.all({ symbol, source_api, interval }) as FinancialData[];
+    
+  //   if (results.length > 0) {
+  //       const mostRecentFetchedAt = results[0].fetched_at;
+  //       const finalResultsStmt = db.prepare(`
+  //           SELECT * FROM financial_data
+  //           WHERE symbol = @symbol
+  //             AND source_api = @source_api
+  //             AND interval = @interval
+  //             AND fetched_at = @mostRecentFetchedAt
+  //           ORDER BY timestamp DESC
+  //       `);
+  //       const finalResults = finalResultsStmt.all({symbol, source_api, interval, mostRecentFetchedAt}) as FinancialData[];
+  //       return finalResults;
+  //   }
+  //   return [];
+  // } catch (error) {
+  //   // ADD THIS NEW LOG LINE:
+  //   console.log('[DEBUG DATABASE] getFallbackData: INNER CATCH BLOCK ENTERED. Error:', error); 
+  //   console.error('Error fetching fallback data from financial_data:', error);
+  //   return [];
+  // }
+  console.log(`[DEBUG DATABASE TEMPORARY] getFallbackData for ${symbol} forcibly returning [].`);
+  return []; // Force return empty array
 }
 
 
@@ -188,6 +203,10 @@ function queryHistoricalData(
   source_api?: string,
   interval?: string
 ): FinancialData[] {
+  if (!db) {
+    console.error('[DATABASE CRITICAL] queryHistoricalData called but db instance is not available!');
+    throw new Error('[DATABASE CRITICAL] db instance is not available in queryHistoricalData.');
+  }
   let sql = 'SELECT * FROM financial_data WHERE symbol = @symbol AND timestamp >= @startTimestamp AND timestamp <= @endTimestamp';
   const params: any = { symbol, startTimestamp, endTimestamp };
 

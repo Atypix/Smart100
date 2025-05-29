@@ -176,8 +176,16 @@ export async function fetchAlphaVantageData(symbol: string, apiKey: string): Pro
 async function handleApiErrorAndFetchFallback(symbol: string, source_api: string, interval: string, apiErrorMsg: string): Promise<TimeSeriesData | null> {
   logger.warn(`API call failed for ${symbol} (${source_api}, ${interval}): ${apiErrorMsg}. Attempting to use fallback data.`);
   try {
+    logger.info(`[DEBUG dataService] Calling getFallbackData for ${symbol}, ${source_api}, ${interval}`);
     const fallbackRecords = getFallbackData(symbol, source_api, interval);
-    if (fallbackRecords.length > 0) {
+    // TEMPORARY LOGGING START
+    logger.info(`[DEBUG dataService] fallbackRecords for ${symbol} (${source_api}):`, fallbackRecords === undefined ? 'undefined' : fallbackRecords === null ? 'null' : `Array with ${fallbackRecords.length} items.`);
+    if (fallbackRecords) {
+      logger.info(`[DEBUG dataService] First item of fallbackRecords (if any):`, fallbackRecords[0]);
+    }
+    // TEMPORARY LOGGING END
+
+    if (fallbackRecords && fallbackRecords.length > 0) { // Added null/undefined check for robustness
       logger.info(`Using ${fallbackRecords.length} fallback data records for ${symbol} from ${source_api} for interval ${interval}.`);
       return {
         symbol: symbol,
@@ -194,11 +202,14 @@ async function handleApiErrorAndFetchFallback(symbol: string, source_api: string
     }
     const finalErrorMessage = `API fetch failed for ${symbol} (${apiErrorMsg}) and no fallback data available.`;
     logger.error(finalErrorMessage);
-    throw new Error(finalErrorMessage); // Re-throw critical error
+    throw new Error(finalErrorMessage);
   } catch (dbError) {
+    // TEMPORARY LOGGING START
+    logger.error(`[DEBUG dataService] Caught error in handleApiErrorAndFetchFallback for ${symbol} (${source_api}). Error:`, dbError);
+    // TEMPORARY LOGGING END
     const finalErrorMessage = `API fetch failed for ${symbol} (${apiErrorMsg}), and an error occurred while querying fallback data.`;
     logger.error(finalErrorMessage, { originalDbError: dbError });
-    throw new Error(finalErrorMessage); // Re-throw critical error
+    throw new Error(finalErrorMessage);
   }
 }
 
@@ -313,8 +324,16 @@ export async function fetchYahooFinanceData(symbol: string): Promise<YahooFinanc
 async function handleYahooApiErrorAndFetchFallback(symbol: string, apiErrorMsg: string): Promise<YahooFinanceData[]> {
   logger.warn(`Yahoo API call failed for ${symbol}: ${apiErrorMsg}. Attempting to use fallback data.`);
   try {
+    logger.info(`[DEBUG dataService] Calling getFallbackData for Yahoo: ${symbol}, ${YAHOO_SOURCE_API}, ${YAHOO_INTERVAL}`);
     const fallbackRecords = getFallbackData(symbol, YAHOO_SOURCE_API, YAHOO_INTERVAL);
-    if (fallbackRecords.length > 0) {
+    // TEMPORARY LOGGING START
+    logger.info(`[DEBUG dataService] fallbackRecords for Yahoo ${symbol}:`, fallbackRecords === undefined ? 'undefined' : fallbackRecords === null ? 'null' : `Array with ${fallbackRecords.length} items.`);
+    if (fallbackRecords) {
+      logger.info(`[DEBUG dataService] First item of Yahoo fallbackRecords (if any):`, fallbackRecords[0]);
+    }
+    // TEMPORARY LOGGING END
+
+    if (fallbackRecords && fallbackRecords.length > 0) { // Added null/undefined check
       logger.info(`Using ${fallbackRecords.length} fallback data records for ${symbol} from ${YAHOO_SOURCE_API} for interval ${YAHOO_INTERVAL}.`);
       return fallbackRecords
         .map(transformDbRecordToYahooFinanceData)
@@ -322,13 +341,13 @@ async function handleYahooApiErrorAndFetchFallback(symbol: string, apiErrorMsg: 
     }
     const finalErrorMessage = `Yahoo API fetch failed for ${symbol} (${apiErrorMsg}) and no fallback data available.`;
     logger.error(finalErrorMessage);
-    // Consistent with original function's behavior of returning empty array or throwing,
-    // Here, throwing an error for critical failure. If empty array is preferred, change to: return [];
     throw new Error(finalErrorMessage);
   } catch (dbError) {
+    // TEMPORARY LOGGING START
+    logger.error(`[DEBUG dataService] Caught error in handleYahooApiErrorAndFetchFallback for ${symbol}. Error:`, dbError);
+    // TEMPORARY LOGGING END
     const finalErrorMessage = `Yahoo API fetch failed for ${symbol} (${apiErrorMsg}), and an error occurred while querying fallback data.`;
     logger.error(finalErrorMessage, { originalDbError: dbError });
-    // Consistent with original function's behavior
     throw new Error(finalErrorMessage);
   }
 }
@@ -633,12 +652,16 @@ async function handleBinanceApiErrorAndFetchFallback(
 ): Promise<KlineData[]> {
   logger.warn(`Binance API call failed for ${symbol} (interval: ${interval}, startTime: ${startTime}, endTime: ${endTime}): ${apiErrorMsg || 'Unknown API error'}. Attempting to use fallback data.`);
   try {
-    // For fallback, we ignore startTime/endTime and just get the most recent data as per getFallbackData's logic
-    // getFallbackData typically fetches data irrespective of 'fetched_at' for a wider fallback range.
-    // If specific range fallback is needed, getFallbackData or a new DB query function would need enhancement.
+    logger.info(`[DEBUG dataService] Calling getFallbackData for Binance: ${symbol}, ${BINANCE_SOURCE_API}, ${interval}`);
     const fallbackRecords = getFallbackData(symbol, BINANCE_SOURCE_API, interval);
+    // TEMPORARY LOGGING START
+    logger.info(`[DEBUG dataService] fallbackRecords for Binance ${symbol} (${interval}):`, fallbackRecords === undefined ? 'undefined' : fallbackRecords === null ? 'null' : `Array with ${fallbackRecords.length} items.`);
+    if (fallbackRecords) {
+      logger.info(`[DEBUG dataService] First item of Binance fallbackRecords (if any):`, fallbackRecords[0]);
+    }
+    // TEMPORARY LOGGING END
     
-    if (fallbackRecords.length > 0) {
+    if (fallbackRecords && fallbackRecords.length > 0) { // Added null/undefined check
       logger.info(`Using ${fallbackRecords.length} fallback data records for ${symbol} from ${BINANCE_SOURCE_API} for interval ${interval}.`);
       const klineData = fallbackRecords
         .map(transformDbRecordToKlineData)
@@ -658,8 +681,11 @@ async function handleBinanceApiErrorAndFetchFallback(
     }
     const finalErrorMessage = `Binance API fetch failed for ${symbol} (${apiErrorMsg || 'Unknown API error'}) and no fallback data available.`;
     logger.error(finalErrorMessage);
-    throw new Error(finalErrorMessage); 
+    throw new Error(finalErrorMessage);
   } catch (dbError) {
+    // TEMPORARY LOGGING START
+    logger.error(`[DEBUG dataService] Caught error in handleBinanceApiErrorAndFetchFallback for ${symbol} (${interval}). Error:`, dbError);
+    // TEMPORARY LOGGING END
     const finalErrorMessage = `Binance API fetch failed for ${symbol} (${apiErrorMsg || 'Unknown API error'}), and an error occurred while querying fallback data.`;
     logger.error(finalErrorMessage, { originalDbError: dbError });
     throw new Error(finalErrorMessage);
