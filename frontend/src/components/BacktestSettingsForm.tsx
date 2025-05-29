@@ -1,5 +1,6 @@
 // frontend/src/components/BacktestSettingsForm.tsx
 import React, { useState, useEffect } from 'react';
+import axios from 'axios'; // Import axios
 import type { BacktestSettings } from '../types';
 import { logger } from '../utils/logger';
 
@@ -10,28 +11,76 @@ interface BacktestSettingsFormProps {
 
 const BacktestSettingsForm: React.FC<BacktestSettingsFormProps> = ({ onSettingsChange, initialSettings }) => {
   const [settings, setSettings] = useState<BacktestSettings>(initialSettings);
+  const [symbolsList, setSymbolsList] = useState<string[]>([]);
+  const [isSymbolsLoading, setIsSymbolsLoading] = useState<boolean>(true);
+  const [symbolsError, setSymbolsError] = useState<string | null>(null);
 
-  // Update local state if initialSettings prop changes (e.g., parent resets form)
+  // Update local state if initialSettings prop changes
   useEffect(() => {
     setSettings(initialSettings);
   }, [initialSettings]);
 
-  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type } = event.target;
+  // Fetch symbols when component mounts
+  useEffect(() => {
+    const fetchSymbols = async () => {
+      setIsSymbolsLoading(true);
+      setSymbolsError(null);
+      try {
+        logger.info('Fetching available symbols for BacktestSettingsForm...');
+        const response = await axios.get<string[]>('/api/data/binance-symbols');
+        const fetchedSymbols = response.data;
+        logger.info(`Fetched ${fetchedSymbols.length} symbols.`);
+        setSymbolsList(fetchedSymbols);
+
+        if (fetchedSymbols.length > 0) {
+          // Check if current symbol is valid or needs to be defaulted
+          const currentSymbolIsValid = settings.symbol && fetchedSymbols.includes(settings.symbol);
+          if (!currentSymbolIsValid) {
+            logger.info(`Current symbol '${settings.symbol}' is invalid or empty. Defaulting to first symbol: ${fetchedSymbols[0]}`);
+            const updatedSettingsWithDefaultSymbol = {
+              ...settings,
+              symbol: fetchedSymbols[0],
+            };
+            setSettings(updatedSettingsWithDefaultSymbol);
+            onSettingsChange(updatedSettingsWithDefaultSymbol); // Notify parent
+          }
+        } else {
+           logger.warn('No symbols fetched from the API.');
+           // If current symbol was set, but list is empty, it becomes invalid.
+           // Consider clearing it or leaving as is, based on desired UX.
+           // For now, if list is empty, we can't set a default.
+        }
+
+      } catch (err) {
+        logger.error('Error fetching symbols for BacktestSettingsForm:', err);
+        const errorMessage = (err as any).response?.data?.message || (err as Error).message || 'Failed to fetch symbols.';
+        setSymbolsError(errorMessage);
+      } finally {
+        setIsSymbolsLoading(false);
+      }
+    };
+
+    fetchSymbols();
+  // eslint-disable-next-line react-hooks/exhaustive-deps 
+  }, []); // Run once on mount. Settings dependency removed to avoid re-fetching on every settings change. Defaulting logic handles symbol update.
+
+
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => { // Extended to HTMLSelectElement
+    const { name, value } = event.target;
     let processedValue: any = value;
 
-    if (type === 'number') {
+    // Check if the event target is an HTMLInputElement for type property
+    if (event.target instanceof HTMLInputElement && event.target.type === 'number') {
       processedValue = parseFloat(value);
-      if (isNaN(processedValue)) processedValue = 0; // Default to 0 or handle as per requirements
+      if (isNaN(processedValue)) processedValue = 0;
     }
-    // Dates are handled as strings (YYYY-MM-DD) by HTML date input
 
     const updatedSettings = {
       ...settings,
       [name]: processedValue,
     };
     setSettings(updatedSettings);
-    onSettingsChange(updatedSettings); // Notify parent of every change
+    onSettingsChange(updatedSettings);
     logger.debug(`BacktestSettingsForm: Setting ${name} changed to`, processedValue);
   };
   
@@ -63,16 +112,23 @@ const BacktestSettingsForm: React.FC<BacktestSettingsFormProps> = ({ onSettingsC
       <h4>Global Backtest Settings</h4>
       <div className="form-grid"> {/* Use form-grid for responsive layout */}
         <div className="form-group">
-          <label htmlFor="symbol">Symbol:</label>
-          <input
-            type="text"
-            id="symbol"
+          <label htmlFor="symbol-select">Symbol:</label>
+          <select
+            id="symbol-select"
             name="symbol"
             value={settings.symbol}
             onChange={handleChange}
-            placeholder="e.g., BTCUSDT, AAPL"
             required
-          />
+            disabled={isSymbolsLoading || !!symbolsError || symbolsList.length === 0}
+          >
+            {isSymbolsLoading && <option value="">Loading symbols...</option>}
+            {symbolsError && <option value="">Error loading symbols</option>}
+            {!isSymbolsLoading && !symbolsError && symbolsList.length === 0 && <option value="">No symbols available</option>}
+            {!isSymbolsLoading && !symbolsError && symbolsList.map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+          {symbolsError && <p className="error-message" style={{fontSize: '0.8em', marginTop: '0.25rem'}}>{symbolsError}</p>}
         </div>
         <div className="form-group">
           <label htmlFor="startDate">Start Date:</label>

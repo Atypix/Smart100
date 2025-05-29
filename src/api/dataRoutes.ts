@@ -1,9 +1,60 @@
 // src/api/dataRoutes.ts
-import { Router, Response, NextFunction, RequestHandler } from 'express';
+import { Router, Response, NextFunction, RequestHandler, Request } from 'express';
+import axios from 'axios'; // Added axios import
 import { authenticateJWT, AuthenticatedRequest } from '../middleware/authMiddleware';
 import logger from '../utils/logger';
 
 const router = Router();
+
+// Endpoint to fetch trading symbols from Binance
+router.get('/binance-symbols', async (req: Request, res: Response) => {
+  try {
+    logger.info('Attempting to fetch exchange information from Binance...');
+    const response = await axios.get('https://api.binance.com/api/v3/exchangeInfo');
+
+    if (response.status !== 200 || !response.data || !response.data.symbols) {
+      logger.error(`Binance API request failed with status ${response.status} or returned invalid data.`, response.data);
+      return res.status(response.status || 502).json({ 
+        message: 'Failed to fetch symbols from Binance due to API error.', 
+        details: response.data 
+      });
+    }
+
+    const symbolsArray = response.data.symbols;
+    if (!Array.isArray(symbolsArray)) {
+        logger.error('Binance API response did not contain a valid symbols array.', response.data);
+        return res.status(500).json({ message: 'Invalid data structure received from Binance API.' });
+    }
+    
+    const extractedSymbols = symbolsArray.map((s: any) => s.symbol).filter((s?: string): s is string => !!s);
+
+    logger.info(`Successfully fetched ${extractedSymbols.length} symbols from Binance.`);
+    res.json(extractedSymbols);
+
+  } catch (error: any) {
+    logger.error('Error fetching symbols from Binance:', {
+      message: error.message,
+      stack: error.stack,
+      response: error.response?.data,
+      status: error.response?.status
+    });
+
+    if (axios.isAxiosError(error) && error.response) {
+      // Error from Binance (e.g., 4xx, 5xx from their end)
+      res.status(error.response.status || 502).json({ 
+        message: 'Failed to fetch symbols from Binance.', 
+        details: error.response.data 
+      });
+    } else if (axios.isAxiosError(error) && error.request) {
+      // Network error or no response from Binance
+      res.status(503).json({ message: 'Network error or no response from Binance API.' });
+    } else {
+      // Other unexpected errors
+      res.status(500).json({ message: 'An unexpected error occurred while fetching symbols.' });
+    }
+  }
+});
+
 
 router.get('/protected/data', authenticateJWT, (async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   if (!req.auth) {
