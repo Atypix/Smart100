@@ -23,9 +23,11 @@ const StrategySelector: React.FC<StrategySelectorProps> = ({ onStrategySelect })
         logger.info('Fetching available strategies...');
         const response = await axios.get<TradingStrategy[]>('/api/strategies');
         setStrategies(response.data);
+        logger.debug('Fetched strategies data:', response.data); // Added detailed log
         logger.info(`Fetched ${response.data.length} strategies.`);
       } catch (err) {
         logger.error('Error fetching strategies:', err);
+        logger.debug('Full error object:', err); // Added detailed log
         const errorMessage = (err as any).response?.data?.message || (err as Error).message || 'Failed to fetch strategies.';
         setError(errorMessage);
       } finally {
@@ -45,13 +47,21 @@ const StrategySelector: React.FC<StrategySelectorProps> = ({ onStrategySelect })
   };
 
   if (loading) {
+    logger.debug('StrategySelector: Rendering loading state'); // Added render log
     return <p className="loading-message">Loading strategies...</p>;
   }
 
   if (error) {
+    logger.debug(`StrategySelector: Rendering error state: ${error}`); // Added render log
     return <p className="error-message">Error: {error}</p>;
   }
 
+  if (!loading && !error && strategies.length === 0) {
+    logger.debug('StrategySelector: Rendering no strategies available message');
+    return <p className="info-message">No trading strategies are currently available. Please check back later or contact support if this issue persists.</p>;
+  }
+
+  logger.debug(`StrategySelector: Rendering select dropdown with ${strategies.length} strategies`); // Added render log
   return (
     <div className="form-group">
       <label htmlFor="strategy-selector">Select Strategy:</label>
