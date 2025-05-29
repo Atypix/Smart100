@@ -64,6 +64,7 @@ const BacktestSettingsForm: React.FC<BacktestSettingsFormProps> = ({ onSettingsC
   // eslint-disable-next-line react-hooks/exhaustive-deps 
   }, []); // Run once on mount. Settings dependency removed to avoid re-fetching on every settings change. Defaulting logic handles symbol update.
 
+  const intervalOptions = ['1m', '5m', '15m', '1h', '4h', '1d', '1w', '1M'];
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => { // Extended to HTMLSelectElement
     const { name, value } = event.target;
@@ -176,15 +177,20 @@ const BacktestSettingsForm: React.FC<BacktestSettingsFormProps> = ({ onSettingsC
           />
         </div>
         <div className="form-group">
-          <label htmlFor="interval">Interval (Optional):</label>
-          <input
-            type="text"
-            id="interval"
+          <label htmlFor="interval-select">Interval (Optional):</label>
+          <select
+            id="interval-select"
             name="interval"
             value={settings.interval || ''}
             onChange={handleChange}
-            placeholder="e.g., 1d, 1h, 5min"
-          />
+          >
+            <option value="">-- Select an interval --</option> {/* Optional: for explicit unselection */}
+            {intervalOptions.map(option => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
     </div>

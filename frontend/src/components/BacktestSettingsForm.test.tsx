@@ -55,7 +55,8 @@ describe('BacktestSettingsForm', () => {
     expect(screen.getByLabelText(/End Date:/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Initial Cash:/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Source API/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Interval/i)).toBeInTheDocument();
+    // The label for interval dropdown is "Interval (Optional):"
+    expect(screen.getByLabelText(/Interval \(Optional\):/i)).toBeInTheDocument(); 
   });
 
   describe('Symbol Dropdown Functionality', () => {
@@ -228,5 +229,80 @@ describe('BacktestSettingsForm', () => {
     expect(mockOnSettingsChange).toHaveBeenCalledWith(
       expect.objectContaining({ initialCash: 5000 })
     );
+  });
+
+  describe('Interval Dropdown Functionality', () => {
+    const intervalOptions = ['1m', '5m', '15m', '1h', '4h', '1d', '1w', '1M'];
+
+    beforeEach(() => {
+      // Ensure symbols are loaded for these tests to isolate interval functionality
+      mockedAxios.get.mockResolvedValueOnce({ data: ['BTCUSDT', 'ETHUSDT'] });
+    });
+
+    test('renders with default value and all predefined options', async () => {
+      render(
+        <BacktestSettingsForm
+          initialSettings={mockInitialSettings} // interval: '1d'
+          onSettingsChange={mockOnSettingsChange}
+        />
+      );
+      await waitFor(() => expect(screen.getByLabelText(/Symbol:/i)).not.toBeDisabled()); // Wait for symbols to load
+
+      const intervalSelect = screen.getByLabelText(/Interval \(Optional\):/i) as HTMLSelectElement;
+      expect(intervalSelect.value).toBe('1d'); // Default value from mockInitialSettings
+
+      // Check for placeholder option
+      expect(screen.getByRole('option', { name: '-- Select an interval --' })).toBeInTheDocument();
+      
+      intervalOptions.forEach(option => {
+        expect(screen.getByRole('option', { name: option })).toBeInTheDocument();
+      });
+    });
+
+    test('allows user to change interval selection', async () => {
+      render(
+        <BacktestSettingsForm
+          initialSettings={mockInitialSettings}
+          onSettingsChange={mockOnSettingsChange}
+        />
+      );
+      await waitFor(() => expect(screen.getByLabelText(/Symbol:/i)).not.toBeDisabled());
+
+      const intervalSelect = screen.getByLabelText(/Interval \(Optional\):/i) as HTMLSelectElement;
+      
+      // Change to '1h'
+      fireEvent.change(intervalSelect, { target: { value: '1h' } });
+      expect(intervalSelect.value).toBe('1h');
+      expect(mockOnSettingsChange).toHaveBeenCalledWith(
+        expect.objectContaining({ interval: '1h' })
+      );
+
+      // Change to '5m'
+      fireEvent.change(intervalSelect, { target: { value: '5m' } });
+      expect(intervalSelect.value).toBe('5m');
+      expect(mockOnSettingsChange).toHaveBeenCalledWith(
+        expect.objectContaining({ interval: '5m' })
+      );
+      
+      // Change to placeholder (empty string value)
+      fireEvent.change(intervalSelect, { target: { value: '' } });
+      expect(intervalSelect.value).toBe('');
+      expect(mockOnSettingsChange).toHaveBeenCalledWith(
+        expect.objectContaining({ interval: '' })
+      );
+    });
+
+    test('correctly uses initial empty interval if provided', async () => {
+       render(
+        <BacktestSettingsForm
+          initialSettings={{...mockInitialSettings, interval: ''}}
+          onSettingsChange={mockOnSettingsChange}
+        />
+      );
+      await waitFor(() => expect(screen.getByLabelText(/Symbol:/i)).not.toBeDisabled());
+      
+      const intervalSelect = screen.getByLabelText(/Interval \(Optional\):/i) as HTMLSelectElement;
+      expect(intervalSelect.value).toBe(''); // Should select the placeholder
+    });
   });
 });
