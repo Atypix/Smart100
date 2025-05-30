@@ -286,18 +286,47 @@ export async function fetchHistoricalDataFromDB(
   const endTimestamp = Math.floor(endDate.getTime() / 1000);
   logger.info(`Fetching historical data from DB for ${symbol}`, { startDate, endDate, source_api, interval, startTimestamp, endTimestamp });
   try {
-    const rawData: FinancialData[] = queryHistoricalDataFromDB(symbol, startTimestamp, endTimestamp, source_api, interval);
+    let rawData: FinancialData[] = queryHistoricalDataFromDB(symbol, startTimestamp, endTimestamp, source_api, interval);
+
+    // If no data found in DB, try to fetch from source API if specified
+    if ((!rawData || rawData.length === 0) && source_api && interval) {
+      logger.info(`No historical data found in DB for ${symbol} (source: ${source_api}, interval: ${interval}) for the range ${startDate.toISOString()} to ${endDate.toISOString()}. Attempting to fetch from source API...`);
+      const sourceApiLower = source_api.toLowerCase();
+
+      if (sourceApiLower === 'binance') {
+        try {
+          logger.info(`Attempting to fetch data from Binance for ${symbol}, interval ${interval}, from ${startDate.toISOString()} to ${endDate.toISOString()}.`);
+          // fetchBinanceData expects timestamps in milliseconds for startTime and endTime
+          await fetchBinanceData(symbol, interval, startDate.getTime(), endDate.getTime());
+          // Re-query the database after attempting to fetch and store data
+          rawData = queryHistoricalDataFromDB(symbol, startTimestamp, endTimestamp, source_api, interval);
+          logger.info(`Data fetched from Binance and re-queried from DB. Found ${rawData.length} records for ${symbol}.`);
+        } catch (fetchError) {
+          logger.error(`Error fetching data from Binance for ${symbol} during on-demand fetch:`, fetchError);
+          // Proceed with potentially empty rawData, error is logged.
+        }
+      } else if (sourceApiLower === 'yahoofinance') {
+        // TODO: Implement Yahoo Finance ranged fetch and integrate here
+        logger.warn(`On-demand fetching for YahooFinance for a specific range is not yet fully implemented in this flow. DB data (if any) will be used.`);
+      } else if (sourceApiLower === 'alphavantage') {
+        logger.warn(`On-demand fetching for AlphaVantage is not supported for backfill in this flow due to API limitations. DB data (if any) will be used.`);
+      } else {
+        logger.warn(`Unsupported sourceApi '${source_api}' for on-demand fetching. DB data (if any) will be used.`);
+      }
+    }
+
     if (!rawData || rawData.length === 0) {
-      logger.info(`No historical data found in DB for ${symbol} with the given criteria.`);
+      logger.info(`No historical data found in DB for ${symbol} with the given criteria after potential fetch attempt.`);
       return [];
     }
+
     const historicalData: HistoricalDataPoint[] = rawData.map(record => ({
       timestamp: record.timestamp, date: new Date(record.timestamp * 1000), open: record.open, high: record.high, low: record.low, close: record.close, volume: record.volume, interval: record.interval, source_api: record.source_api, symbol: record.symbol,
     }));
-    logger.info(`Successfully fetched ${historicalData.length} historical data points from DB for ${symbol}.`);
+    logger.info(`Successfully processed ${historicalData.length} historical data points from DB for ${symbol}.`);
     return historicalData;
   } catch (error) {
-    logger.error(`Error fetching historical data from DB for ${symbol}:`, { error, symbol, startDate, endDate });
+    logger.error(`Error processing historical data from DB for ${symbol}:`, { error, symbol, startDate, endDate });
     throw error; 
   }
 }

@@ -1,0 +1,72 @@
+## On-Demand Data Fetching: System Considerations
+
+The introduction of on-demand data fetching in `fetchHistoricalDataFromDB` (triggered when the local database lacks the required range for a given `symbol`, `source_api`, and `interval`) has several implications for system behavior, data integrity, and user experience.
+
+### 1. API Rate Limits
+
+Fetching data directly from external APIs during a user-initiated operation like a backtest introduces risks related to API rate limits.
+
+*   **Binance (`fetchBinanceData`)**:
+    *   Binance has API rate limits based on requests per minute and potentially other factors.
+    *   If users run many backtests for unique symbols, intervals, or wide date ranges that aren't cached locally, the system could frequently hit these limits.
+    *   The `fetchBinanceData` function fetches data in chunks if necessary (e.g., for very long ranges, though current implementation might fetch all at once depending on how it calls the Binance API). Each chunk or large request counts towards the limit.
+    *   Consequence: API may temporarily block the server's IP, leading to fetch failures for subsequent requests across all users.
+
+*   **Yahoo Finance (`fetchYahooFinanceData`)**:
+    *   Generally considered less strict than dedicated crypto exchange APIs for historical EOD data.
+    *   However, very frequent requests for extensive historical data across many symbols (once ranged fetch is fully implemented and used in this on-demand flow) could still lead to temporary blocks or throttling.
+    *   Consequence: Similar to Binance, fetch failures.
+
+*   **Alpha Vantage (`fetchAlphaVantageData`)**:
+    *   Known for having quite restrictive rate limits on its free tier (e.g., 5 requests per minute, 100 per day).
+    *   The current implementation rightly logs a warning and does *not* attempt on-demand backfill for Alpha Vantage due to these limitations. Fetching large historical ranges, especially for smaller intervals, would quickly exhaust limits.
+    *   Consequence: This source is effectively excluded from on-demand backfill, relying solely on pre-populated DB data.
+
+### 2. Data Availability and Consistency
+
+The success of on-demand fetching depends heavily on what the external APIs provide.
+
+*   **Data Quantity & Quality**:
+    *   Historical data depth varies significantly between APIs (e.g., Binance might have deep history for major crypto pairs, Yahoo Finance for stocks, Alpha Vantage more limited for free intraday).
+    *   Data quality (accuracy of OHLCV, presence of gaps) is also API-dependent.
+    *   The system will store whatever data is returned, which might be incomplete or of varying quality.
+
+*   **Interval Support**:
+    *   The requested `interval` for `fetchHistoricalDataFromDB` must be compatible with what the chosen `sourceApi` offers and how the respective fetcher function (`fetchBinanceData`, `fetchYahooFinanceData`) translates it.
+    *   For example, if `fetchBinanceData` is called with an `interval` it doesn't support for the given `symbol`, the fetch will likely fail or return no data. The on-demand logic currently passes the `interval` through.
+
+*   **Symbol Availability**:
+    *   The requested `symbol` must exist and be active on the specified `sourceApi`.
+
+### 3. User Experience (UX)
+
+On-demand fetching can directly impact the user's perception of the backtesting feature.
+
+*   **Increased Latency for First-Time Backtests**:
+    *   If data for a specific symbol/source/interval/range is not in the database, the first backtest will be noticeably slower as it waits for the API call(s) to complete and data to be stored before proceeding.
+    *   Subsequent backtests for the same or overlapping ranges should be fast, using the cached DB data.
+
+*   **Potential for Fetch Failures**:
+    *   If an API call fails (due to rate limits, API downtime, invalid symbol/interval, network issues), the `fetchHistoricalDataFromDB` function currently logs the error and proceeds with whatever data it has (which would be none if the initial query was empty).
+    *   This means a backtest might run on empty or incomplete data without explicit, immediate failure feedback to the user *within the backtest result itself* that data was missing. The logs would show it, but the API response for the backtest might just show a flat performance.
+
+*   **Partial Data Coverage**:
+    *   The current implementation uses a simple "is `rawData` empty?" check. It doesn't verify if the fetched data *fully* covers the requested `startTimestamp` to `endTimestamp`.
+    *   An API might return some data but not for the entire range (e.g., symbol delisted, data gaps). The backtest would run on this partial dataset.
+
+### 4. Future Robustness Considerations
+
+To mitigate some of these issues and improve the feature, the following could be considered:
+
+*   **Clear UI Feedback**: Inform the user when data is being fetched on-demand and the potential delay.
+*   **More Selective/Delta Fetching**: Instead of just checking if `rawData` is empty, identify missing *segments* within the requested range and fetch only those. This is more complex.
+*   **Configurable On-Demand Behavior**: Allow administrators to enable/disable on-demand fetching per API source or globally.
+*   **Background Data Population**: Implement more robust background scripts/workers to proactively populate and update the historical data database, reducing the need for on-demand fetches.
+*   **Granular Error Handling & Messaging**:
+    *   If a fetch fails, provide more specific error information back to the user (e.g., "Could not fetch data: API rate limit hit" vs. just running on empty data).
+    *   Potentially allow the user to decide if they want to proceed with a backtest on partial data.
+*   **Caching Layer for API Responses**: Before hitting the DB, a short-lived cache for raw API responses could prevent immediate re-fetches if multiple requests for the exact same new data come in quick succession.
+*   **Retry Mechanisms**: Implement intelligent retry mechanisms for transient API errors, with backoff.
+*   **Data Coverage Verification**: After fetching, verify if the newly acquired data (combined with any pre-existing data) now adequately covers the requested range. Warn the user if not.
+
+These considerations highlight the trade-offs between convenience (automatic data fetching) and system stability/predictability.
