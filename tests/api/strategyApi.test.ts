@@ -1,6 +1,6 @@
 // tests/api/strategyApi.test.ts
 import request from 'supertest';
-import { app } from '../../src/index'; // Assuming app is exported from src/index.ts
+import { createApp } from '../../src/index'; // Corrected import: createApp instead of app
 import { getAvailableStrategies } from '../../src/strategies/strategyManager';
 import { runBacktest, BacktestResult } from '../../src/backtest'; // Import BacktestResult from here
 import { TradingStrategy, StrategyParameterDefinition } from '../../src/strategies/strategy.types'; // For typing mocks
@@ -18,7 +18,13 @@ jest.mock('../../src/backtest', () => ({
 const mockGetAvailableStrategies = getAvailableStrategies as jest.MockedFunction<typeof getAvailableStrategies>;
 const mockRunBacktest = runBacktest as jest.MockedFunction<typeof runBacktest>;
 
+let app: any; // Declare app variable
+
 describe('Strategy API Endpoints', () => {
+  beforeAll(() => { // Use beforeAll to create app instance once for the suite
+    app = createApp();
+  });
+
   beforeEach(() => {
     // Reset mocks before each test
     mockGetAvailableStrategies.mockReset();
@@ -72,8 +78,8 @@ describe('Strategy API Endpoints', () => {
 
     const mockSuccessResult: BacktestResult = {
       symbol: 'BTCUSDT',
-      startDate: new Date('2023-01-01'), // Changed to Date object
-      endDate: new Date('2023-03-31'),   // Changed to Date object
+      startDate: new Date('2023-01-01'), // Reverted to Date object
+      endDate: new Date('2023-03-31'),   // Reverted to Date object
       initialPortfolioValue: 10000,
       finalPortfolioValue: 12000,
       totalProfitOrLoss: 2000,
@@ -88,11 +94,15 @@ describe('Strategy API Endpoints', () => {
       mockRunBacktest.mockResolvedValue(mockSuccessResult);
 
       const response = await request(app)
-        .post('/api/backtest')
+        .post('/api/strategies/backtest') // Corrected path
         .send(validBacktestBody);
 
       expect(response.status).toBe(200);
-      expect(response.body).toEqual(mockSuccessResult); // Dates will be ISO strings
+      expect(response.body).toEqual({
+        ...mockSuccessResult,
+        startDate: mockSuccessResult.startDate.toISOString(),
+        endDate: mockSuccessResult.endDate.toISOString(),
+      });
       expect(mockRunBacktest).toHaveBeenCalledWith(
         validBacktestBody.symbol,
         new Date(validBacktestBody.startDate), // runBacktest expects Date objects
@@ -108,28 +118,28 @@ describe('Strategy API Endpoints', () => {
     it('should return 400 for missing required fields', async () => {
       const incompleteBody = { ...validBacktestBody, symbol: undefined };
       // @ts-ignore to allow sending incomplete body for testing
-      const response = await request(app).post('/api/backtest').send(incompleteBody);
+      const response = await request(app).post('/api/strategies/backtest').send(incompleteBody); // Corrected path
       expect(response.status).toBe(400);
       expect(response.body.message).toBe('Missing required field: symbol');
     });
     
     it('should return 400 for non-positive initialCash', async () => {
       const invalidBody = { ...validBacktestBody, initialCash: 0 };
-      const response = await request(app).post('/api/backtest').send(invalidBody);
+      const response = await request(app).post('/api/strategies/backtest').send(invalidBody); // Corrected path
       expect(response.status).toBe(400);
       expect(response.body.message).toBe('initialCash must be a positive number.');
     });
 
     it('should return 400 for invalid date format', async () => {
       const invalidDateBody = { ...validBacktestBody, startDate: 'invalid-date' };
-      const response = await request(app).post('/api/backtest').send(invalidDateBody);
+      const response = await request(app).post('/api/strategies/backtest').send(invalidDateBody); // Corrected path
       expect(response.status).toBe(400);
       expect(response.body.message).toBe('Invalid date format. Use YYYY-MM-DD.');
     });
     
     it('should return 400 if endDate is not after startDate', async () => {
       const invalidDateRangeBody = { ...validBacktestBody, endDate: '2023-01-01', startDate: '2023-01-31' };
-      const response = await request(app).post('/api/backtest').send(invalidDateRangeBody);
+      const response = await request(app).post('/api/strategies/backtest').send(invalidDateRangeBody); // Corrected path
       expect(response.status).toBe(400);
       expect(response.body.message).toBe('endDate must be after startDate.');
     });
@@ -140,7 +150,7 @@ describe('Strategy API Endpoints', () => {
         throw new Error("Strategy with ID 'non-existent-strat' not found. Aborting backtest.");
       });
       const bodyWithInvalidStrategy = { ...validBacktestBody, strategyId: 'non-existent-strat' };
-      const response = await request(app).post('/api/backtest').send(bodyWithInvalidStrategy);
+      const response = await request(app).post('/api/strategies/backtest').send(bodyWithInvalidStrategy); // Corrected path
       expect(response.status).toBe(404); // strategyRoutes.ts handles this specific error message as 404
       expect(response.body.message).toContain("Strategy with ID 'non-existent-strat' not found");
     });
@@ -149,7 +159,7 @@ describe('Strategy API Endpoints', () => {
       mockRunBacktest.mockImplementation(async () => {
         throw new Error('Unexpected backtesting engine failure');
       });
-      const response = await request(app).post('/api/backtest').send(validBacktestBody);
+      const response = await request(app).post('/api/strategies/backtest').send(validBacktestBody); // Corrected path
       expect(response.status).toBe(500);
       expect(response.body.message).toBe('Error running backtest');
       expect(response.body.error).toBe('Unexpected backtesting engine failure');
@@ -181,7 +191,7 @@ describe('Strategy API Endpoints', () => {
       };
 
       const response = await request(app)
-        .post('/api/backtest')
+        .post('/api/strategies/backtest') // Corrected path
         .send(aiBacktestBody);
 
       expect(response.status).toBe(200);

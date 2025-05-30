@@ -1,6 +1,6 @@
 // tests/api/auth.test.ts
 import request from 'supertest';
-import { app } from '../../src/index'; 
+import { createApp } from '../../src/index'; // Corrected import
 import { clearUsers, createUser, findUserByEmail, getAllUsers } from '../../src/services/userService';
 import logger from '../../src/utils/logger';
 
@@ -8,11 +8,19 @@ jest.spyOn(logger, 'info').mockImplementation(() => logger);
 jest.spyOn(logger, 'warn').mockImplementation(() => logger);
 jest.spyOn(logger, 'error').mockImplementation(() => logger);
 
+let app: any; // Declare app variable
 
 describe('Auth Endpoints API', () => {
+  beforeAll(() => { // Use beforeAll to create app instance once for the suite
+    app = createApp();
+  });
+
   beforeEach(() => {
     clearUsers(); 
-    process.env.JWT_SECRET = 'test_jwt_secret_for_api_tests_1234567890_!@#$%^&*()';
+    // JWT_SECRET is now set globally in tests/setupEnv.ts, so local override is not strictly needed here
+    // unless a specific test in this suite requires a different secret temporarily.
+    // For consistency, rely on the global one from setupEnv.ts.
+    // process.env.JWT_SECRET = 'test_jwt_secret_for_api_tests_1234567890_!@#$%^&*()'; 
   });
 
   describe('POST /api/auth/register', () => { // Corrected path prefix

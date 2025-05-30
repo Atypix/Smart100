@@ -1,6 +1,7 @@
 import request from 'supertest';
-import express, { Express } from 'express';
-import mainRouter from '../../src/api/index';
+// import express, { Express } from 'express'; // No longer directly using Express here
+// import mainRouter from '../../src/api/index'; // mainRouter is used by createApp
+import { createApp } from '../../src/index'; // Import createApp
 // Import the new helper and its type
 import { getAISelectorActiveState, AISelectorChoiceState } from '../../src/strategies/implementations/aiSelectorStrategy';
 // Removed StrategyManager import as it's not directly used and caused issues with mocking
@@ -26,13 +27,15 @@ jest.mock('../../src/strategies/implementations/aiSelectorStrategy', () => {
   };
 });
 
-const app: Express = express();
-app.use(express.json());
-app.use('/api', mainRouter);
+let app: any; // Declare app variable
 
 describe('GET /api/ai/current-strategy/:symbol', () => {
   // Define a type for our mock to ensure it's used correctly
   let mockGetAISelectorActiveState: jest.MockedFunction<typeof getAISelectorActiveState>;
+
+  beforeAll(() => { // Use beforeAll to create app instance once for the suite
+    app = createApp();
+  });
 
   beforeEach(() => {
     jest.clearAllMocks();

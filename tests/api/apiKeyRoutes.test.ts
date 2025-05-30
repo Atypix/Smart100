@@ -39,16 +39,16 @@ beforeAll(async () => {
     .post('/api/auth/register') // Corrected path
     .send({ email: TEST_USER_EMAIL, password: TEST_USER_PASSWORD });
   
-  console.log('[[[[ DEBUG REGISTER RESPONSE ]]]]:', JSON.stringify(registerRes.body));
-  console.log('[[[[ DEBUG REGISTER STATUS ]]]]:', registerRes.status);
+  // console.log('[[[[ DEBUG REGISTER RESPONSE ]]]]:', JSON.stringify(registerRes.body)); // Removed
+  // console.log('[[[[ DEBUG REGISTER STATUS ]]]]:', registerRes.status); // Removed
 
 
   const loginRes = await request(app)
     .post('/api/auth/login') // Corrected path
     .send({ email: TEST_USER_EMAIL, password: TEST_USER_PASSWORD });
   
-  console.log('[[[[ DEBUG LOGIN RESPONSE ]]]]:', JSON.stringify(loginRes.body));
-  console.log('[[[[ DEBUG LOGIN STATUS ]]]]:', loginRes.status);
+  // console.log('[[[[ DEBUG LOGIN RESPONSE ]]]]:', JSON.stringify(loginRes.body)); // Removed
+  // console.log('[[[[ DEBUG LOGIN STATUS ]]]]:', loginRes.status); // Removed
   
   authToken = loginRes.body.token;
   
@@ -57,8 +57,8 @@ beforeAll(async () => {
     testUser = userService.findUserById(loginRes.body.user.id)!;
   } else {
     // Fallback or error if user info is not in login response as expected
-    console.error("Login response did not contain user.id. Falling back to email query.");
-    console.error("Full login response body:", JSON.stringify(loginRes.body)); // Log full body on error
+    // console.error("Login response did not contain user.id. Falling back to email query."); // Removed
+    // console.error("Full login response body:", JSON.stringify(loginRes.body)); // Removed
     testUser = userService.findUserByEmail(TEST_USER_EMAIL)!;
   }
 
@@ -214,22 +214,16 @@ describe('API Key Management Routes (/api/keys)', () => {
     it('should return 404 if API key belongs to another user', async () => {
       const otherUserEmail = 'otheruser-put@example.com'; // Unique email
       const otherUserRes = await request(app)
-        .post('/auth/register')
+        .post('/api/auth/register') // Corrected path
         .send({ email: otherUserEmail, password: 'Password123!' });
       const otherUserId = otherUserRes.body.id;
 
-      // ==== START DIAGNOSTIC LOG ====
-      console.log('[TEST DEBUG] otherUserId for PUT test:', otherUserId);
-      const createKeyParams = { 
+  const otherKey = await apiKeyService.createApiKey({ 
         user_id: otherUserId, 
         exchange_name: 'OtherUserExchange', 
         api_key: 'otherkey', 
         api_secret: 'othersecret' 
-      };
-      console.log('[TEST DEBUG] params for createApiKey in PUT test:', JSON.stringify(createKeyParams));
-      // ==== END DIAGNOSTIC LOG ====
-
-      const otherKey = await apiKeyService.createApiKey(createKeyParams);
+  });
 
       const res = await request(app)
         .put(`/api/keys/${otherKey.id}`)
@@ -292,26 +286,16 @@ describe('API Key Management Routes (/api/keys)', () => {
     it('should return 404 if API key belongs to another user', async () => {
       const otherUserEmail = 'otheruser-delete@example.com'; // Unique email
       const otherUserRes = await request(app)
-        .post('/auth/register')
+        .post('/api/auth/register') // Corrected path
         .send({ email: otherUserEmail, password: 'Password123!' });
-      
-      // ==== MORE DIAGNOSTIC LOG ====
-      console.log('[TEST DEBUG] otherUserRes status for PUT test:', otherUserRes.status);
-      console.log('[TEST DEBUG] otherUserRes body for PUT test:', JSON.stringify(otherUserRes.body));
       const otherUserId = otherUserRes.body.id;
 
-      // ==== START DIAGNOSTIC LOG ====
-      console.log('[TEST DEBUG] otherUserId for DELETE test:', otherUserId);
-      const createKeyParams = { 
+      const otherKey = await apiKeyService.createApiKey({ 
         user_id: otherUserId, 
         exchange_name: 'OtherUserExchangeDel', 
         api_key: 'otherkeyDel', 
         api_secret: 'othersecretDel' 
-      };
-      console.log('[TEST DEBUG] params for createApiKey in DELETE test:', JSON.stringify(createKeyParams));
-      // ==== END DIAGNOSTIC LOG ====
-
-      const otherKey = await apiKeyService.createApiKey(createKeyParams);
+      });
 
       const res = await request(app)
         .delete(`/api/keys/${otherKey.id}`)

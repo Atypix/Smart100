@@ -6,18 +6,12 @@ import { ApiKey, ApiKeyStored, CreateApiKeyInput, UpdateApiKeyInput } from '../m
 
 let API_ENCRYPTION_KEY: Buffer; // Module-level variable
 
-// Environment variable for encryption key (original line can be removed or commented)
-// const API_ENCRYPTION_KEY_HEX_RAW = process.env.API_ENCRYPTION_KEY_HEX;
-
 export const initializeApiKeyService = () => {
   const API_ENCRYPTION_KEY_HEX_RAW = process.env.API_ENCRYPTION_KEY_HEX;
   if (!API_ENCRYPTION_KEY_HEX_RAW || API_ENCRYPTION_KEY_HEX_RAW.length !== 64) {
-    // console.error('FATAL ERROR: API_ENCRYPTION_KEY_HEX is not set or is not a 32-byte hex string (64 characters). Please set it in your .env file. Exiting.');
-    // process.exit(1); // Removing process.exit for better testability, throw error instead
-    throw new Error('FATAL ERROR: API_ENCRYPTION_KEY_HEX is not set or is not a 32-byte hex string (64 characters). Please set it in your .env file.');
+    throw new Error('API_ENCRYPTION_KEY_HEX must be a 64-character hex string.');
   }
   API_ENCRYPTION_KEY = Buffer.from(API_ENCRYPTION_KEY_HEX_RAW, 'hex');
-  console.log('ApiKeyService initialized with key from env var.'); // For verification
 };
 
 const ALGORITHM = 'aes-256-gcm';
@@ -107,6 +101,8 @@ export const createApiKey = (data: CreateApiKeyInput): ApiKey => {
       `INSERT INTO api_keys (id, user_id, exchange_name, api_key_encrypted, api_secret_encrypted, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     );
+    // ==== DIAGNOSTIC LOG ====
+    console.log('[apiKeyService.createApiKey DEBUG PARAMS]:', { id, user_id, exchange_name, api_key_encrypted_length: api_key_encrypted.length, api_secret_encrypted_length: api_secret_encrypted.length, now });
     stmt.run(id, user_id, exchange_name, api_key_encrypted, api_secret_encrypted, now, now);
 
     return {
