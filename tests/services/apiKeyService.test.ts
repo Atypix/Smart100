@@ -1,23 +1,19 @@
 // tests/services/apiKeyService.test.ts
 
-// Set the environment variable *before* any modules are imported, especially apiKeyService.
-const MOCK_ENCRYPTION_KEY = 'a0123456789b0123456789c0123456789d0123456789e0123456789f01234567'; // 32 bytes hex
-process.env.API_ENCRYPTION_KEY_HEX = MOCK_ENCRYPTION_KEY; // Corrected to API_ENCRYPTION_KEY_HEX
+// The API_ENCRYPTION_KEY_HEX is now expected to be set by tests/setupEnv.ts
+// before these tests run.
 
 import { db, initializeSchema } from '../../src/database';
 import * as apiKeyService from '../../src/services/apiKeyService';
 import * as userService from '../../src/services/userService';
 import { User } from '../../src/models/user.types';
 import { ApiKey, CreateApiKeyInput, UpdateApiKeyInput } from '../../src/models/apiKey.types';
-import { v4 as uuidv4 } from 'uuid';
+// We will import the mocked uuid to control it if needed (e.g. reset counter)
+import * as uuid from 'uuid'; // uuid is now the mock object from setupMocks.ts
 
-let mockUuidCounterForKeyService = 0; 
-jest.mock('uuid', () => ({
-  v4: jest.fn().mockImplementation(() => {
-    mockUuidCounterForKeyService++;
-    return `mock-uuid-apiKeyService-${mockUuidCounterForKeyService}`; 
-  }),
-}));
+// Remove local mock for uuid as it's now globally mocked in setupMocks.ts
+// let mockUuidCounterForKeyService = 0; 
+// jest.mock('uuid', () => ({ ... }));
 
 let testUser: User;
 let userEmailCounter = 0; 
@@ -34,12 +30,11 @@ beforeEach(async () => {
   db.exec('DELETE FROM api_keys;');
   db.exec('DELETE FROM users;');
   
-  mockUuidCounterForKeyService = 0; // Reset counter for fresh UUIDs per test
-  (uuidv4 as jest.Mock).mockClear(); // Clear any prior mock settings for v4
-  (uuidv4 as jest.Mock).mockImplementation(() => { // Re-apply a fresh implementation
-    mockUuidCounterForKeyService++;
-    return `mock-uuid-apiKeyService-${mockUuidCounterForKeyService}-${Date.now()}`; // Add timestamp for more uniqueness
-  });
+  // Reset the global UUID mock counter before each test
+  // The uuid module imported is actually our uuidMockObject from setupMocks.ts
+  if (typeof (uuid as any)._resetMockCounter === 'function') {
+    (uuid as any)._resetMockCounter();
+  }
 
   userEmailCounter++;
   testUser = userService.createUser({
@@ -65,7 +60,7 @@ describe('API Key Service (Database and Encryption)', () => {
 
       const result = apiKeyService.createApiKey(apiKeyData);
 
-      expect(result.id).toMatch(/^mock-uuid-apiKeyService-/); // Check if it's a mock UUID
+      expect(result.id).toMatch(/^mock-uuid-global-/); // Updated expectation for global mock
       expect(result.user_id).toBe(testUser.id);
       expect(result.exchange_name).toBe(apiKeyData.exchange_name);
       expect(result.api_key).toBe(apiKeyData.api_key); 

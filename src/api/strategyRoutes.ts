@@ -6,10 +6,10 @@ import logger from '../utils/logger'; // Corrected logger import
 
 const router: Router = express.Router();
 
-// --- GET /api/strategies ---
-router.get('/strategies', ((req: Request, res: Response, next: NextFunction) => {
+// --- GET / (mounted at /api/strategies in src/api/index.ts) ---
+router.get('/', ((req: Request, res: Response, next: NextFunction) => { // Changed '/strategies' to '/'
   try {
-    logger.info('API call to GET /strategies');
+    logger.info('API call to GET /api/strategies');
     const strategies = getAvailableStrategies();
     // We only want to expose fields relevant for selection and parameterization to the UI
     const strategiesForUI = strategies.map(s => ({

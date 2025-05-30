@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "es2020",
     "module": "commonjs",
-    "rootDir": "./src",
+    // "rootDir": "./src", // Removing rootDir or setting to "." when including tests
     "outDir": "./dist",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
@@ -11,6 +11,6 @@
     "resolveJsonModule": true,
     "types": ["node", "jest"]
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "tests", "dist"]
+  "include": ["src/**/*", "tests/**/*"], // Include tests
+  "exclude": ["node_modules", "dist"] // No longer exclude tests from TS context for Jest
 }

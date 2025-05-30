@@ -1,125 +1,71 @@
-// Mock better-sqlite3 before any imports that might use it
-const mockDbInstance = {
-  exec: jest.fn(),
-  prepare: jest.fn().mockReturnThis(), // Ensure prepare returns 'this' for chaining .get(), .all(), .run()
-  transaction: jest.fn((fn) => fn), // Mock transaction to just execute the function
-  pragma: jest.fn(),
-  close: jest.fn(),
-  // Mock other methods used by your functions if necessary
-  get: jest.fn(),
-  all: jest.fn(),
-  run: jest.fn(),
-};
-const mockBetterSqlite3 = jest.fn(() => mockDbInstance);
-jest.mock('better-sqlite3', () => ({
-  __esModule: true, // This is important for ES modules
-  default: mockBetterSqlite3, 
-}));
-
-
-import Database from 'better-sqlite3'; // This will now be the mocked version
+// tests/database/database.test.ts
 import {
+  db, // The actual in-memory database instance for tests
   initializeSchema,
   insertData,
   getRecentData,
   getFallbackData,
   queryHistoricalData,
   FinancialData,
-  // db, // We won't directly use or try to swap 'db' from the module anymore
-} from '../../src/database'; // Adjust path as necessary
-// import { DB_FILE_PATH_TEST } from '../testConfig'; // Not used for in-memory
+} from '../../src/database';
 
-// This is the actual instance we want our mocked 'new Database()' to return
-let testDb: Database.Database; 
-
-// Helper to reset mocks before each test
-const resetMocks = () => {
-  mockDbInstance.exec.mockClear();
-  mockDbInstance.prepare.mockClear();
-  mockDbInstance.transaction.mockClear();
-  mockDbInstance.pragma.mockClear();
-  mockDbInstance.close.mockClear();
-  mockDbInstance.get.mockClear();
-  mockDbInstance.all.mockClear();
-  mockDbInstance.run.mockClear();
-  
-  // Default mock implementations that can be overridden in specific tests
-  mockDbInstance.prepare.mockImplementation(jest.fn().mockReturnThis());
-  mockDbInstance.transaction.mockImplementation((fn) => (...args: any[]) => fn(...args)); // Ensure transaction executes the passed function
-};
-
-
-describe('Database Module Tests', () => {
-  beforeAll(() => {
-    // Create a real in-memory database for our testDb instance
-    // This instance will be used by our mocked 'better-sqlite3'
-    testDb = new (jest.requireActual('better-sqlite3'))(':memory:');
-  });
-  
-  afterAll(() => {
-    if (testDb) {
-      testDb.close();
-    }
-  });
-  
+describe('Database Module Tests (Integration with In-Memory DB)', () => {
   beforeEach(() => {
-    resetMocks();
-    // Ensure our mock is returning the real testDb instance for operations
-    mockBetterSqlite3.mockImplementation(() => testDb as any);
-    
-    // Initialize schema directly on the real testDb
-    // This is because initializeSchema itself calls db.exec which we want to go to the real testDb
-    testDb.exec(`
-      DROP TABLE IF EXISTS financial_data;
-      DROP INDEX IF EXISTS idx_symbol;
-      DROP INDEX IF EXISTS idx_timestamp;
-      DROP INDEX IF EXISTS idx_source_api;
-      DROP INDEX IF EXISTS idx_symbol_timestamp_source_interval;
-    `);
-    initializeSchema(); // This will call the mocked db.exec if not careful.
-                        // We need initializeSchema to use the *actual* testDb.
-                        // The mock setup ensures that calls to 'new Database()' return testDb.
-                        // If initializeSchema uses a global 'db' from its module, that 'db'
-                        // instance (created by 'new Database()') should be our testDb.
-    
-    // Verify initializeSchema by checking the real testDb
-    const tableInfo = testDb.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='financial_data';").get();
-    if (!tableInfo) {
-        // If the table isn't there, it means initializeSchema didn't work as expected
-        // with the mock. Forcing schema creation on real testDb for safety in tests.
-        testDb.exec(`
-          CREATE TABLE IF NOT EXISTS financial_data (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            symbol TEXT NOT NULL,
-            timestamp INTEGER NOT NULL,
-            open REAL NOT NULL,
-            high REAL NOT NULL,
-            low REAL NOT NULL,
-            close REAL NOT NULL,
-            volume REAL NOT NULL,
-            source_api TEXT NOT NULL,
-            fetched_at INTEGER NOT NULL,
-            interval TEXT
-          );
-        `);
-        testDb.exec('CREATE INDEX IF NOT EXISTS idx_symbol ON financial_data (symbol);');
-        testDb.exec('CREATE INDEX IF NOT EXISTS idx_timestamp ON financial_data (timestamp);');
-        testDb.exec('CREATE INDEX IF NOT EXISTS idx_source_api ON financial_data (source_api);');
-        testDb.exec('CREATE INDEX IF NOT EXISTS idx_symbol_timestamp_source_interval ON financial_data (symbol, timestamp, source_api, interval);');
+    // Clear all tables and re-initialize schema before each test
+    // This ensures a clean state for each test.
+    try {
+      db.exec('DROP TABLE IF EXISTS financial_data;');
+      db.exec('DROP INDEX IF EXISTS idx_symbol;');
+      db.exec('DROP INDEX IF EXISTS idx_timestamp;');
+      db.exec('DROP INDEX IF EXISTS idx_source_api;');
+      db.exec('DROP INDEX IF EXISTS idx_symbol_timestamp_source_interval;');
+      
+      db.exec('DROP TABLE IF EXISTS users;');
+      db.exec('DROP INDEX IF EXISTS idx_users_email;');
+
+      db.exec('DROP TABLE IF EXISTS api_keys;');
+      db.exec('DROP INDEX IF EXISTS idx_api_keys_user_id;');
+      db.exec('DROP INDEX IF EXISTS idx_api_keys_user_id_exchange_name;');
+
+    } catch (error) {
+      // console.error("Error dropping tables/indexes:", error);
+      // Ignore if tables/indexes don't exist yet (e.g., first run)
     }
+    initializeSchema(); // Re-creates tables and indexes
   });
 
-  test('initializeSchema should create financial_data table and indexes', () => {
-    const tableInfo = testDb.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='financial_data';").get();
-    expect(tableInfo).toBeDefined();
-    expect((tableInfo as any).name).toBe('financial_data');
+  afterAll(() => {
+    // db.close(); // Closing in-memory DB is optional, often not needed
+  });
 
-    const indexes = testDb.prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='financial_data';").all();
-    const indexNames = indexes.map((idx: any) => idx.name);
-    expect(indexNames).toContain('idx_symbol');
-    expect(indexNames).toContain('idx_timestamp');
-    expect(indexNames).toContain('idx_source_api');
-    expect(indexNames).toContain('idx_symbol_timestamp_source_interval');
+  test('initializeSchema should create all tables and indexes', () => {
+    // Check financial_data table
+    const financialTableInfo = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='financial_data';").get();
+    expect(financialTableInfo).toBeDefined();
+    expect((financialTableInfo as any).name).toBe('financial_data');
+
+    const financialIndexes = db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='financial_data';").all();
+    const financialIndexNames = financialIndexes.map((idx: any) => idx.name);
+    expect(financialIndexNames).toContain('idx_symbol');
+    expect(financialIndexNames).toContain('idx_timestamp');
+    expect(financialIndexNames).toContain('idx_source_api');
+    expect(financialIndexNames).toContain('idx_symbol_timestamp_source_interval');
+
+    // Check users table
+    const usersTableInfo = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='users';").get();
+    expect(usersTableInfo).toBeDefined();
+    expect((usersTableInfo as any).name).toBe('users');
+    const usersIndexes = db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='users';").all();
+    expect(usersIndexes.map((idx: any) => idx.name)).toContain('idx_users_email');
+    
+    // Check api_keys table
+    const apiKeysTableInfo = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='api_keys';").get();
+    expect(apiKeysTableInfo).toBeDefined();
+    expect((apiKeysTableInfo as any).name).toBe('api_keys');
+    const apiKeysIndexes = db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='api_keys';").all();
+    const apiKeyIndexNames = apiKeysIndexes.map((idx: any) => idx.name);
+    expect(apiKeyIndexNames).toContain('idx_api_keys_user_id');
+    expect(apiKeyIndexNames).toContain('idx_api_keys_user_id_exchange_name');
   });
 
   describe('insertData', () => {
@@ -128,34 +74,36 @@ describe('Database Module Tests', () => {
         symbol: 'TEST', timestamp: 1672531200, open: 100, high: 105, low: 99, close: 102,
         volume: 1000, source_api: 'TestAPI', fetched_at: 1672531260, interval: '5min'
       };
-      
-      // Mock the prepare and run methods for this specific test
-      const mockStatement = { run: jest.fn() };
-      mockDbInstance.prepare.mockReturnValue(mockStatement);
-      mockDbInstance.transaction.mockImplementation((fn) => fn); // Make sure transaction executes
-
       insertData([record]);
 
-      expect(mockDbInstance.prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO financial_data'));
-      expect(mockStatement.run).toHaveBeenCalledWith(record);
+      const savedRecord = db.prepare('SELECT * FROM financial_data WHERE symbol = ?').get('TEST') as FinancialData | undefined;
+      expect(savedRecord).toBeDefined();
+      // SQLite stores numbers, so parseFloat for comparison if necessary, though direct should work.
+      expect(savedRecord?.symbol).toBe(record.symbol);
+      expect(savedRecord?.timestamp).toBe(record.timestamp);
+      expect(savedRecord?.open).toBe(record.open);
+      expect(savedRecord?.high).toBe(record.high);
+      expect(savedRecord?.low).toBe(record.low);
+      expect(savedRecord?.close).toBe(record.close);
+      expect(savedRecord?.volume).toBe(record.volume);
+      expect(savedRecord?.source_api).toBe(record.source_api);
+      expect(savedRecord?.fetched_at).toBe(record.fetched_at);
+      expect(savedRecord?.interval).toBe(record.interval);
     });
 
     test('should insert multiple records correctly', () => {
       const records: FinancialData[] = [
         { symbol: 'TEST1', timestamp: 1672531200, open: 100, high: 105, low: 99, close: 102, volume: 1000, source_api: 'TestAPI', fetched_at: 1672531260, interval: '5min' },
-        { symbol: 'TEST2', timestamp: 1672531200, open: 200, high: 205, low: 199, close: 202, volume: 2000, source_api: 'TestAPI', fetched_at: 1672531260, interval: '5min' },
+        { symbol: 'TEST2', timestamp: 1672531201, open: 200, high: 205, low: 199, close: 202, volume: 2000, source_api: 'TestAPI', fetched_at: 1672531261, interval: '5min' },
       ];
-      const mockStatement = { run: jest.fn() };
-      mockDbInstance.prepare.mockReturnValue(mockStatement);
-      mockDbInstance.transaction.mockImplementation((fn) => fn);
-
-
       insertData(records);
 
-      expect(mockDbInstance.prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO financial_data'));
-      expect(mockStatement.run).toHaveBeenCalledTimes(2);
-      expect(mockStatement.run).toHaveBeenCalledWith(records[0]);
-      expect(mockStatement.run).toHaveBeenCalledWith(records[1]);
+      const savedRecords = db.prepare('SELECT * FROM financial_data WHERE source_api = ? ORDER BY symbol ASC').all('TestAPI') as FinancialData[];
+      expect(savedRecords.length).toBe(2);
+      expect(savedRecords[0].symbol).toBe('TEST1');
+      expect(savedRecords[1].symbol).toBe('TEST2');
+      expect(savedRecords[0].close).toBe(102);
+      expect(savedRecords[1].close).toBe(202);
     });
   });
 
@@ -163,88 +111,66 @@ describe('Database Module Tests', () => {
     const now = Math.floor(Date.now() / 1000);
     const recentTime = now - 10 * 60; // 10 minutes ago
     const oldTime = now - 30 * 60;    // 30 minutes ago
+    
     const sampleData: FinancialData[] = [
-      { id: 1, symbol: 'AAPL', timestamp: now - 12*60, open: 150, high: 152, low: 149, close: 151, volume: 1000, source_api: 'API1', fetched_at: recentTime, interval: '1min' },
-      { id: 2, symbol: 'AAPL', timestamp: now - 25*60, open: 140, high: 142, low: 139, close: 141, volume: 1200, source_api: 'API1', fetched_at: oldTime, interval: '1min' },
-      { id: 3, symbol: 'MSFT', timestamp: now - 5*60, open: 250, high: 252, low: 249, close: 251, volume: 800, source_api: 'API1', fetched_at: recentTime, interval: '1min' },
+      { symbol: 'AAPL', timestamp: now - 12*60, open: 150, high: 152, low: 149, close: 151, volume: 1000, source_api: 'API1', fetched_at: recentTime, interval: '1min' },
+      { symbol: 'AAPL', timestamp: now - 25*60, open: 140, high: 142, low: 139, close: 141, volume: 1200, source_api: 'API1', fetched_at: oldTime, interval: '1min' }, // Old fetched_at
+      { symbol: 'MSFT', timestamp: now - 5*60, open: 250, high: 252, low: 249, close: 251, volume: 800, source_api: 'API1', fetched_at: recentTime, interval: '1min' },
+      { symbol: 'AAPL', timestamp: now - 2*60, open: 155, high: 156, low: 154, close: 155, volume: 1100, source_api: 'API1', fetched_at: recentTime, interval: '1min' }, // Another recent AAPL
     ];
 
-    test('should return only recent data', () => {
-      mockDbInstance.prepare.mockImplementation((sql: string) => {
-        // Simulate prepare returning an object that has an `all` method
-        return {
-          all: jest.fn((params: any) => {
-            // Filter sampleData based on params similar to how the SQL query would
-            return sampleData.filter(r => 
-              r.symbol === params.symbol &&
-              r.source_api === params.source_api &&
-              r.interval === params.interval &&
-              r.fetched_at >= params.threshold_seconds
-            );
-          })
-        };
-      });
-
-      const result = getRecentData('AAPL', 'API1', '1min', now - 15 * 60); // Threshold is 15 mins ago
-      expect(mockDbInstance.prepare).toHaveBeenCalledWith(expect.stringContaining('SELECT * FROM financial_data'));
-      expect(result.length).toBe(1);
-      expect(result[0].id).toBe(1); // Only the first AAPL record is recent
+    beforeEach(() => {
+      insertData(sampleData);
     });
 
-    test('should return empty array if no recent data found', () => {
-       mockDbInstance.prepare.mockImplementation(() => ({ all: jest.fn(() => []) }));
+    test('should return only recent data for a specific symbol, source_api, and interval', () => {
+      const result = getRecentData('AAPL', 'API1', '1min', now - 15 * 60); // Threshold is 15 mins ago
+      expect(result.length).toBe(2); // Two AAPL records are recent
+      expect(result.every(r => r.symbol === 'AAPL' && r.fetched_at >= (now - 15*60))).toBe(true);
+      // Check sorting (DESC by timestamp)
+      expect(result[0].timestamp).toBeGreaterThan(result[1].timestamp);
+    });
+
+    test('should return empty array if no recent data found for criteria', () => {
       const result = getRecentData('GOOG', 'API1', '1min', now - 15 * 60);
+      expect(result.length).toBe(0);
+    });
+     test('should return empty array if all data is older than threshold', () => {
+      const result = getRecentData('AAPL', 'API1', '1min', now + 60); // Threshold in the future
       expect(result.length).toBe(0);
     });
   });
 
   describe('getFallbackData', () => {
     const now = Math.floor(Date.now() / 1000);
-    const fetch1 = now - 60 * 60; // 1 hour ago
+    const fetch1 = now - 60 * 60;     // 1 hour ago (most recent for GOOG API2 5min)
     const fetch2 = now - 2 * 60 * 60; // 2 hours ago
-    const sampleData: FinancialData[] = [
-      // Batch 1 (most recent fetch)
-      { id: 1, symbol: 'GOOG', timestamp: fetch1 - 100, open: 100, high: 101, low: 99, close: 100, volume: 100, source_api: 'API2', fetched_at: fetch1, interval: '5min' },
-      { id: 2, symbol: 'GOOG', timestamp: fetch1 - 200, open: 99, high: 100, low: 98, close: 99, volume: 110, source_api: 'API2', fetched_at: fetch1, interval: '5min' },
-      // Batch 2 (older fetch)
-      { id: 3, symbol: 'GOOG', timestamp: fetch2 - 100, open: 95, high: 96, low: 94, close: 95, volume: 120, source_api: 'API2', fetched_at: fetch2, interval: '5min' },
-      // Different symbol
-      { id: 4, symbol: 'MSFT', timestamp: fetch1 - 100, open: 200, high: 201, low: 199, close: 200, volume: 130, source_api: 'API2', fetched_at: fetch1, interval: '5min' },
+    
+    const sampleFallbackData: FinancialData[] = [
+      // Batch 1 (most recent fetch for GOOG, API2, 5min)
+      { symbol: 'GOOG', timestamp: fetch1 - 200, open: 99, high: 100, low: 98, close: 99, volume: 110, source_api: 'API2', fetched_at: fetch1, interval: '5min' },
+      { symbol: 'GOOG', timestamp: fetch1 - 100, open: 100, high: 101, low: 99, close: 100, volume: 100, source_api: 'API2', fetched_at: fetch1, interval: '5min' },
+      // Batch 2 (older fetch for GOOG, API2, 5min)
+      { symbol: 'GOOG', timestamp: fetch2 - 100, open: 95, high: 96, low: 94, close: 95, volume: 120, source_api: 'API2', fetched_at: fetch2, interval: '5min' },
+      // Different symbol or API or interval
+      { symbol: 'MSFT', timestamp: fetch1 - 100, open: 200, high: 201, low: 199, close: 200, volume: 130, source_api: 'API2', fetched_at: fetch1, interval: '5min' },
+      { symbol: 'GOOG', timestamp: fetch1 - 50, open: 101, high: 102, low: 100, close: 101, volume: 140, source_api: 'API_OTHER', fetched_at: fetch1, interval: '5min' },
+      { symbol: 'GOOG', timestamp: fetch1 - 20, open: 102, high: 103, low: 101, close: 102, volume: 150, source_api: 'API2', fetched_at: fetch1, interval: '1min' },
     ];
 
-    test('should return all records from the most recent fetch for the given criteria', () => {
-      mockDbInstance.prepare.mockImplementation((sql: string) => {
-        // This mock needs to be more sophisticated to handle the two-step query in getFallbackData
-        if (sql.includes('ORDER BY fetched_at DESC, timestamp DESC')) { // First query
-          return { 
-            all: jest.fn((params: any) => sampleData.filter(r => 
-                r.symbol === params.symbol &&
-                r.source_api === params.source_api &&
-                r.interval === params.interval
-              ).sort((a,b) => b.fetched_at - a.fetched_at || b.timestamp - a.timestamp).slice(0,100) // Simplified LIMIT
-            )
-          };
-        } else { // Second query (after finding mostRecentFetchedAt)
-           return {
-             all: jest.fn((params: any) => sampleData.filter(r => 
-                r.symbol === params.symbol &&
-                r.source_api === params.source_api &&
-                r.interval === params.interval &&
-                r.fetched_at === params.mostRecentFetchedAt
-              ).sort((a,b) => b.timestamp - a.timestamp)
-            )
-           };
-        }
-      });
+    beforeEach(() => {
+      insertData(sampleFallbackData);
+    });
 
+    test('should return all records from the most recent fetch for the given criteria, sorted by timestamp DESC', () => {
       const result = getFallbackData('GOOG', 'API2', '5min');
       expect(result.length).toBe(2);
-      expect(result[0].id).toBe(1); // Timestamp fetch1 - 100
-      expect(result[1].id).toBe(2); // Timestamp fetch1 - 200
-      expect(result.every(r => r.fetched_at === fetch1)).toBe(true);
+      expect(result.every(r => r.symbol === 'GOOG' && r.source_api === 'API2' && r.interval === '5min' && r.fetched_at === fetch1)).toBe(true);
+      expect(result[0].timestamp).toBe(fetch1 - 100); // Most recent timestamp from that batch
+      expect(result[1].timestamp).toBe(fetch1 - 200);
     });
-     test('should return empty array if no data found', () => {
-       mockDbInstance.prepare.mockReturnValue({ all: jest.fn(() => []) });
+
+    test('should return empty array if no data found for criteria', () => {
       const result = getFallbackData('AMZN', 'API2', '5min');
       expect(result.length).toBe(0);
     });
@@ -252,70 +178,64 @@ describe('Database Module Tests', () => {
 
   describe('queryHistoricalData', () => {
     const now = Math.floor(Date.now() / 1000);
-    const data = [
-      { id: 1, symbol: 'TSLA', timestamp: now - 3*86400, open: 200, high: 205, low: 195, close: 202, volume: 1000, source_api: 'API_H', fetched_at: now, interval: '1d' },
-      { id: 2, symbol: 'TSLA', timestamp: now - 2*86400, open: 202, high: 208, low: 200, close: 205, volume: 1200, source_api: 'API_H', fetched_at: now, interval: '1d' },
-      { id: 3, symbol: 'TSLA', timestamp: now - 1*86400, open: 205, high: 210, low: 203, close: 208, volume: 1100, source_api: 'API_H', fetched_at: now, interval: '1d' },
-      { id: 4, symbol: 'TSLA', timestamp: now - 1*86400, open: 207, high: 210, low: 206, close: 209, volume: 500, source_api: 'API_H_5min', fetched_at: now, interval: '5min' }, // Same day, diff interval
-      { id: 5, symbol: 'NVDA', timestamp: now - 2*86400, open: 300, high: 305, low: 295, close: 303, volume: 2000, source_api: 'API_H', fetched_at: now, interval: '1d' },
-    ] as FinancialData[];
+    const data: FinancialData[] = [
+      { symbol: 'TSLA', timestamp: now - 3*86400, open: 200, high: 205, low: 195, close: 202, volume: 1000, source_api: 'API_H', fetched_at: now, interval: '1d' },
+      { symbol: 'TSLA', timestamp: now - 2*86400, open: 202, high: 208, low: 200, close: 205, volume: 1200, source_api: 'API_H', fetched_at: now, interval: '1d' },
+      { symbol: 'TSLA', timestamp: now - 1*86400, open: 205, high: 210, low: 203, close: 208, volume: 1100, source_api: 'API_H', fetched_at: now, interval: '1d' },
+      { symbol: 'TSLA', timestamp: now - 1*86400 + 3600, open: 207, high: 210, low: 206, close: 209, volume: 500, source_api: 'API_H_5min', fetched_at: now, interval: '5min' }, // Same day, different interval/API
+      { symbol: 'NVDA', timestamp: now - 2*86400, open: 300, high: 305, low: 295, close: 303, volume: 2000, source_api: 'API_H', fetched_at: now, interval: '1d' },
+      { symbol: 'TSLA', timestamp: now, open: 210, high: 212, low: 208, close: 211, volume: 1300, source_api: 'API_H', fetched_at: now, interval: '1d' }, // Today's data
+    ];
 
-    const mockQueryImplementation = (params: any) => {
-        let filtered = data.filter(r => 
-            r.symbol === params.symbol &&
-            r.timestamp >= params.startTimestamp &&
-            r.timestamp <= params.endTimestamp
-        );
-        if (params.source_api) {
-            filtered = filtered.filter(r => r.source_api === params.source_api);
-        }
-        if (params.interval) {
-            filtered = filtered.filter(r => r.interval === params.interval);
-        }
-        return filtered.sort((a,b) => a.timestamp - b.timestamp);
-    };
+    beforeEach(() => {
+      insertData(data);
+    });
 
-
-    test('should retrieve by symbol and date range', () => {
-      mockDbInstance.prepare.mockReturnValue({ all: jest.fn(mockQueryImplementation) });
+    test('should retrieve by symbol and date range, sorted by timestamp ASC', () => {
       const result = queryHistoricalData('TSLA', now - 3*86400, now - 1*86400);
-      expect(result.length).toBe(3); // 3 daily TSLA records (ignoring 5min one for this generic call)
-      expect(result[0].id).toBe(1);
-      expect(result[2].id).toBe(3);
+      expect(result.length).toBe(3); 
+      expect(result[0].timestamp).toBe(now - 3*86400);
+      expect(result[1].timestamp).toBe(now - 2*86400);
+      expect(result[2].timestamp).toBe(now - 1*86400);
+      expect(result.every(r => r.symbol === 'TSLA')).toBe(true);
     });
 
     test('should filter by source_api if provided', () => {
-      mockDbInstance.prepare.mockReturnValue({ all: jest.fn(mockQueryImplementation) });
-      const result = queryHistoricalData('TSLA', now - 3*86400, now, 'API_H_5min');
+      const result = queryHistoricalData('TSLA', now - 1*86400, now, 'API_H_5min');
       expect(result.length).toBe(1);
-      expect(result[0].id).toBe(4);
+      expect(result[0].source_api).toBe('API_H_5min');
+      expect(result[0].interval).toBe('5min');
     });
 
     test('should filter by interval if provided', () => {
-      mockDbInstance.prepare.mockReturnValue({ all: jest.fn(mockQueryImplementation) });
-      const result = queryHistoricalData('TSLA', now - 3*86400, now - 1*86400, undefined, '1d');
-      expect(result.length).toBe(3);
-      expect(result.every(r => r.interval === '1d')).toBe(true);
+      const resultDaily = queryHistoricalData('TSLA', now - 3*86400, now, undefined, '1d');
+      expect(resultDaily.length).toBe(4); // Includes today's record
+      expect(resultDaily.every(r => r.interval === '1d')).toBe(true);
+      
+      const result5min = queryHistoricalData('TSLA', now - 1*86400, now, undefined, '5min');
+      expect(result5min.length).toBe(1);
+      expect(result5min[0].interval).toBe('5min');
     });
     
     test('should filter by both source_api and interval', () => {
-      mockDbInstance.prepare.mockReturnValue({ all: jest.fn(mockQueryImplementation) });
-      const result = queryHistoricalData('TSLA', now - 3*86400, now, 'API_H_5min', '5min');
+      const result = queryHistoricalData('TSLA', now - 1*86400, now, 'API_H_5min', '5min');
       expect(result.length).toBe(1);
-      expect(result[0].id).toBe(4);
+      expect(result[0].source_api).toBe('API_H_5min');
+      expect(result[0].interval).toBe('5min');
     });
 
     test('should return empty array if no data matches criteria', () => {
-      mockDbInstance.prepare.mockReturnValue({ all: jest.fn(mockQueryImplementation) });
       const result = queryHistoricalData('AMD', now - 3*86400, now);
       expect(result.length).toBe(0);
     });
-     test('should be sorted by timestamp ascending', () => {
-      mockDbInstance.prepare.mockReturnValue({ all: jest.fn(mockQueryImplementation) });
-      const result = queryHistoricalData('TSLA', now - 3*86400, now - 1*86400, 'API_H', '1d');
-      expect(result.length).toBe(3);
-      expect(result[0].timestamp).toBeLessThan(result[1].timestamp);
-      expect(result[1].timestamp).toBeLessThan(result[2].timestamp);
+
+    test('should be sorted by timestamp ascending (default)', () => {
+      const result = queryHistoricalData('TSLA', now - 3*86400, now, 'API_H', '1d');
+      expect(result.length).toBe(4); // includes today's record
+      expect(result[0].timestamp).toBe(now - 3*86400);
+      expect(result[1].timestamp).toBe(now - 2*86400);
+      expect(result[2].timestamp).toBe(now - 1*86400);
+      expect(result[3].timestamp).toBe(now);
     });
   });
 });

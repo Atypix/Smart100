@@ -1,6 +1,6 @@
 // tests/api/apiKeyRoutes.test.ts
 import request from 'supertest';
-import { app } from '../../src/index';
+import { createApp } from '../../src/index'; // Import createApp
 import { db, initializeSchema } from '../../src/database';
 import * as userService from '../../src/services/userService';
 import * as apiKeyService from '../../src/services/apiKeyService'; // For direct interaction if needed for setup/teardown
@@ -18,13 +18,14 @@ const TEST_USER_EMAIL = 'apikeytestuser@example.com';
 const TEST_USER_PASSWORD = 'Password123!';
 let testUser: User;
 let authToken: string;
+let app: any; // To hold the app instance
 
-const MOCK_ENCRYPTION_KEY_HEX = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'; // 64 hex chars
+// const MOCK_ENCRYPTION_KEY_HEX = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'; // This was commented out, assuming setupEnv handles it.
 const JWT_TEST_SECRET = 'test_jwt_secret_for_api_key_routes_!@#$%^&*()_+';
 
 beforeAll(async () => {
-  process.env.API_ENCRYPTION_KEY = MOCK_ENCRYPTION_KEY_HEX;
-  process.env.JWT_SECRET = JWT_TEST_SECRET;
+  app = createApp(); // Create the app instance for this test suite
+  // JWT_SECRET is now set globally in tests/setupEnv.ts
 
   // Ensure schema is up-to-date
   try {
@@ -34,32 +35,67 @@ beforeAll(async () => {
   initializeSchema();
 
   // Register and login a test user to get a token
-  await request(app)
-    .post('/auth/register')
+  const registerRes = await request(app)
+    .post('/api/auth/register') // Corrected path
     .send({ email: TEST_USER_EMAIL, password: TEST_USER_PASSWORD });
   
+  // console.log('[[[[ DEBUG REGISTER RESPONSE ]]]]:', JSON.stringify(registerRes.body)); // Removed
+  // console.log('[[[[ DEBUG REGISTER STATUS ]]]]:', registerRes.status); // Removed
+
+
   const loginRes = await request(app)
-    .post('/auth/login')
+    .post('/api/auth/login') // Corrected path
     .send({ email: TEST_USER_EMAIL, password: TEST_USER_PASSWORD });
+  
+  // console.log('[[[[ DEBUG LOGIN RESPONSE ]]]]:', JSON.stringify(loginRes.body)); // Removed
+  // console.log('[[[[ DEBUG LOGIN STATUS ]]]]:', loginRes.status); // Removed
   
   authToken = loginRes.body.token;
-  testUser = userService.findUserByEmail(TEST_USER_EMAIL)!; // Get the full user object
+  
+  // Fetch user by ID from login response to ensure consistency
+  if (loginRes.body.user && loginRes.body.user.id) {
+    testUser = userService.findUserById(loginRes.body.user.id)!;
+  } else {
+    // Fallback or error if user info is not in login response as expected
+    // console.error("Login response did not contain user.id. Falling back to email query."); // Removed
+    // console.error("Full login response body:", JSON.stringify(loginRes.body)); // Removed
+    testUser = userService.findUserByEmail(TEST_USER_EMAIL)!;
+  }
 
   if (!authToken || !testUser) {
-    throw new Error('Failed to setup test user and token for API key tests.');
+    throw new Error('Failed to setup test user and token for API key tests. Ensure registration and login are working and return expected user data.');
   }
 });
 
 beforeEach(() => {
   // Clean api_keys table before each test, but keep the testUser
   // If other users are created in specific tests, they should be cleaned up there or use unique emails.
-  db.prepare('DELETE FROM api_keys WHERE user_id = ?').run(testUser.id);
+  if (testUser && testUser.id) { // Ensure testUser is defined before using its id
+    db.prepare('DELETE FROM api_keys WHERE user_id = ?').run(testUser.id);
+  } else {
+    // This case should ideally not be reached if beforeAll is successful.
+    // If it is, it indicates a problem with testUser setup.
+    console.warn('testUser was not defined in beforeEach for apiKeyRoutes; API keys not cleaned for a specific user.');
+  }
 });
 
 afterAll(() => {
   // Clean up the test user
-  db.exec(`DELETE FROM api_keys WHERE user_id = '${testUser.id}';`);
-  db.exec(`DELETE FROM users WHERE id = '${testUser.id}';`);
+  if (testUser && testUser.id) { // Ensure testUser is defined
+    db.exec(`DELETE FROM api_keys WHERE user_id = '${testUser.id}';`);
+    db.exec(`DELETE FROM users WHERE id = '${testUser.id}';`);
+  } else {
+    console.warn('testUser was not defined in afterAll for apiKeyRoutes; specific user and keys not cleaned up.');
+    // As a broader cleanup, try to delete by email if ID is missing
+    if (TEST_USER_EMAIL) {
+        const userByEmail = userService.findUserByEmail(TEST_USER_EMAIL);
+        if (userByEmail) {
+            db.exec(`DELETE FROM api_keys WHERE user_id = '${userByEmail.id}';`);
+            db.exec(`DELETE FROM users WHERE id = '${userByEmail.id}';`);
+            console.log(`Cleaned up user ${TEST_USER_EMAIL} and their API keys in afterAll fallback.`);
+        }
+    }
+  }
   // db.close(); // Close db if it's exclusively for tests and not shared
 });
 
@@ -176,22 +212,27 @@ describe('API Key Management Routes (/api/keys)', () => {
     });
 
     it('should return 404 if API key belongs to another user', async () => {
-      // Create another user and an API key for them
+      const otherUserEmail = 'otheruser-put@example.com'; // Unique email
       const otherUserRes = await request(app)
-        .post('/auth/register')
-        .send({ email: 'otheruser@example.com', password: 'Password123!' });
+        .post('/api/auth/register') // Corrected path
+        .send({ email: otherUserEmail, password: 'Password123!' });
       const otherUserId = otherUserRes.body.id;
-      const otherKey = await apiKeyService.createApiKey({ user_id: otherUserId, exchange_name: 'OtherUserExchange', api_key: 'otherkey', api_secret: 'othersecret' });
+
+  const otherKey = await apiKeyService.createApiKey({ 
+        user_id: otherUserId, 
+        exchange_name: 'OtherUserExchange', 
+        api_key: 'otherkey', 
+        api_secret: 'othersecret' 
+  });
 
       const res = await request(app)
-        .put(`/api/keys/${otherKey.id}`) // Attempt to update other user's key
-        .set('Authorization', `Bearer ${authToken}`) // Using main testUser's token
+        .put(`/api/keys/${otherKey.id}`)
+        .set('Authorization', `Bearer ${authToken}`)
         .send({ exchange_name: 'MaliciousUpdate' });
-      expect(res.statusCode).toBe(404); // Service returns null, route translates to 404
+      expect(res.statusCode).toBe(404);
       
-      // Cleanup other user
       db.exec(`DELETE FROM api_keys WHERE user_id = '${otherUserId}';`);
-      db.exec(`DELETE FROM users WHERE id = '${otherUserId}';`);
+      db.exec(`DELETE FROM users WHERE email = '${otherUserEmail}';`);
     });
     
     it('should return 400 for invalid input (e.g. empty exchange_name)', async () => {
@@ -243,20 +284,26 @@ describe('API Key Management Routes (/api/keys)', () => {
     });
 
     it('should return 404 if API key belongs to another user', async () => {
+      const otherUserEmail = 'otheruser-delete@example.com'; // Unique email
       const otherUserRes = await request(app)
-        .post('/auth/register')
-        .send({ email: 'otheruserfordelete@example.com', password: 'Password123!' });
+        .post('/api/auth/register') // Corrected path
+        .send({ email: otherUserEmail, password: 'Password123!' });
       const otherUserId = otherUserRes.body.id;
-      const otherKey = await apiKeyService.createApiKey({ user_id: otherUserId, exchange_name: 'OtherUserExchangeDel', api_key: 'otherkeyDel', api_secret: 'othersecretDel' });
+
+      const otherKey = await apiKeyService.createApiKey({ 
+        user_id: otherUserId, 
+        exchange_name: 'OtherUserExchangeDel', 
+        api_key: 'otherkeyDel', 
+        api_secret: 'othersecretDel' 
+      });
 
       const res = await request(app)
         .delete(`/api/keys/${otherKey.id}`)
         .set('Authorization', `Bearer ${authToken}`);
       expect(res.statusCode).toBe(404);
       
-      // Cleanup other user
       db.exec(`DELETE FROM api_keys WHERE user_id = '${otherUserId}';`);
-      db.exec(`DELETE FROM users WHERE id = '${otherUserId}';`);
+      db.exec(`DELETE FROM users WHERE email = '${otherUserEmail}';`);
     });
 
     it('should return 401 if no token is provided', async () => {

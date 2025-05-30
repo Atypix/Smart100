@@ -1,7 +1,6 @@
 // tests/setupMocks.ts
-// Note: We don't actually need to import the logger here to mock it.
-// The path in jest.mock is relative to the project root or module paths.
 
+// Mock for logger
 jest.mock('../src/utils/logger', () => ({ // Path relative to project root
   __esModule: true, // This is important for ES Modules
   default: {
@@ -9,7 +8,10 @@ jest.mock('../src/utils/logger', () => ({ // Path relative to project root
     warn: jest.fn(),
     error: jest.fn(),
     debug: jest.fn(),
-    verbose: jest.fn(), // Added verbose as it was in other mocks
-    silly: jest.fn(),   // Added silly as it was in other mocks
+    verbose: jest.fn(),
+    silly: jest.fn(),
   },
 }));
+
+// The uuid mock has been moved to tests/setupEnv.ts to ensure it's applied
+// before apiKeyService is imported by tests/setupEnv.ts.

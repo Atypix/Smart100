@@ -20,6 +20,7 @@ export const authenticateJWT = (req: AuthenticatedRequest, res: Response, next: 
     }
 
     const jwtSecret = process.env.JWT_SECRET;
+
     if (!jwtSecret) {
       logger.error('JWT_SECRET is not defined in environment variables for token verification.');
       res.status(500).json({ error: 'Internal server error: JWT configuration missing.' });
@@ -41,7 +42,7 @@ export const authenticateJWT = (req: AuthenticatedRequest, res: Response, next: 
         res.status(403).json({ error: 'Invalid token.' });
         return;
       }
-      logger.error('Error during token verification:', error);
+      logger.error('Error during token verification (generic catch):', error);
       res.status(403).json({ error: 'Forbidden, error verifying token.' });
       return;
     }
