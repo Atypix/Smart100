@@ -6,9 +6,9 @@ import type {
     BacktestSettingsAPI,
     TradingStrategyParameters,
     BacktestResultAPI,
-    Trade,
-    HistoricalDataPoint,
-    AIDecision
+    Trade as APITrade, // Alias for API type
+    HistoricalDataPoint as APIHistoricalDataPoint, // Alias for API type
+    AIDecision as APIAIDecision // Alias for API type
 } from '../types'; // Corrected path
 
 const router = Router();
@@ -53,16 +53,16 @@ router.post('/', async (req: Request, res: Response) => {
 
     // Assuming runBacktest now expects Date objects for startDate and endDate
     // and its result (BacktestResult) has Date objects for relevant date fields.
-    const backtestResultInternal = await runBacktest({
+    const backtestResultInternal = await runBacktest(
+      symbol,
+      startDateObj, // Pass Date object
+      endDateObj,     // Pass Date object
+      initialCash,
       strategyId,
       strategyParams,
-      symbol,
-      startDate: startDateObj, // Pass Date object
-      endDate: endDateObj,     // Pass Date object
-      initialCash,
       sourceApi,
       interval,
-    });
+    );
 
     // Convert Date objects in the internal result to ISO strings for the API response,
     // conforming to BacktestResultAPI.
@@ -70,25 +70,26 @@ router.post('/', async (req: Request, res: Response) => {
         ...backtestResultInternal,
         startDate: backtestResultInternal.startDate.toISOString().split('T')[0], // Example: YYYY-MM-DD
         endDate: backtestResultInternal.endDate.toISOString().split('T')[0],     // Example: YYYY-MM-DD
-        trades: backtestResultInternal.trades.map((trade: Trade) => ({
+        trades: backtestResultInternal.trades.map((trade: import('../backtest/index').Trade): APITrade => ({
             ...trade,
-            // Assuming trade.date from runBacktest is a Date object
-            // If it's already a string matching the target format, this logic is fine.
-            // The Trade type from types.ts defines date as string.
-            // The runBacktest function's Trade type defines date as Date.
-            // This transformation correctly converts Date to string.
-            date: typeof trade.date === 'string' ? trade.date : (trade.date as Date).toISOString().split('T')[0],
+            // trade.date is Date from import('../backtest/index').Trade
+            // APITrade expects date as string
+            date: (trade.date as Date).toISOString().split('T')[0],
         })),
         // Optional chaining for historicalDataUsed and aiDecisionLog as they might not exist
-        historicalDataUsed: backtestResultInternal.historicalDataUsed?.map((point: HistoricalDataPoint) => ({
+        historicalDataUsed: backtestResultInternal.historicalDataUsed?.map((point: import('../services/dataService').HistoricalDataPoint): APIHistoricalDataPoint => ({
             ...point,
-            // Similar date handling as above for HistoricalDataPoint
-            date: typeof point.date === 'string' ? point.date : (point.date as Date).toISOString().split('T')[0],
+            // point.date is Date from import('../services/dataService').HistoricalDataPoint
+            // APIHistoricalDataPoint expects date as string
+            date: (point.date as Date).toISOString().split('T')[0],
         })),
-        aiDecisionLog: backtestResultInternal.aiDecisionLog?.map((decision: AIDecision) => ({
+        aiDecisionLog: backtestResultInternal.aiDecisionLog?.map((decision: import('../strategies').AIDecision): APIAIDecision => ({
             ...decision,
-            // Similar date handling as above for AIDecision
-            date: typeof decision.date === 'string' ? decision.date : (decision.date as Date).toISOString().split('T')[0],
+            // decision.date needs to be string for APIAIDecision
+            // decision.date from import('../strategies').AIDecision is already a string.
+            // APIAIDecision (from src/types.ts) also expects date: string.
+            // No conversion needed, just pass it through.
+            date: decision.date,
         })),
         // portfolioHistory does not have a 'date' field to convert, only 'timestamp' and 'value'
         sharpeRatio: backtestResultInternal.sharpeRatio,
