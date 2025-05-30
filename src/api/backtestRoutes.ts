@@ -1,10 +1,15 @@
 // src/api/backtestRoutes.ts
 import { Router, Request, Response } from 'express';
-// src/api/backtestRoutes.ts
-import { Router, Request, Response } from 'express';
 import { runBacktest } from '../../backtest'; // Assuming runBacktest is exported from src/backtest/index.ts
 import logger from '../../utils/logger'; // Assuming logger is in src/utils
-import type { BacktestSettingsAPI, TradingStrategyParameters, BacktestResultAPI } from '../../types'; // Assuming these types exist
+import type {
+    BacktestSettingsAPI,
+    TradingStrategyParameters,
+    BacktestResultAPI,
+    Trade,
+    HistoricalDataPoint,
+    AIDecision
+} from '../../types'; // Assuming these types exist
 
 const router = Router();
 
@@ -65,21 +70,24 @@ router.post('/', async (req: Request, res: Response) => {
         ...backtestResultInternal,
         startDate: backtestResultInternal.startDate.toISOString().split('T')[0], // Example: YYYY-MM-DD
         endDate: backtestResultInternal.endDate.toISOString().split('T')[0],     // Example: YYYY-MM-DD
-        trades: backtestResultInternal.trades.map(trade => ({
+        trades: backtestResultInternal.trades.map((trade: Trade) => ({
             ...trade,
             // Assuming trade.date from runBacktest is a Date object
             // If it's already a string matching the target format, this logic is fine.
+            // The Trade type from types.ts defines date as string.
+            // The runBacktest function's Trade type defines date as Date.
+            // This transformation correctly converts Date to string.
             date: typeof trade.date === 'string' ? trade.date : (trade.date as Date).toISOString().split('T')[0],
         })),
         // Optional chaining for historicalDataUsed and aiDecisionLog as they might not exist
-        historicalDataUsed: backtestResultInternal.historicalDataUsed?.map(point => ({
+        historicalDataUsed: backtestResultInternal.historicalDataUsed?.map((point: HistoricalDataPoint) => ({
             ...point,
-            // Assuming point.date from runBacktest is a Date object
+            // Similar date handling as above for HistoricalDataPoint
             date: typeof point.date === 'string' ? point.date : (point.date as Date).toISOString().split('T')[0],
         })),
-        aiDecisionLog: backtestResultInternal.aiDecisionLog?.map(decision => ({
+        aiDecisionLog: backtestResultInternal.aiDecisionLog?.map((decision: AIDecision) => ({
             ...decision,
-            // Assuming decision.date from runBacktest is a Date object
+            // Similar date handling as above for AIDecision
             date: typeof decision.date === 'string' ? decision.date : (decision.date as Date).toISOString().split('T')[0],
         })),
         // portfolioHistory does not have a 'date' field to convert, only 'timestamp' and 'value'
