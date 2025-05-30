@@ -65,6 +65,7 @@ const BacktestSettingsForm: React.FC<BacktestSettingsFormProps> = ({ onSettingsC
   }, []); // Run once on mount. Settings dependency removed to avoid re-fetching on every settings change. Defaulting logic handles symbol update.
 
   const intervalOptions = ['1m', '5m', '15m', '1h', '4h', '1d', '1w', '1M'];
+  const dataSourceOptions = ['Binance', 'YahooFinance', 'AlphaVantage'];
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => { // Extended to HTMLSelectElement
     const { name, value } = event.target;
@@ -167,14 +168,19 @@ const BacktestSettingsForm: React.FC<BacktestSettingsFormProps> = ({ onSettingsC
         </div>
         <div className="form-group">
           <label htmlFor="sourceApi">Source API (Optional):</label>
-          <input
-            type="text"
+          <select
             id="sourceApi"
             name="sourceApi"
-            value={settings.sourceApi || ''}
+            value={settings.sourceApi || ''} // Default to Binance or handle empty
             onChange={handleChange}
-            placeholder="e.g., Binance, YahooFinance"
-          />
+          >
+            {/* <option value="">-- Select Source --</option> */} {/* Retaining this commented as per plan to default to existing value */}
+            {dataSourceOptions.map(source => (
+              <option key={source} value={source}>
+                {source}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="form-group">
           <label htmlFor="interval-select">Interval (Optional):</label>
