@@ -12,7 +12,7 @@ router.use(authMiddleware);
 // --- POST / (Create API Key) ---
 router.post('/', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const { exchange_name, api_key, api_secret } = req.body;
-  const userId = (req as any).user?.userId; // Accessing userId from authMiddleware
+  const userId = (req as any).auth?.userId; // Corrected: req.auth instead of req.user
 
   if (!userId) {
     logger.warn('User ID not found in request after authMiddleware for POST /keys');
@@ -52,7 +52,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction): Promis
 
 // --- GET / (Get All API Keys for User) ---
 router.get('/', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  const userId = (req as any).user?.userId;
+  const userId = (req as any).auth?.userId; // Corrected: req.auth instead of req.user
 
   if (!userId) {
     logger.warn('User ID not found in request after authMiddleware for GET /keys');
@@ -75,7 +75,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
 // --- PUT /:id (Update API Key) ---
 router.put('/:id', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const apiKeyId = req.params.id;
-  const userId = (req as any).user?.userId;
+  const userId = (req as any).auth?.userId; // Corrected: req.auth instead of req.user
   const { exchange_name, api_key, api_secret } = req.body;
 
   if (!userId) {
@@ -138,7 +138,7 @@ router.put('/:id', async (req: Request, res: Response, next: NextFunction): Prom
 // --- DELETE /:id (Delete API Key) ---
 router.delete('/:id', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const apiKeyId = req.params.id;
-  const userId = (req as any).user?.userId;
+  const userId = (req as any).auth?.userId; // Corrected: req.auth instead of req.user
 
   if (!userId) {
     logger.warn(`User ID not found in request after authMiddleware for DELETE /keys/${apiKeyId}`);

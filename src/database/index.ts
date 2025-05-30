@@ -155,43 +155,40 @@ function getRecentData(symbol: string, source_api: string, interval: string, thr
 // Function to get the most recent fallback data
 function getFallbackData(symbol: string, source_api: string, interval: string): FinancialData[] {
   if (!db) {
-    // console.error('[DATABASE CRITICAL] getFallbackData called but db instance is not available!');
-    // throw new Error('[DATABASE CRITICAL] db instance is not available in getFallbackData.');
-  // }
-  // try {
-  //   const stmt = db.prepare(`
-  //     SELECT * FROM financial_data
-  //     WHERE symbol = @symbol
-  //       AND source_api = @source_api
-  //       AND interval = @interval
-  //     ORDER BY fetched_at DESC, timestamp DESC 
-  //     LIMIT 100;
-  //   `);
+    console.error('[DATABASE CRITICAL] getFallbackData called but db instance is not available!');
+    throw new Error('[DATABASE CRITICAL] db instance is not available in getFallbackData.');
+  }
+  try {
+    const stmt = db.prepare(`
+      SELECT * FROM financial_data
+      WHERE symbol = @symbol
+        AND source_api = @source_api
+        AND interval = @interval
+      ORDER BY fetched_at DESC, timestamp DESC 
+      LIMIT 100;
+    `);
 
-  //   const results = stmt.all({ symbol, source_api, interval }) as FinancialData[];
+    const results = stmt.all({ symbol, source_api, interval }) as FinancialData[];
     
-  //   if (results.length > 0) {
-  //       const mostRecentFetchedAt = results[0].fetched_at;
-  //       const finalResultsStmt = db.prepare(`
-  //           SELECT * FROM financial_data
-  //           WHERE symbol = @symbol
-  //             AND source_api = @source_api
-  //             AND interval = @interval
-  //             AND fetched_at = @mostRecentFetchedAt
-  //           ORDER BY timestamp DESC
-  //       `);
-  //       const finalResults = finalResultsStmt.all({symbol, source_api, interval, mostRecentFetchedAt}) as FinancialData[];
-  //       return finalResults;
-  //   }
-  //   return [];
-  // } catch (error) {
-  //   // ADD THIS NEW LOG LINE:
-  //   console.log('[DEBUG DATABASE] getFallbackData: INNER CATCH BLOCK ENTERED. Error:', error); 
-  //   console.error('Error fetching fallback data from financial_data:', error);
-  //   return [];
-  // }
-  console.log(`[DEBUG DATABASE TEMPORARY] getFallbackData for ${symbol} forcibly returning [].`);
-  return []; // Force return empty array
+    if (results && results.length > 0) {
+        const mostRecentFetchedAt = results[0].fetched_at;
+        const finalResultsStmt = db.prepare(`
+            SELECT * FROM financial_data
+            WHERE symbol = @symbol
+              AND source_api = @source_api
+              AND interval = @interval
+              AND fetched_at = @mostRecentFetchedAt
+            ORDER BY timestamp DESC
+        `);
+        const finalResults = finalResultsStmt.all({symbol, source_api, interval, mostRecentFetchedAt}) as FinancialData[];
+        return finalResults;
+    }
+    return []; 
+  } catch (error) { 
+    // console.log('[DEBUG DATABASE] getFallbackData: INNER CATCH BLOCK ENTERED. Error:', error); // Remove this debug log
+    console.error('Error fetching fallback data from financial_data:', error); 
+    throw error; // Re-throw the error
+  }
 }
 
 

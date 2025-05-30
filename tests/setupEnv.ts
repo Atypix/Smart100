@@ -25,6 +25,10 @@ import { initializeApiKeyService } from '../src/services/apiKeyService'; // Corr
 const envPath = path.resolve(__dirname, '../.env'); // Corrected path to .env at project root
 dotenv.config({ path: envPath });
 
+// Set a consistent JWT_SECRET for all tests
+process.env.JWT_SECRET = 'a_very_secure_and_consistent_test_secret_123!'; 
+console.log('[tests/setupEnv.ts] JWT_SECRET set for tests.');
+
 console.log('[tests/setupEnv.ts] process.env.API_ENCRYPTION_KEY_HEX after dotenv:', process.env.API_ENCRYPTION_KEY_HEX); // For verification
 
 // Initialize the ApiKeyService with the now-loaded environment variables

@@ -30,15 +30,8 @@ import {
   KlineData,
   fetchBinanceData,
 } from '../../src/services/dataService';
-import {
-  db, // Real db instance
-  initializeSchema,
-  insertData, // Real insertData
-  FinancialData,
-  getRecentData, // Real getRecentData for verification if needed, though dataService uses its own logic
-  getFallbackData, // Real getFallbackData for verification if needed
-  queryHistoricalData, // Real queryHistoricalData
-} from '../../src/database';
+// Import all exports from database to allow spying on getFallbackData
+import * as databaseUtils from '../../src/database'; 
 import logger from '../../src/utils/logger';
 
 const mockedAxios = axios as jest.Mocked<typeof axios>;
@@ -47,19 +40,19 @@ describe('Data Service Tests (Integration with In-Memory DB)', () => {
   beforeAll(() => {
     // Ensure schema is initialized once for all tests in this file
     // as db connection is established when `../../src/database` is imported.
-    // initializeSchema(); // Already called when db module is loaded.
+    // databaseUtils.initializeSchema(); // Already called when db module is loaded.
   });
 
   beforeEach(async () => {
     jest.clearAllMocks();
     // Clean database state before each test
     try {
-      db.exec('DELETE FROM financial_data;');
+      databaseUtils.db.exec('DELETE FROM financial_data;');
       // Add DELETES for other tables if dataService interacts with them directly or indirectly
     } catch (error) {
       console.error('Error clearing database tables:', error);
       // If tables don't exist, initializeSchema will create them
-      initializeSchema();
+      databaseUtils.initializeSchema();
     }
   });
 
@@ -81,13 +74,13 @@ describe('Data Service Tests (Integration with In-Memory DB)', () => {
         { timestamp: '2023-10-27 15:55:00', open: 149.50, high: 150.50, low: 149, close: 150, volume: 8000 },
       ],
     };
-    const correspondingFinancialData: FinancialData[] = [
+    const correspondingFinancialData: databaseUtils.FinancialData[] = [
       { symbol: symbol, timestamp: Math.floor(new Date('2023-10-27 16:00:00').getTime() / 1000), open: 150, high: 152, low: 149, close: 151, volume: 10000, source_api: source_api, fetched_at: Math.floor(Date.now() / 1000) - 60, interval: interval }, // fetched 1 min ago
       { symbol: symbol, timestamp: Math.floor(new Date('2023-10-27 15:55:00').getTime() / 1000), open: 149.50, high: 150.50, low: 149, close: 150, volume: 8000, source_api: source_api, fetched_at: Math.floor(Date.now() / 1000) - 60, interval: interval }, // fetched 1 min ago
     ];
 
     test('Caching: should return cached data if getRecentData returns fresh data', async () => {
-      insertData(correspondingFinancialData); // Use real insertData
+      databaseUtils.insertData(correspondingFinancialData); // Use real insertData
       const result = await fetchAlphaVantageData(symbol, apiKey);
       expect(result).toEqual(expectedTransformedOutput);
       expect(mockedAxios.get).not.toHaveBeenCalled();
@@ -98,7 +91,7 @@ describe('Data Service Tests (Integration with In-Memory DB)', () => {
       const result = await fetchAlphaVantageData(symbol, apiKey);
       expect(result).toEqual(expectedTransformedOutput);
 
-      const dbData = db.prepare('SELECT * FROM financial_data WHERE symbol = ? ORDER BY timestamp DESC').all(symbol) as FinancialData[];
+      const dbData = databaseUtils.db.prepare('SELECT * FROM financial_data WHERE symbol = ? ORDER BY timestamp DESC').all(symbol) as databaseUtils.FinancialData[];
       expect(dbData.length).toBe(2);
       expect(dbData[0].close).toBe(151.00);
       expect(dbData[1].close).toBe(150.00);
@@ -109,7 +102,7 @@ describe('Data Service Tests (Integration with In-Memory DB)', () => {
       mockedAxios.get.mockRejectedValue(mockError);
       // Prepare fallback data in DB
       const fallbackFinancialData = correspondingFinancialData.map(d => ({...d, fetched_at: Math.floor(Date.now()/1000) - 3 * 3600})); // 3 hours old
-      insertData(fallbackFinancialData);
+      databaseUtils.insertData(fallbackFinancialData);
       
       const result = await fetchAlphaVantageData(symbol, apiKey);
       expect(result).toEqual(expectedTransformedOutput); // Assuming fallback data is transformed same way
@@ -124,7 +117,7 @@ describe('Data Service Tests (Integration with In-Memory DB)', () => {
       const mockError = new Error('Simulated Network Error');
       mockedAxios.get.mockRejectedValue(mockError);
       // Ensure no data for 'IBM' or specifically no fallback data
-      db.exec("DELETE FROM financial_data WHERE symbol = 'IBM';");
+      databaseUtils.db.exec("DELETE FROM financial_data WHERE symbol = 'IBM';");
 
       const expectedApiErrorMsg = `Generic error processing Alpha Vantage data for ${symbol}: ${mockError.message}`;
       const expectedErrorMessage = `API fetch failed for ${symbol} (${expectedApiErrorMsg}) and no fallback data available.`;
@@ -135,16 +128,19 @@ describe('Data Service Tests (Integration with In-Memory DB)', () => {
       const mockApiError = new Error('Simulated API Network Error');
       mockedAxios.get.mockRejectedValue(mockApiError);
 
-      // Simulate a DB error during getFallbackData by temporarily making db inaccessible or corrupting table
-      const originalDbExec = db.exec;
-      db.exec = jest.fn(() => { throw new Error("Simulated DB error during fallback query"); }) as any;
+      const apiErrorMsgInDataService = `Generic error processing Alpha Vantage data for ${symbol}: ${mockApiError.message}`;
+      const expectedThrownErrorMessage = `API fetch failed for ${symbol} (${apiErrorMsgInDataService}), and an error occurred while querying fallback data.`;
 
-      const expectedApiErrorMsg = `Generic error processing Alpha Vantage data for ${symbol}: ${mockApiError.message}`;
-      const expectedThrownErrorMessage = `API fetch failed for ${symbol} (${expectedApiErrorMsg}), and an error occurred while querying fallback data.`;
-      
-      await expect(fetchAlphaVantageData(symbol, apiKey)).rejects.toThrow(expectedThrownErrorMessage);
-      
-      db.exec = originalDbExec; // Restore original exec
+      const getFallbackDataSpy = jest.spyOn(databaseUtils, 'getFallbackData');
+      getFallbackDataSpy.mockImplementationOnce(() => {
+        throw new Error('Simulated DB error directly from getFallbackData');
+      });
+
+      try {
+        await expect(fetchAlphaVantageData(symbol, apiKey)).rejects.toThrow(expectedThrownErrorMessage);
+      } finally {
+        getFallbackDataSpy.mockRestore();
+      }
     });
   });
 
@@ -165,7 +161,7 @@ describe('Data Service Tests (Integration with In-Memory DB)', () => {
       const result = await fetchYahooFinanceData(symbol);
       expect(result).toEqual(expectedTransformedOutput);
 
-      const dbData = db.prepare('SELECT * FROM financial_data WHERE symbol = ? ORDER BY timestamp DESC').all(symbol) as FinancialData[];
+      const dbData = databaseUtils.db.prepare('SELECT * FROM financial_data WHERE symbol = ? ORDER BY timestamp DESC').all(symbol) as databaseUtils.FinancialData[];
       expect(dbData.length).toBe(2);
       expect(dbData[0].close).toBe(171);
       expect(dbData[1].close).toBe(172);
@@ -174,7 +170,7 @@ describe('Data Service Tests (Integration with In-Memory DB)', () => {
     test('API Error & Fallback Miss: should throw if API fails and no fallback', async () => {
       const mockError = new Error('Simulated Yahoo Network Error');
       mockYahooHistorical.mockRejectedValue(mockError);
-      db.exec("DELETE FROM financial_data WHERE symbol = 'AAPL';");
+      databaseUtils.db.exec("DELETE FROM financial_data WHERE symbol = 'AAPL';");
 
       const expectedApiErrorMsg = `Error fetching data for symbol ${symbol} from Yahoo Finance API. Details: ${mockError.message}`;
       const expectedErrorMessage = `Yahoo API fetch failed for ${symbol} (${expectedApiErrorMsg}) and no fallback data available.`;
@@ -185,14 +181,19 @@ describe('Data Service Tests (Integration with In-Memory DB)', () => {
         const mockApiError = new Error('Simulated Yahoo Network Error');
         mockYahooHistorical.mockRejectedValue(mockApiError);
         
-        const originalDbExec = db.exec;
-        db.exec = jest.fn(() => { throw new Error("Simulated DB error during Yahoo fallback"); }) as any;
+        const apiErrorMsgInDataService = `Error fetching data for symbol ${symbol} from Yahoo Finance API. Details: ${mockApiError.message}`;
+        const expectedThrownErrorMessage = `Yahoo API fetch failed for ${symbol} (${apiErrorMsgInDataService}), and an error occurred while querying fallback data.`;
 
-        const expectedApiErrorMsg = `Error fetching data for symbol ${symbol} from Yahoo Finance API. Details: ${mockApiError.message}`;
-        const expectedThrownErrorMessage = `Yahoo API fetch failed for ${symbol} (${expectedApiErrorMsg}), and an error occurred while querying fallback data.`;
-        
-        await expect(fetchYahooFinanceData(symbol)).rejects.toThrow(expectedThrownErrorMessage);
-        db.exec = originalDbExec; // Restore
+        const getFallbackDataSpy = jest.spyOn(databaseUtils, 'getFallbackData');
+        getFallbackDataSpy.mockImplementationOnce(() => {
+          throw new Error('Simulated DB error directly from getFallbackData for Yahoo');
+        });
+
+        try {
+          await expect(fetchYahooFinanceData(symbol)).rejects.toThrow(expectedThrownErrorMessage);
+        } finally {
+          getFallbackDataSpy.mockRestore();
+        }
     });
   });
 
@@ -203,7 +204,7 @@ describe('Data Service Tests (Integration with In-Memory DB)', () => {
     const startTimestamp = Math.floor(startDate.getTime() / 1000);
     const endTimestamp = Math.floor(endDate.getTime() / 1000);
 
-    const dbResponse: FinancialData[] = [
+    const dbResponse: databaseUtils.FinancialData[] = [
       { symbol: symbol, timestamp: startTimestamp + 86400, open: 200, high: 202, low: 199, close: 201, volume: 100, source_api: 'DB_Source', fetched_at: startTimestamp, interval: '1d_interval' },
       { symbol: symbol, timestamp: startTimestamp + (2*86400), open: 201, high: 203, low: 200, close: 202, volume: 110, source_api: 'DB_Source', fetched_at: startTimestamp, interval: '1d_interval' },
     ];
@@ -221,7 +222,7 @@ describe('Data Service Tests (Integration with In-Memory DB)', () => {
     }));
 
     test('should call queryHistoricalDataFromDB and transform results', async () => {
-      insertData(dbResponse);
+      databaseUtils.insertData(dbResponse);
       const result = await fetchHistoricalDataFromDB(symbol, startDate, endDate, 'DB_Source', '1d_interval');
       expect(result).toEqual(expectedTransformedResult);
     });
@@ -251,7 +252,7 @@ describe('Data Service Tests (Integration with In-Memory DB)', () => {
       mockedAxios.get.mockResolvedValue({ data: mockApiKlines });
       await fetchBinanceData(symbol, interval);
       
-      const dbData = db.prepare('SELECT * FROM financial_data WHERE symbol = ? ORDER BY timestamp ASC').all(symbol.toUpperCase()) as FinancialData[];
+      const dbData = databaseUtils.db.prepare('SELECT * FROM financial_data WHERE symbol = ? ORDER BY timestamp ASC').all(symbol.toUpperCase()) as databaseUtils.FinancialData[];
       expect(dbData.length).toBe(expectedKlineDataOutput.length);
       dbData.forEach((dbPoint, index) => {
         expect(dbPoint.symbol).toBe(symbol.toUpperCase());
@@ -264,7 +265,7 @@ describe('Data Service Tests (Integration with In-Memory DB)', () => {
     test('API Error & Fallback Miss: should throw if API fails and no fallback', async () => {
       const mockError = new Error('Simulated Binance API Network Error');
       mockedAxios.get.mockRejectedValue(mockError);
-      db.exec(`DELETE FROM financial_data WHERE symbol = '${symbol.toUpperCase()}';`);
+      databaseUtils.db.exec(`DELETE FROM financial_data WHERE symbol = '${symbol.toUpperCase()}';`);
       
       const expectedApiErrorMsg = `Generic error processing Binance data for ${symbol.toUpperCase()}: ${mockError.message}`;
       const expectedErrorMessage = `Binance API fetch failed for ${symbol.toUpperCase()} (${expectedApiErrorMsg}) and no fallback data available.`;
@@ -275,14 +276,19 @@ describe('Data Service Tests (Integration with In-Memory DB)', () => {
         const mockApiError = new Error('Simulated Binance API Network Error');
         mockedAxios.get.mockRejectedValue(mockApiError);
         
-        const originalDbExec = db.exec;
-        db.exec = jest.fn(() => { throw new Error("Simulated DB error during Binance fallback"); }) as any;
+        const apiErrorMsgInDataService = `Generic error processing Binance data for ${symbol.toUpperCase()}: ${mockApiError.message}`;
+        const expectedThrownErrorMessage = `Binance API fetch failed for ${symbol.toUpperCase()} (${apiErrorMsgInDataService}), and an error occurred while querying fallback data.`;
 
-        const expectedApiErrorMsg = `Generic error processing Binance data for ${symbol.toUpperCase()}: ${mockApiError.message}`;
-        const expectedThrownErrorMessage = `Binance API fetch failed for ${symbol.toUpperCase()} (${expectedApiErrorMsg}), and an error occurred while querying fallback data.`;
-        
-        await expect(fetchBinanceData(symbol, interval)).rejects.toThrow(expectedThrownErrorMessage);
-        db.exec = originalDbExec; // Restore
+        const getFallbackDataSpy = jest.spyOn(databaseUtils, 'getFallbackData');
+        getFallbackDataSpy.mockImplementationOnce(() => {
+          throw new Error('Simulated DB error directly from getFallbackData for Binance');
+        });
+
+        try {
+          await expect(fetchBinanceData(symbol, interval)).rejects.toThrow(expectedThrownErrorMessage);
+        } finally {
+          getFallbackDataSpy.mockRestore();
+        }
     });
   });
 });

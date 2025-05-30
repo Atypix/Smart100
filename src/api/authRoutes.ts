@@ -99,7 +99,11 @@ router.post('/login', (async (req: Request<{}, {}, LoginRequestBody>, res: Respo
     });
 
     logger.info(`User logged in: ${user.email}`);
-    res.status(200).json({ token });
+    // Return token and user information (id and email)
+    res.status(200).json({ 
+        token, 
+        user: { id: user.id, email: user.email } 
+    });
 
   } catch (error) {
     logger.error('Error during user login:', error);
