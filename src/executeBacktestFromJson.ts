@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { runBacktest, BacktestResult } from './backtest'; // Assuming runBacktest and BacktestResult are exported from src/backtest/index.ts
 import { getStrategy, getAvailableStrategies } from './strategies'; // Assuming these are exported from src/strategies/index.ts
-import { logger } from './utils/logger'; // For consistent logging
+import logger from './utils/logger'; // For consistent logging
 
 interface BacktestConfigEntry {
   symbol: string;

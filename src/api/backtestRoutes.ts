@@ -1,5 +1,5 @@
 // src/api/backtestRoutes.ts
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, RequestHandler } from 'express';
 import { runBacktest } from '../backtest/index'; // Corrected path
 import logger from '../utils/logger'; // Corrected path
 import type {
@@ -11,9 +11,9 @@ import type {
     AIDecision as APIAIDecision // Alias for API type
 } from '../types'; // Corrected path
 
-const router = Router();
+const router: Router = Router();
 
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', (async (req: Request, res: Response) => {
   const {
     strategyId,
     strategyParams,
@@ -109,6 +109,6 @@ router.post('/', async (req: Request, res: Response) => {
     }
     res.status(500).json({ message: 'Error running backtest', error: error.message });
   }
-});
+}) as RequestHandler);
 
 export default router;
