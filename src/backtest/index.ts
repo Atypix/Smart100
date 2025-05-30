@@ -361,13 +361,18 @@ export async function runBacktest(
     maxDrawdown: maxDrawdown, // Add Max Drawdown to results
   };
 
-  logger.info(`Backtest completed for ${symbol} using strategy ${selectedStrategy.name}`, {
+  const logDetails = {
     initialValue: result.initialPortfolioValue,
     finalValue: result.finalPortfolioValue,
     profitOrLoss: result.totalProfitOrLoss,
     profitPercentage: result.profitOrLossPercentage,
     totalTrades: result.totalTrades,
-  });
+  };
+  if (result.totalTrades === 0) {
+    logger.info(`Backtest completed for ${symbol} using strategy ${selectedStrategy.name}. No trades were executed.`, logDetails);
+  } else {
+    logger.info(`Backtest completed for ${symbol} using strategy ${selectedStrategy.name}.`, logDetails);
+  }
 
   return result;
 }
