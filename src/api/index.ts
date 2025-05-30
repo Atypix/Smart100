@@ -4,6 +4,7 @@ import authRoutes from './authRoutes';
 import dataRoutes from './dataRoutes';
 import strategyRoutes from './strategyRoutes';
 import apiKeyRoutes from './apiKeyRoutes'; // Import the new API key routes
+import backtestRoutes from './backtestRoutes'; // Import backtest routes
 import logger from '../utils/logger';
 
 const mainRouter = Router();
@@ -28,6 +29,10 @@ logger.info('API Key routes mounted under /keys');
 import aiRoutes from './aiRoutes'; // Import AI routes
 mainRouter.use('/ai', aiRoutes); // Mount AI routes under /ai
 logger.info('AI routes mounted under /ai');
+
+// Mount backtest routes
+mainRouter.use('/backtest', backtestRoutes);
+logger.info('Backtest routes mounted under /backtest');
 
 
 export default mainRouter;

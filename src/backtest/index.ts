@@ -54,6 +54,8 @@ export interface BacktestResult {
   historicalDataUsed?: HistoricalDataPoint[];
   portfolioHistory?: { timestamp: number; value: number }[]; // Added for equity curve
   aiDecisionLog?: AIDecision[]; // Add the AI decision log
+  sharpeRatio?: number; // Added for Sharpe Ratio
+  maxDrawdown?: number; // Added for Maximum Drawdown
 }
 
 
@@ -187,6 +189,17 @@ export async function runBacktest(
   logger.info(`Processing ${historicalData.length} data points for backtest using strategy: ${selectedStrategy.name}...`);
   
   const portfolioHistoryTimeline: { timestamp: number; value: number }[] = []; // For equity curve
+  let peakPortfolioValue = initialCash;
+  let maxDrawdown = 0;
+
+  // Initialize portfolio history with the starting value
+  if (historicalData.length > 0) {
+      // Assuming the first data point's timestamp is representative for the start
+      // or use a dedicated start timestamp if available and more accurate.
+      // For drawdown calculation, the first point in history should be initialCash.
+      portfolioHistoryTimeline.push({ timestamp: historicalData[0].timestamp, value: initialCash });
+  }
+
 
   for (let i = 0; i < historicalData.length; i++) {
     // Record portfolio value at the START of the period (before current data point is processed)
@@ -253,7 +266,17 @@ export async function runBacktest(
 
     // Update current portfolio value after any potential trade
     portfolio.currentValue = portfolio.cash + portfolio.shares * currentPrice;
+
+    // Update peak portfolio value and calculate max drawdown
+    peakPortfolioValue = Math.max(peakPortfolioValue, portfolio.currentValue);
+    if (peakPortfolioValue > 0) { // Avoid division by zero if peak is somehow 0
+        const currentDrawdown = (peakPortfolioValue - portfolio.currentValue) / peakPortfolioValue;
+        maxDrawdown = Math.max(maxDrawdown, currentDrawdown);
+    }
+
+    // Record portfolio value for history AFTER all calculations for the current period, including drawdown
     portfolioHistoryTimeline.push({ timestamp: historicalData[i].timestamp, value: portfolio.currentValue });
+
 
     // Collect AI Decision Log if applicable
     if (selectedStrategy.id === 'ai-selector' && (selectedStrategy as any).lastAIDecision) {
@@ -283,6 +306,43 @@ export async function runBacktest(
     ? (totalProfitOrLoss === 0 ? 0 : Infinity) 
     : (totalProfitOrLoss / portfolio.initialValue) * 100;
 
+  // Calculate Sharpe Ratio
+  let sharpeRatio: number | undefined = undefined;
+  if (portfolioHistoryTimeline && portfolioHistoryTimeline.length >= 2) {
+    const periodReturns: number[] = [];
+    for (let k = 1; k < portfolioHistoryTimeline.length; k++) {
+      const prevValue = portfolioHistoryTimeline[k-1].value;
+      const currentValue = portfolioHistoryTimeline[k].value;
+      if (prevValue !== 0) {
+        periodReturns.push((currentValue - prevValue) / prevValue);
+      } else {
+        periodReturns.push(0); // Or handle as appropriate, e.g., if value can go to 0 and recover
+      }
+    }
+
+    if (periodReturns.length > 1) {
+      const averageReturn = periodReturns.reduce((sum, ret) => sum + ret, 0) / periodReturns.length;
+      const stdDevReturns = Math.sqrt(
+        periodReturns.map(ret => Math.pow(ret - averageReturn, 2)).reduce((sum, sq) => sum + sq, 0) / (periodReturns.length -1) // Use n-1 for sample std dev
+      );
+
+      if (stdDevReturns !== 0) {
+        const riskFreeRate = 0; // Assuming Rf = 0 for simplicity
+        const sharpeRatioPeriod = (averageReturn - riskFreeRate) / stdDevReturns;
+        // Annualize Sharpe Ratio, assuming daily data if not specified otherwise (N=252)
+        // A more robust solution would determine N based on data interval
+        const annualizationFactor = Math.sqrt(252);
+        sharpeRatio = sharpeRatioPeriod * annualizationFactor;
+      } else {
+        sharpeRatio = 0; // Or NaN, if averageReturn is non-zero and stdDev is zero (constant returns)
+      }
+    } else {
+      sharpeRatio = 0; // Not enough returns to calculate std dev
+    }
+  } else {
+    sharpeRatio = 0; // Not enough portfolio history points
+  }
+
   const result: BacktestResult = {
     symbol,
     startDate,
@@ -297,6 +357,8 @@ export async function runBacktest(
     historicalDataUsed: historicalData, // Include the historical data
     portfolioHistory: portfolioHistoryTimeline, // Include portfolio history
     aiDecisionLog: aiDecisionLog.length > 0 ? aiDecisionLog : undefined, // Add AI decision log
+    sharpeRatio: sharpeRatio, // Add Sharpe Ratio to results
+    maxDrawdown: maxDrawdown, // Add Max Drawdown to results
   };
 
   logger.info(`Backtest completed for ${symbol} using strategy ${selectedStrategy.name}`, {
