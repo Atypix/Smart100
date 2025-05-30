@@ -1,7 +1,7 @@
 // src/api/backtestRoutes.ts
 import { Router, Request, Response } from 'express';
-import { runBacktest } from '../backtest/index'; // Corrected path
-import logger from '../utils/logger'; // Corrected path
+import { runBacktest } from '../../backtest/index'; // Assuming runBacktest is exported from src/backtest/index.ts
+import logger from '../../utils/logger'; // Assuming logger is in src/utils
 import type {
     BacktestSettingsAPI,
     TradingStrategyParameters,
@@ -9,7 +9,7 @@ import type {
     Trade,
     HistoricalDataPoint,
     AIDecision
-} from '../types'; // Corrected path
+} from '../../types'; // Assuming these types exist
 
 const router = Router();
 
