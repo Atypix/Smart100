@@ -83,6 +83,8 @@ router.post('/', async (req: Request, res: Response) => {
             date: typeof decision.date === 'string' ? decision.date : (decision.date as Date).toISOString().split('T')[0],
         })),
         // portfolioHistory does not have a 'date' field to convert, only 'timestamp' and 'value'
+        sharpeRatio: backtestResultInternal.sharpeRatio,
+        maxDrawdown: backtestResultInternal.maxDrawdown, // Add this line
     };
 
     logger.info(`Backtest API: Successfully ran backtest for strategy ${strategyId} on ${symbol}`);

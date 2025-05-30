@@ -70,4 +70,6 @@ export interface BacktestResultAPI {
   historicalDataUsed?: HistoricalDataPoint[];
   portfolioHistory?: PortfolioHistoryPoint[];
   aiDecisionLog?: AIDecision[];
+  sharpeRatio?: number; // Added for Sharpe Ratio
+  maxDrawdown?: number; // Added for Maximum Drawdown
 }

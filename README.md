@@ -321,30 +321,32 @@ All backend endpoints are prefixed with `/api`. The backend provides the followi
               "startDate": "2023-01-01",
               "endDate": "2023-03-31",
               "initialPortfolioValue": 10000,
-              "finalPortfolioValue": 12500,
-              "totalProfitOrLoss": 2500,
-              "profitOrLossPercentage": 25,
+              "finalPortfolioValue": 10500, // Adjusted for a simpler single trade example
+              "totalProfitOrLoss": 500,    // Adjusted
+              "profitOrLossPercentage": 5, // Adjusted
+              "sharpeRatio": 1.25,          // Example value
+              "maxDrawdown": 0.05,          // Example value (representing 5%)
               "trades": [
                 {
-                  "timestamp": 1673740800,
+                  "timestamp": 1673740800,    // Example: Unix timestamp for 2023-01-15 00:00:00 UTC
                   "date": "2023-01-15",
                   "action": "BUY",
-                  "price": 21000,
-                  "sharesTraded": 0.1,
-                  "cashAfterTrade": 7900
+                  "price": 20000,           // Example price
+                  "sharesTraded": 0.25,       // Example shares
+                  "cashAfterTrade": 5000      // initialCash 10000 - (20000 * 0.25) = 5000
                 }
-                // ... more trades
+                // Assuming a subsequent SELL that results in the finalPortfolioValue
               ],
-              "totalTrades": 5,
+              "totalTrades": 1, // Adjusted to reflect a single illustrative trade for simplicity
               "dataPointsProcessed": 90,
               "historicalDataUsed": [
                 {
-                  "timestamp": 1672531200,
+                  "timestamp": 1672531200,    // Example: Unix timestamp for 2023-01-01 00:00:00 UTC
                   "date": "2023-01-01",
-                  "open": 20000,
-                  "high": 20500,
-                  "low": 19800,
-                  "close": 20200,
+                  "open": 19000,
+                  "high": 19500,
+                  "low": 18800,
+                  "close": 19200,
                   "volume": 1000
                 }
                 // ... more data points
