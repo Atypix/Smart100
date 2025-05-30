@@ -1,6 +1,6 @@
 // src/api/backtestRoutes.ts
 import { Router, Request, Response } from 'express';
-import { runBacktest } from '../../backtest'; // Assuming runBacktest is exported from src/backtest/index.ts
+import { runBacktest } from '../../backtest/index'; // Assuming runBacktest is exported from src/backtest/index.ts
 import logger from '../../utils/logger'; // Assuming logger is in src/utils
 import type {
     BacktestSettingsAPI,
