@@ -318,16 +318,37 @@ All backend endpoints are prefixed with `/api`. The backend provides the followi
             ```json
             {
               "symbol": "BTCUSDT",
-              "startDate": "2023-01-01T00:00:00.000Z",
-              "endDate": "2023-03-31T00:00:00.000Z",
+              "startDate": "2023-01-01",
+              "endDate": "2023-03-31",
               "initialPortfolioValue": 10000,
               "finalPortfolioValue": 12500,
               "totalProfitOrLoss": 2500,
               "profitOrLossPercentage": 25,
-              "trades": [ /* ... array of trade objects ... */ ],
+              "trades": [
+                {
+                  "timestamp": 1673740800,
+                  "date": "2023-01-15",
+                  "action": "BUY",
+                  "price": 21000,
+                  "sharesTraded": 0.1,
+                  "cashAfterTrade": 7900
+                }
+                // ... more trades
+              ],
               "totalTrades": 5,
               "dataPointsProcessed": 90,
-              "historicalDataUsed": [ /* ... array of historical data points ... */ ],
+              "historicalDataUsed": [
+                {
+                  "timestamp": 1672531200,
+                  "date": "2023-01-01",
+                  "open": 20000,
+                  "high": 20500,
+                  "low": 19800,
+                  "close": 20200,
+                  "volume": 1000
+                }
+                // ... more data points
+              ],
               "portfolioHistory": [ /* ... array of portfolio history points ... */ ],
               "aiDecisionLog": [ // Optional: Present if AISelectorStrategy was used
                 {

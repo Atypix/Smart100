@@ -31,7 +31,7 @@ router.post('/', async (req: Request, res: Response) => {
       logger.warn('Backtest API: Invalid date format provided.', { startDate: startDateString, endDate: endDateString });
       return res.status(400).json({ message: 'Invalid date format. Please use YYYY-MM-DD or ISO string.' });
   }
-  
+
   // Validate endDate is after startDate
   if (new Date(endDateString) <= new Date(startDateString)) {
       logger.warn('Backtest API: endDate must be after startDate.', { startDate: startDateString, endDate: endDateString });
@@ -48,7 +48,7 @@ router.post('/', async (req: Request, res: Response) => {
 
     // Assuming runBacktest now expects Date objects for startDate and endDate
     // and its result (BacktestResult) has Date objects for relevant date fields.
-    const backtestResultInternal = await runBacktest({ 
+    const backtestResultInternal = await runBacktest({
       strategyId,
       strategyParams,
       symbol,
@@ -58,7 +58,7 @@ router.post('/', async (req: Request, res: Response) => {
       sourceApi,
       interval,
     });
-    
+
     // Convert Date objects in the internal result to ISO strings for the API response,
     // conforming to BacktestResultAPI.
     const apiResponseData: BacktestResultAPI = {
@@ -69,7 +69,7 @@ router.post('/', async (req: Request, res: Response) => {
             ...trade,
             // Assuming trade.date from runBacktest is a Date object
             // If it's already a string matching the target format, this logic is fine.
-            date: typeof trade.date === 'string' ? trade.date : (trade.date as Date).toISOString().split('T')[0], 
+            date: typeof trade.date === 'string' ? trade.date : (trade.date as Date).toISOString().split('T')[0],
         })),
         // Optional chaining for historicalDataUsed and aiDecisionLog as they might not exist
         historicalDataUsed: backtestResultInternal.historicalDataUsed?.map(point => ({
