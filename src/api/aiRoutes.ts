@@ -3,6 +3,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { getAISelectorActiveState, AISelectorChoiceState } from '../strategies/implementations/aiSelectorStrategy';
 // import { StrategyManager } from '../strategies/strategyManager'; // StrategyManager is likely already imported - REMOVED
 import logger from '../utils/logger'; // Corrected logger import
+import { getCapitalAwareStrategySuggestion, SuggestionResponse } from '../../services/aiSuggestionService';
 
 const router = Router();
 
@@ -49,6 +50,56 @@ router.get('/current-strategy/:symbol', async (req: Request, res: Response, next
         message: "Internal server error while fetching AI strategy choice."
     });
     return;
+  }
+});
+
+router.post('/suggest-strategy', async (req: Request, res: Response, next: NextFunction) => {
+  const {
+    symbol,
+    initialCapital,
+    lookbackPeriod, // optional
+    evaluationMetric, // optional
+    optimizeParameters // optional
+  } = req.body;
+
+  if (!symbol || typeof symbol !== 'string' || symbol.trim() === "") {
+    return res.status(400).json({ message: "Symbol parameter is required and must be a non-empty string." });
+  }
+  if (initialCapital === undefined || typeof initialCapital !== 'number' || initialCapital <= 0) {
+    return res.status(400).json({ message: "Initial capital parameter is required and must be a positive number." });
+  }
+  // Optional: Validate optional param types if necessary (e.g., lookbackPeriod is a number)
+  if (lookbackPeriod !== undefined && typeof lookbackPeriod !== 'number') {
+    return res.status(400).json({ message: "Optional parameter 'lookbackPeriod' must be a number." });
+  }
+  if (evaluationMetric !== undefined && typeof evaluationMetric !== 'string') {
+    return res.status(400).json({ message: "Optional parameter 'evaluationMetric' must be a string." });
+  }
+  if (optimizeParameters !== undefined && typeof optimizeParameters !== 'boolean') {
+    return res.status(400).json({ message: "Optional parameter 'optimizeParameters' must be a boolean." });
+  }
+
+  try {
+    logger.info(`[API /suggest-strategy] Received request for symbol ${symbol}, capital ${initialCapital}`);
+    const suggestion: SuggestionResponse = await getCapitalAwareStrategySuggestion(
+      symbol,
+      initialCapital,
+      lookbackPeriod,
+      evaluationMetric,
+      optimizeParameters
+    );
+
+    // The service function SuggestionResponse always includes a message.
+    // If suggestedStrategyId is null, it means no active suggestion could be made,
+    // but the operation itself didn't fail.
+    return res.status(200).json(suggestion);
+
+  } catch (error: any) {
+    logger.error(`[API /suggest-strategy] Internal error for symbol ${symbol}, capital ${initialCapital}:`, error);
+    // Pass to a generic error handler if implemented, or return 500
+    // Ensure NextFunction (next) is called if it's an unhandled error meant for middleware
+    // For now, directly return 500.
+    return res.status(500).json({ message: "Internal server error while generating strategy suggestion.", error: error.message });
   }
 });
 

@@ -10,7 +10,9 @@ import type {
   ApiError,
   HistoricalDataPoint as FrontendHistoricalDataPoint, // Keep alias for clarity if needed
   Trade, // Use the Trade type from types.ts
+  SuggestionResponse, // Import the new type
 } from '../types';
+import { fetchStrategySuggestion } from '../services/api'; // Import the new API function
 import StrategySelector from './StrategySelector';
 import StrategyParameterForm from './StrategyParameterForm';
 import BacktestSettingsForm from './BacktestSettingsForm';
@@ -36,13 +38,36 @@ const BacktestRunnerPage: React.FC = () => {
   const [currentBacktestSettings, setCurrentBacktestSettings] = useState<BacktestSettings>(initialBacktestSettings);
   
   const [backtestResult, setBacktestResult] = useState<BacktestResult | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false); // For main backtest run
+  const [error, setError] = useState<string | null>(null); // For main backtest run
 
-  // State for AI Selector Strategy Choice
-  const [aiChosenStrategyInfo, setAiChosenStrategyInfo] = useState<AIChoiceResponse | null>(null); // No change needed here, type usage
+  // State for AI Selector Strategy Choice (when ai-selector is chosen)
+  const [aiChosenStrategyInfo, setAiChosenStrategyInfo] = useState<AIChoiceResponse | null>(null);
   const [isFetchingAIChoice, setIsFetchingAIChoice] = useState<boolean>(false);
   const [aiChoiceError, setAiChoiceError] = useState<string | null>(null);
+
+  // State for Smart Strategy Suggestion Feature
+  const [initialCapitalForSuggestion, setInitialCapitalForSuggestion] = useState<number>(10000); // Default capital for suggestion
+  const [suggestionResult, setSuggestionResult] = useState<SuggestionResponse | null>(null);
+  const [isFetchingSuggestion, setIsFetchingSuggestion] = useState<boolean>(false);
+  const [suggestionError, setSuggestionError] = useState<string | null>(null); // For suggestion fetching errors
+
+  const [availableStrategies, setAvailableStrategies] = useState<TradingStrategy[]>([]);
+
+  // Fetch available strategies once on mount for the "Apply to Parameters" feature
+  useEffect(() => {
+    axios.get<TradingStrategy[]>('/api/strategies')
+      .then(response => {
+        setAvailableStrategies(response.data);
+        logger.info('[BacktestRunnerPage] Fetched available strategies for suggestion application:', response.data.length);
+      })
+      .catch(error => {
+        logger.error('[BacktestRunnerPage] Error fetching available strategies:', error);
+        // Optionally set an error state here if this list is critical for other features too
+        // For now, we'll assume StrategySelector handles its own error display for this list.
+      });
+  }, []);
+
 
   const handleStrategySelect = useCallback((strategy: TradingStrategy | null) => {
     logger.info('BacktestRunnerPage: Strategy selected', strategy?.name || 'None');
@@ -150,12 +175,192 @@ const BacktestRunnerPage: React.FC = () => {
     }
   };
 
+  // Handler for the new "Get Strategy Suggestion" button
+  const handleGetSuggestion = async () => {
+    if (!currentBacktestSettings.symbol) {
+      setSuggestionError("Please select a symbol first.");
+      logger.warn('[GetSuggestion] No symbol selected.');
+      return;
+    }
+    if (initialCapitalForSuggestion <= 0) {
+      setSuggestionError("Please enter a positive initial capital for suggestion.");
+      logger.warn('[GetSuggestion] Invalid initial capital for suggestion.');
+      return;
+    }
+
+    setIsFetchingSuggestion(true);
+    setSuggestionResult(null);
+    setSuggestionError(null);
+    logger.info(`[GetSuggestion] Fetching suggestion for ${currentBacktestSettings.symbol} with capital ${initialCapitalForSuggestion}`);
+
+    try {
+      const result = await fetchStrategySuggestion(
+        currentBacktestSettings.symbol,
+        initialCapitalForSuggestion
+        // TODO: Optionally pass preferredLookback, preferredMetric, preferredOptimizeParams
+        // if UI controls are added for them for the suggestion feature.
+      );
+      setSuggestionResult(result);
+      if (!result.suggestedStrategyId) {
+        logger.info(`[BacktestRunnerPage] Suggestion API returned successfully but no specific strategy chosen: ${result.message}`);
+        // Optional: setSuggestionError(result.message); // Or let the display handle the message from result
+      } else {
+        logger.info('[GetSuggestion] Suggestion received:', result);
+      }
+    } catch (err: any) {
+      const errorMessage = err.message || 'Failed to fetch strategy suggestion.';
+      setSuggestionError(errorMessage);
+      logger.error('[GetSuggestion] Error fetching suggestion:', err);
+    } finally {
+      setIsFetchingSuggestion(false);
+    }
+  };
+
+  // Handler for "Apply & Run Backtest with Suggestion"
+  const handleApplyAndRunSuggestion = async () => {
+    if (!suggestionResult || !suggestionResult.suggestedStrategyId || !suggestionResult.suggestedParameters) {
+      setError("Aucune suggestion valide à appliquer pour le backtest."); // French
+      logger.warn('[ApplyAndRun] No valid suggestion to apply.');
+      return;
+    }
+
+    const endDate = new Date().toISOString().split('T')[0];
+    const startDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // Default 90 days ago
+
+    const requestBody = {
+      strategyId: suggestionResult.suggestedStrategyId,
+      strategyParams: suggestionResult.suggestedParameters,
+      symbol: currentBacktestSettings.symbol, // From existing form state
+      startDate: startDate,
+      endDate: endDate,
+      initialCash: initialCapitalForSuggestion, // Use the capital from the suggestion input
+      sourceApi: 'Binance', // Default for suggested run
+      interval: '1d',       // Default for suggested run
+    };
+
+    logger.info('[ApplyAndRun] Running backtest with suggested settings:', requestBody);
+    setIsLoading(true); // Main loading indicator
+    setBacktestResult(null);
+    setError(null); // Main error display
+
+    try {
+      const response = await axios.post<BacktestResult>('/api/backtest', requestBody);
+      setBacktestResult(response.data);
+      logger.info('[ApplyAndRun] Backtest with suggestion successful:', response.data);
+    } catch (err) {
+      const axiosError = err as AxiosError<ApiError>;
+      const errorMessage = axiosError.response?.data?.message || axiosError.message || 'An unknown error occurred.';
+      setError(errorMessage); // Main error display
+      logger.error('[ApplyAndRun] Backtest with suggestion failed:', axiosError);
+    } finally {
+      setIsLoading(false); // Main loading indicator
+    }
+  };
+
+  // Handler for "Appliquer aux Paramètres"
+  const handleApplySuggestionToConfig = () => {
+    if (!suggestionResult || !suggestionResult.suggestedStrategyId || !suggestionResult.suggestedParameters) {
+      setSuggestionError("Aucune suggestion valide à appliquer."); // French
+      logger.warn('[ApplyToConfig] No valid suggestion to apply.');
+      return;
+    }
+
+    const strategyToApply = availableStrategies.find(s => s.id === suggestionResult.suggestedStrategyId);
+    if (!strategyToApply) {
+      logger.error(`[ApplyToConfig] Suggested strategy ID '${suggestionResult.suggestedStrategyId}' not found in available strategies list.`);
+      setSuggestionError("Erreur : La stratégie suggérée est introuvable dans la liste des stratégies disponibles."); // French
+      return;
+    }
+
+    // Update main form states
+    // Calling handleStrategySelect will also reset params to defaults, so call setCurrentStrategyParams after.
+    handleStrategySelect(strategyToApply); // This calls setSelectedStrategy and sets default params
+    setCurrentStrategyParams(suggestionResult.suggestedParameters); // Override with suggested params
+
+    setCurrentBacktestSettings(prevSettings => ({
+      ...prevSettings,
+      initialCash: initialCapitalForSuggestion, // Use capital from suggestion input
+      // Keep other settings like symbol, dates, interval, sourceApi from the main form
+    }));
+
+    // Clear previous backtest results and errors as settings have changed
+    setBacktestResult(null);
+    setError(null);
+    // Provide user feedback
+    // Consider a more subtle notification system for this in the future.
+    // For now, reusing suggestionError to display a success/info message.
+    setSuggestionError("Suggestion appliquée aux formulaires de configuration principaux. Veuillez vérifier et lancer le backtest manuellement."); // French
+    logger.info(`[ApplyToConfig] Applied suggestion: Strategy '${strategyToApply.name}', Params:`, suggestionResult.suggestedParameters, `InitialCash: ${initialCapitalForSuggestion}`);
+  };
+
+
   return (
     <div className="backtest-runner-page">
       <h2>Backtest Configuration</h2>
+
+      {/* Section for Smart Strategy Suggestion */}
+      <div className="backtest-section suggestion-section">
+        <h4>Suggestion de Stratégie Intelligente</h4>
+        <div className="form-group">
+          <label htmlFor="initialCapitalForSuggestion">Capital Initial pour Suggestion :</label>
+          <input
+            type="number"
+            id="initialCapitalForSuggestion"
+            name="initialCapitalForSuggestion"
+            value={initialCapitalForSuggestion}
+            onChange={(e) => setInitialCapitalForSuggestion(parseFloat(e.target.value) || 0)}
+            min="1"
+          />
+        </div>
+        <button onClick={handleGetSuggestion} disabled={isFetchingSuggestion || !currentBacktestSettings.symbol}>
+          {isFetchingSuggestion ? 'Recherche de suggestion en cours...' : 'Obtenir une Suggestion de Stratégie'}
+        </button>
+
+        {isFetchingSuggestion && <p>Recherche de suggestion en cours...</p>}
+        {suggestionError && <p className="error-message" style={{ marginTop: '10px' }}>Erreur de suggestion : {suggestionError}</p>}
+        {suggestionResult && !isFetchingSuggestion && (
+          <div className="suggestion-result info-box-styled" style={{ marginTop: '10px' }}>
+            <p><strong>Détails de la Suggestion :</strong></p>
+            {/* Display backend message first, as it might explain why no strategy was chosen */}
+            <p>{suggestionResult.message}</p>
+
+            {suggestionResult.suggestedStrategyId && suggestionResult.suggestedStrategyName && (
+              <>
+                <p>Stratégie Suggérée : <strong>{suggestionResult.suggestedStrategyName}</strong> (ID: {suggestionResult.suggestedStrategyId})</p>
+
+                {suggestionResult.recentPriceUsed !== undefined && suggestionResult.recentPriceUsed !== null && (
+                  <p style={{ fontStyle: 'italic', fontSize: '0.9em' }}>
+                    Basé sur votre capital de {initialCapitalForSuggestion.toLocaleString()}€ et un prix récent de {suggestionResult.recentPriceUsed.toFixed(2)} pour {currentBacktestSettings.symbol}, le paramètre de taille de transaction (ex: 'tradeAmount') a été ajusté.
+                  </p>
+                )}
+
+                {suggestionResult.suggestedParameters && Object.keys(suggestionResult.suggestedParameters).length > 0 && (
+                  <div>
+                    <p>Paramètres Suggérés :</p>
+                    <ul>
+                      {Object.entries(suggestionResult.suggestedParameters).map(([key, value]) => (
+                        <li key={key}><code>{key}</code>: {String(value)}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <button onClick={handleApplyAndRunSuggestion} disabled={isLoading} style={{ marginTop: '10px' }}>
+                  Appliquer et Lancer le Backtest avec la Suggestion
+                </button>
+                <button onClick={handleApplySuggestionToConfig} disabled={!suggestionResult || !suggestionResult.suggestedStrategyId} style={{ marginTop: '10px', marginLeft: '10px' }}>
+                  Appliquer aux Paramètres
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
       
       <div className="backtest-section config-section">
-        <StrategySelector onStrategySelect={handleStrategySelect} />
+        <StrategySelector
+          strategies={availableStrategies} // Pass fetched strategies to selector
+          onStrategySelect={handleStrategySelect}
+        />
         <StrategyParameterForm 
           strategy={selectedStrategy} 
           onParamsChange={handleParamsChange}

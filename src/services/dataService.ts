@@ -275,6 +275,70 @@ async function handleYahooApiErrorAndFetchFallback(symbol: string, apiErrorMsg: 
   }
 }
 
+export async function getMostRecentClosePrice(
+  symbol: string,
+  sourceApiInput?: string,
+  intervalInput?: string
+): Promise<number | null> {
+  const sourceApi = sourceApiInput?.toLowerCase() || 'binance';
+  const interval = intervalInput || '1d';
+  logger.info(`Fetching most recent close price for ${symbol} from ${sourceApi} (${interval})`);
+
+  try {
+    // Attempt 1: Query DB for the most recent record within a recent window.
+    // Query for the last 3 days to catch the latest '1d' point.
+    // queryHistoricalDataFromDB returns data sorted ASC by timestamp.
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(endDate.getDate() - 3); // 3-day window should be enough for daily or common intervals
+
+    const startTimestamp = Math.floor(startDate.getTime() / 1000);
+    const endTimestamp = Math.floor(endDate.getTime() / 1000);
+
+    let recentDbData = queryHistoricalDataFromDB(symbol, startTimestamp, endTimestamp, sourceApi, interval);
+
+    if (recentDbData && recentDbData.length > 0) {
+      const mostRecentRecord = recentDbData[recentDbData.length - 1];
+      logger.info(`Found recent price in DB for ${symbol}: ${mostRecentRecord.close} on ${new Date(mostRecentRecord.timestamp * 1000).toISOString()}`);
+      return mostRecentRecord.close;
+    }
+
+    // Attempt 2: API Fallback if DB is empty for the recent window
+    logger.info(`No recent price in DB for ${symbol} from ${sourceApi} (${interval}), attempting API fetch.`);
+    let apiFetchAttempted = false;
+    if (sourceApi === 'binance') {
+      // fetchBinanceData typically fetches a batch (e.g., 500 points if no range) and stores it.
+      // We are interested in the most recent point after storage.
+      await fetchBinanceData(symbol, interval);
+      apiFetchAttempted = true;
+    } else if (sourceApi === 'yahoofinance') {
+      // fetchYahooFinanceData currently fetches last 7 days and stores it.
+      await fetchYahooFinanceData(symbol);
+      apiFetchAttempted = true;
+    } else {
+      logger.warn(`getMostRecentClosePrice: sourceApi '${sourceApi}' not supported for API fallback.`);
+      // Do not attempt to re-query if no fetch was made
+    }
+
+    if (apiFetchAttempted) {
+      // After fetching, query DB again for the most recent point in the same recent window.
+      recentDbData = queryHistoricalDataFromDB(symbol, startTimestamp, endTimestamp, sourceApi, interval);
+      if (recentDbData && recentDbData.length > 0) {
+        const mostRecentRecord = recentDbData[recentDbData.length - 1];
+        logger.info(`Fetched via API and found recent price for ${symbol}: ${mostRecentRecord.close} on ${new Date(mostRecentRecord.timestamp * 1000).toISOString()}`);
+        return mostRecentRecord.close;
+      }
+    }
+
+    logger.warn(`No price data found for ${symbol} from ${sourceApi} (${interval}) after DB query and API fallback.`);
+    return null;
+
+  } catch (error) {
+    logger.error(`Error in getMostRecentClosePrice for ${symbol} (${sourceApi}, ${interval}):`, error);
+    return null;
+  }
+}
+
 export interface HistoricalDataPoint {
   timestamp: number; date: Date; open: number; high: number; low: number; close: number; volume: number; interval: string; source_api: string; symbol: string;
 }

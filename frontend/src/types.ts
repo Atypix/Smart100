@@ -114,3 +114,12 @@ export interface ApiKeyFormData {
   api_key: string;
   api_secret: string;
 }
+
+// --- AI Strategy Suggestion Service Types ---
+export interface SuggestionResponse {
+  suggestedStrategyId: string | null;
+  suggestedStrategyName: string | null;
+  suggestedParameters: Record<string, any> | null;
+  recentPriceUsed?: number | null;
+  message: string;
+}
