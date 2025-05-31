@@ -8,10 +8,16 @@ import { HistoricalDataPoint } from '../../services/dataService'; // Added for e
 
 // Module-scoped stateful properties
 let currentChoicesBySymbol = new Map<string, string>();
-let optimizedParamsForChoice = new Map<string, { strategyId: string, params: Record<string, any> }>();
+// Updated optimizedParamsForChoice to include evaluation details
+let optimizedParamsForChoice = new Map<string, {
+    strategyId: string,
+    params: Record<string, any>,
+    evaluationScore?: number, // Added
+    evaluationMetric?: string  // Added
+}>();
 let lastAIDecision: AIDecision | null = null;
 
-// Removed local AIDecision interface
+// AIDecision is imported from strategy.types.ts, which should already include evaluationScore and evaluationMetricUsed
 
 interface AISelectorStrategyParams {
   evaluationLookbackPeriod: number;
@@ -351,7 +357,12 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
         paramsToStoreAndExecuteWith = defaultSelectedStrategyParams;
         logger.info(`AISelectorStrategy for ${symbol}: Storing DEFAULT params for ${bestStrategyId} as optimization was off or yielded no improvement.`);
     }
-    optimizedParamsForChoice.set(symbol, { strategyId: bestStrategyId, params: paramsToStoreAndExecuteWith });
+    optimizedParamsForChoice.set(symbol, {
+        strategyId: bestStrategyId,
+        params: paramsToStoreAndExecuteWith,
+        evaluationScore: currentBestMetricValue, // Store score
+        evaluationMetric: metric // Store metric
+    });
     
     const currentBarForDecision = context.historicalData[context.currentIndex];
     lastAIDecision = {
@@ -360,8 +371,8 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
       chosenStrategyId: bestStrategyId,
       chosenStrategyName: finalSelectedStrategy.name,
       parametersUsed: paramsToStoreAndExecuteWith,
-      evaluationScore: currentBestMetricValue,
-      evaluationMetricUsed: metric,
+      evaluationScore: currentBestMetricValue, // This is correctly set for lastAIDecision
+      evaluationMetricUsed: metric, // This is correctly set for lastAIDecision
     };
 
     const strategyContextForExecution: StrategyContext<Record<string, any>> = {
@@ -379,6 +390,8 @@ export interface AISelectorChoiceState {
     chosenStrategyId: string | null;
     chosenStrategyName: string | null;
     parametersUsed: Record<string, any> | null;
+    evaluationScore?: number | null; // Added
+    evaluationMetricUsed?: string | null; // Added
     message?: string;
 }
 
@@ -391,22 +404,29 @@ export function getAISelectorActiveState(symbol: string): AISelectorChoiceState 
             chosenStrategyId: choiceData.strategyId,
             chosenStrategyName: strategyDetails ? strategyDetails.name : "Unknown Strategy",
             parametersUsed: choiceData.params,
+            evaluationScore: choiceData.evaluationScore, // Retrieve score
+            evaluationMetricUsed: choiceData.evaluationMetric, // Retrieve metric
+            message: `Strategy chosen based on ${choiceData.evaluationMetric || 'metric'} with score ${choiceData.evaluationScore?.toFixed(4) || 'N/A'}.`
         };
     }
     
-    const chosenStrategyId = currentChoicesBySymbol.get(symbol);
-    if (chosenStrategyId) {
-        const strategyDetails = StrategyManagerModule.getStrategy(chosenStrategyId);
+    // Fallback to currentChoicesBySymbol (might not have score/metric readily)
+    // This path is less likely if optimizedParamsForChoice is always set after a successful selection.
+    const chosenStrategyIdFromCurrent = currentChoicesBySymbol.get(symbol);
+    if (chosenStrategyIdFromCurrent) {
+        const strategyDetails = StrategyManagerModule.getStrategy(chosenStrategyIdFromCurrent);
         let params: Record<string, any> | null = null;
         if (strategyDetails && strategyDetails.parameters) {
             params = {};
             strategyDetails.parameters.forEach((p: StrategyParameterDefinition) => params![p.name] = p.defaultValue);
         }
         return {
-            chosenStrategyId: chosenStrategyId,
+            chosenStrategyId: chosenStrategyIdFromCurrent,
             chosenStrategyName: strategyDetails ? strategyDetails.name : "Unknown Strategy",
-            parametersUsed: params,
-            message: "Parameters used are defaults; specific optimized/selected params not found in current state."
+            parametersUsed: params, // These would be default params
+            evaluationScore: null, // Not available in this simpler map
+            evaluationMetricUsed: null, // Not available in this simpler map
+            message: "Strategy choice retrieved (default params); detailed evaluation metrics for this specific state might not be available."
         };
     }
 
@@ -414,6 +434,8 @@ export function getAISelectorActiveState(symbol: string): AISelectorChoiceState 
         chosenStrategyId: null,
         chosenStrategyName: null,
         parametersUsed: null,
-        message: "No strategy choice has been made for this symbol yet."
+        evaluationScore: null,
+        evaluationMetricUsed: null,
+        message: "No strategy choice has been made for this symbol yet, or previous choice data is incomplete."
     };
 }

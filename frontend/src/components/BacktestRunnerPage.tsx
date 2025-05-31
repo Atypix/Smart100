@@ -48,6 +48,7 @@ const BacktestRunnerPage: React.FC = () => {
 
   // State for Smart Strategy Suggestion Feature
   const [initialCapitalForSuggestion, setInitialCapitalForSuggestion] = useState<number>(10000); // Default capital for suggestion
+  const [riskPercentageForSuggestion, setRiskPercentageForSuggestion] = useState<number>(20); // Default to 20%
   const [suggestionResult, setSuggestionResult] = useState<SuggestionResponse | null>(null);
   const [isFetchingSuggestion, setIsFetchingSuggestion] = useState<boolean>(false);
   const [suggestionError, setSuggestionError] = useState<string | null>(null); // For suggestion fetching errors
@@ -196,9 +197,11 @@ const BacktestRunnerPage: React.FC = () => {
     try {
       const result = await fetchStrategySuggestion(
         currentBacktestSettings.symbol,
-        initialCapitalForSuggestion
-        // TODO: Optionally pass preferredLookback, preferredMetric, preferredOptimizeParams
-        // if UI controls are added for them for the suggestion feature.
+        initialCapitalForSuggestion,
+        undefined, // lookbackPeriod - placeholder for future UI
+        undefined, // evaluationMetric - placeholder for future UI
+        undefined, // optimizeParameters - placeholder for future UI
+        riskPercentageForSuggestion // Pass the new state value
       );
       setSuggestionResult(result);
       if (!result.suggestedStrategyId) {
@@ -312,6 +315,27 @@ const BacktestRunnerPage: React.FC = () => {
             min="1"
           />
         </div>
+        <div className="form-group">
+          <label htmlFor="riskPercentageForSuggestion">Pourcentage du capital par transaction (%):</label>
+          <input
+            type="number"
+            id="riskPercentageForSuggestion"
+            name="riskPercentageForSuggestion"
+            value={riskPercentageForSuggestion}
+            onChange={(e) => {
+              const value = parseInt(e.target.value, 10);
+              if (e.target.value === "") {
+                setRiskPercentageForSuggestion(1); // Or some other default like 0, or handle as string if needed
+              } else if (value >= 1 && value <= 100) {
+                setRiskPercentageForSuggestion(value);
+              }
+              // Optionally, provide feedback if value is outside 1-100 and not empty
+            }}
+            min="1"
+            max="100"
+            step="1"
+          />
+        </div>
         <button onClick={handleGetSuggestion} disabled={isFetchingSuggestion || !currentBacktestSettings.symbol}>
           {isFetchingSuggestion ? 'Recherche de suggestion en cours...' : 'Obtenir une Suggestion de Stratégie'}
         </button>
@@ -328,9 +352,23 @@ const BacktestRunnerPage: React.FC = () => {
               <>
                 <p>Stratégie Suggérée : <strong>{suggestionResult.suggestedStrategyName}</strong> (ID: {suggestionResult.suggestedStrategyId})</p>
 
-                {suggestionResult.recentPriceUsed !== undefined && suggestionResult.recentPriceUsed !== null && (
+                {suggestionResult.evaluationMetricUsed && (
+                  <p>
+                    <strong>Métrique d'Évaluation Utilisée :</strong> {suggestionResult.evaluationMetricUsed}
+                  </p>
+                )}
+                {typeof suggestionResult.evaluationScore === 'number' && (
+                  <p>
+                    <strong>Score d'Évaluation :</strong> {suggestionResult.evaluationScore.toFixed(4)}
+                  </p>
+                )}
+
+                {suggestionResult.suggestedStrategyId && typeof suggestionResult.recentPriceUsed === 'number' && (
                   <p style={{ fontStyle: 'italic', fontSize: '0.9em' }}>
-                    Basé sur votre capital de {initialCapitalForSuggestion.toLocaleString()}€ et un prix récent de {suggestionResult.recentPriceUsed.toFixed(2)} pour {currentBacktestSettings.symbol}, le paramètre de taille de transaction (ex: 'tradeAmount') a été ajusté.
+                    Basé sur votre capital de {initialCapitalForSuggestion.toLocaleString()}€,
+                    un pourcentage de risque par transaction de {riskPercentageForSuggestion}%,
+                    et un prix récent de {suggestionResult.recentPriceUsed.toFixed(2)} pour {currentBacktestSettings.symbol},
+                    le paramètre de taille de transaction (ex: 'tradeAmount') a été ajusté.
                   </p>
                 )}
 
