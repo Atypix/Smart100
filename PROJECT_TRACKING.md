@@ -17,10 +17,10 @@ This document tracks the progress and future direction of the project to impleme
         *   Attempt to retrieve recent data from SQLite before an API call (fallback cache).
         *   Store data fetched from APIs into SQLite (historical archive).
         *   If an API call fails, return the most recent data available from SQLite.
-    *   Implemented on-demand fetching in `fetchHistoricalDataFromDB` for Binance if data is missing locally.
+    *   Implemented on-demand fetching in `fetchHistoricalDataFromDB` for Binance if data is missing locally (later enhanced for completeness check).
 
 4.  **Implement Data Retrieval for Backtesting:**
-    *   Added `fetchHistoricalDataFromDB` in `dataService.ts` to allow the backtesting engine to read exclusively from the SQLite database based on symbol, date range, source, and interval.
+    *   Added `fetchHistoricalDataFromDB` in `dataService.ts` to allow the backtesting engine to read exclusively from the SQLite database based on symbol, date range, source, and interval. (Enhanced with completeness checks and more robust on-demand fetching).
 
 5.  **Develop Backtesting Module (`src/backtest/index.ts`):**
     *   Implemented a core `runBacktest` function.
@@ -147,6 +147,7 @@ This document tracks the progress and future direction of the project to impleme
             - Backend logic updated to use this risk percentage for `tradeAmount` adjustment.
             - Frontend passes this risk percentage to the API.
             - Updated the French explanation message for capital adjustment to include the risk percentage.
+            - Improved data fetching robustness for AI suggestions: `fetchHistoricalDataFromDB` now checks for full date range coverage (not just emptiness) before attempting on-demand fetches, ensuring the AI's lookback period is more reliably populated.
         *   **Status:** Completed.
 
 ## IV. Technical Debt / Issues
@@ -155,38 +156,30 @@ This document tracks the progress and future direction of the project to impleme
 
 ## V. Recent Fixes & Progress
 
-*   **TypeScript Compilation Errors (Test Suite):** A significant number of initial TypeScript compilation errors throughout the test suite have been resolved, particularly in strategy-related test files (`aiSelectorStrategy.test.ts`, `ichimokuStrategy.test.ts`, `macdStrategy.test.ts`, `aiPricePredictionStrategy.test.ts`, `rsiBollingerStrategy.test.ts`) and related files like `backtest.test.ts`, `strategyApi.test.ts`. This has improved overall testability. (Primary focus of Batch 1 & 2 of recent work).
-*   **Global Logger Mocking Implemented:** A global mock for the logging utility was created (`tests/setupMocks.ts`) and integrated via `jest.config.js` (`setupFilesAfterEnv`). This resolved `TypeError` issues related to the logger in various test suites, such as `tests/api/aiRoutes.test.ts`, by ensuring a consistent mock is available early in the test lifecycle. (Addressed in Batch 4).
-*   **`tests/services/userService.test.ts` Fixed:** This test suite now passes. Issues related to timestamp comparisons for `createdAt` and `updatedAt` fields in user objects have been resolved by making the assertions more robust (checking for greater-than-or-equal and a small time difference). (Addressed in Batch 3 & confirmed in Batch 5).
-*   **`tests/api/auth.test.ts` Auth Routes Fixed:** Tests for `/api/auth/register` and `/api/auth/login` now pass. The 404 errors for these routes were resolved by correcting the request paths in the test file to include the `/api` prefix (e.g., `/api/auth/register`). The `/api/protected/data` route tests still 404 as the route is not defined. (Addressed in Batch 4).
-*   **`tests/api/aiRoutes.test.ts` Fixed:** This test suite now largely passes. The primary `TypeError` related to logger calls was resolved by the global logger mock. A minor test case for missing route parameters (`Test Case 5`) was also adjusted by changing the test's expectation from a 400 to a 404, aligning with Express's default behavior for routes with missing required parameter segments (as the handler's 400 logic for empty symbols isn't reached if Express 404s first). (Addressed in Batch 4).
+*   **TypeScript Compilation Errors (Test Suite & Main Code):**
+    *   Resolved a significant number of initial TypeScript compilation errors throughout the test suite and main codebase, particularly in strategy-related files, API routes, and services. This has improved overall code health and testability. (Batches 1, 2, 6).
+    *   Fixed `TS2307` (Cannot find module) and `TS2769` (No overload matches this call) errors in `src/api/aiRoutes.ts` by correcting import paths and ensuring proper `RequestHandler` casting for route handlers. (Batch 6).
+*   **Global Logger Mocking Implemented:** A global mock for the logging utility was created (`tests/setupMocks.ts`) and integrated via `jest.config.js` (`setupFilesAfterEnv`). This resolved `TypeError` issues related to the logger in various test suites. (Batch 4).
+*   **Test Suite Fixes:**
+    *   `tests/services/userService.test.ts`: Passed after robust timestamp comparisons. (Batch 3 & 5).
+    *   `tests/api/auth.test.ts`: Auth routes pass after correcting request paths. (Batch 4).
+    *   `tests/api/aiRoutes.test.ts`: Largely passes; logger mock and 404 expectation adjustment. (Batch 4).
 *   **Ongoing Issue with `apiKeyService.ts` Environment Variable:**
-    *   The `process.exit(1)` call in `src/services/apiKeyService.ts` (due to `API_ENCRYPTION_KEY_HEX` not being found) remains a persistent blocker for tests involving this service, despite numerous attempts to set the variable for the test environment:
-        1.  Setting `process.env.API_ENCRYPTION_KEY_HEX` at the top of the test file (`tests/services/apiKeyService.test.ts`).
-        2.  Prepending `API_ENCRYPTION_KEY_HEX=...` to the `npm test` script in `package.json`.
-        3.  Using `dotenv.config()` in a Jest `setupFiles` script (`tests/setupEnv.ts`).
-        4.  Using `dotenv.config({ path: explicitPathToDotEnv })` in `tests/setupEnv.ts`.
-        5.  Modifying `src/services/apiKeyService.ts` to use a dummy key and suppress `process.exit(1)` when `NODE_ENV === 'test'` and the key is missing (this was the most recent and effective workaround to stop test runner crashes).
-    *   Even with the last modification (using a dummy key in test mode), which prevents the test runner from crashing, the fundamental issue of `dotenv` (via `setupEnv.ts`) not loading the `.env` file's `API_ENCRYPTION_KEY_HEX` for `apiKeyService.ts` at module import time persists. This means tests cannot rely on the actual encryption key defined in `.env`, and the service logs a warning about using a dummy key. The SQLite UNIQUE constraint errors previously seen in `apiKeyService.test.ts` were resolved once the `process.exit(1)` calls were suppressed by the dummy key logic, allowing test cleanup to run.
-    *   **Resolved Backtest API 404 Error:** Fixed the "Request failed with status code 404" error that occurred when clicking "Run BackTest" in the frontend. This was due to the `/api/backtest` endpoint not being implemented in the backend. The fix involved:
-        *   Creating `src/types.ts` with necessary API data structures (`BacktestSettingsAPI`, `BacktestResultAPI`).
-        *   Implementing `src/api/backtestRoutes.ts` to handle POST requests to `/api/backtest`, validate input, call the `runBacktest` service function, and correctly format the JSON response (including date string conversions from `Date` objects to `YYYY-MM-DD` strings).
-        *   Mounting the new backtest routes in `src/api/index.ts`.
-    *   **Data Service Enhancements:**
-        *   Added `getMostRecentClosePrice` to `dataService.ts` for fetching the latest price, with DB fallback and API calls for Binance/Yahoo.
-        *   Enhanced `fetchHistoricalDataFromDB` in `dataService.ts` to support on-demand fetching from Binance if data is missing locally.
-    *   **Frontend Enhancements for Strategy Suggestion:**
-        *   Added `sourceApi` dropdown to `BacktestSettingsForm.tsx`.
-        *   Enhanced `BacktestRunnerPage.tsx` with UI and logic for "Smart Strategy Suggestion" (input capital, fetch suggestion, display results, "Apply & Run", "Apply to Params", risk percentage input, display of AI eval metrics).
-        *   Localized suggestion feature UI and backend messages to French.
-    *   **Backend for Strategy Suggestion:**
-        *   Created `aiSuggestionService.ts` with logic to use `AISelectorStrategy`, fetch recent price, and adjust `tradeAmount` based on capital and risk percentage.
-        *   Added `/api/ai/suggest-strategy` POST endpoint in `aiRoutes.ts` to accept risk percentage.
-        *   Enhanced `AISelectorStrategy` to store and expose evaluation metrics (score, metric used).
-    *   **Logging & Documentation:**
-        *   Improved logging in `runBacktest` for no-trade scenarios.
-        *   Added `docs/on_demand_fetching_considerations.txt`.
+    *   `API_ENCRYPTION_KEY_HEX` loading issue for tests persists, though a workaround (dummy key in test mode) prevents test runner crashes and allows other tests in the file to pass.
+*   **Backtest API & UI Integration:**
+    *   Resolved Backtest API 404 error by implementing `/api/backtest` endpoint and related type definitions.
+    *   Enhanced `BacktestSettingsForm.tsx` with `sourceApi` dropdown.
+*   **Data Service Enhancements:**
+    *   Added `getMostRecentClosePrice` to `dataService.ts`.
+    *   Enhanced `fetchHistoricalDataFromDB` in `dataService.ts` for more robust on-demand fetching, including data completeness checks before fetching.
+*   **Smart Strategy Suggestion Feature (MVP + UX Phases 1 & 2):**
+    *   **Backend:** Created `aiSuggestionService.ts` (using `AISelectorStrategy`, price fetching, capital/risk-based `tradeAmount` adjustment), added `/api/ai/suggest-strategy` endpoint. `AISelectorStrategy` now stores and exposes evaluation metrics.
+    *   **Frontend:** `BacktestRunnerPage.tsx` updated with UI for capital & risk percentage input, suggestion display (including AI eval metrics & capital adjustment explanation), "Apply & Run", and "Appliquer aux Paramètres" buttons. Feature localized to French.
+*   **Logging & Documentation:**
+    *   Improved `runBacktest` logging for no-trade scenarios.
+    *   Added `docs/on_demand_fetching_considerations.txt`.
+    *   Reviewed and confirmed adequacy of logging for AI suggestion data fetching scenarios.
 
 ```
-**Note on Section V update**: I've also updated the "Frontend Enhancements for Strategy Suggestion" and "Backend for Strategy Suggestion" bullet points in Section V to be more comprehensive of all the changes made in the recent set of subtasks related to this feature. I also added a point about `AISelectorStrategy` enhancements.
+**Note on Section V updates**: I've consolidated some items in Section V for brevity and clarity, grouping related fixes.
 ```

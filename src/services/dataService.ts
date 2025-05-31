@@ -351,36 +351,59 @@ export async function fetchHistoricalDataFromDB(
   logger.info(`Fetching historical data from DB for ${symbol}`, { startDate, endDate, source_api, interval, startTimestamp, endTimestamp });
   try {
     let rawData: FinancialData[] = queryHistoricalDataFromDB(symbol, startTimestamp, endTimestamp, source_api, interval);
+    logger.info(`[DataService] Initial DB query for ${symbol} (${source_api}/${interval}) from ${startDate.toISOString()} to ${endDate.toISOString()} found ${rawData.length} records.`);
 
-    // If no data found in DB, try to fetch from source API if specified
-    if ((!rawData || rawData.length === 0) && source_api && interval) {
-      logger.info(`No historical data found in DB for ${symbol} (source: ${source_api}, interval: ${interval}) for the range ${startDate.toISOString()} to ${endDate.toISOString()}. Attempting to fetch from source API...`);
+    const dataIsPresent = rawData && rawData.length > 0;
+    // Note: queryHistoricalDataFromDB sorts by timestamp ASC.
+    const coversStartDate = dataIsPresent && rawData[0].timestamp <= startTimestamp;
+    // For coversEndDate, we need to be careful if interval is e.g. daily.
+    // The last data point's timestamp should be on or after the start of the endDate's day.
+    // A simple >= endTimestamp check might be too strict if endTimestamp is end of day.
+    // For daily data, if last point's date is same or after endDate's date, it's likely covered.
+    // For simplicity now, using a direct comparison, but this might need refinement for different intervals.
+    const coversEndDate = dataIsPresent && rawData[rawData.length - 1].timestamp >= endTimestamp;
+
+    // A simple sufficiency check for now: are the start and end of the requested range covered?
+    // This does not check for internal gaps.
+    const isDataSufficient = dataIsPresent && coversStartDate && coversEndDate;
+
+    if (!isDataSufficient && source_api && interval) {
+      logger.warn(`[DataService] Existing data for ${symbol} (${source_api}/${interval}) is insufficient or incomplete for the range ${startDate.toISOString()} to ${endDate.toISOString()}. (Present: ${dataIsPresent}, CoversStart: ${coversStartDate}, CoversEnd: ${coversEndDate}). Attempting to fetch entire range.`);
+
       const sourceApiLower = source_api.toLowerCase();
-
-      if (sourceApiLower === 'binance') {
-        try {
-          logger.info(`Attempting to fetch data from Binance for ${symbol}, interval ${interval}, from ${startDate.toISOString()} to ${endDate.toISOString()}.`);
-          // fetchBinanceData expects timestamps in milliseconds for startTime and endTime
+      try {
+        if (sourceApiLower === 'binance') {
+          logger.info(`[DataService] Fetching from Binance for ${symbol}, interval ${interval}, from ${startDate.toISOString()} to ${endDate.toISOString()}`);
           await fetchBinanceData(symbol, interval, startDate.getTime(), endDate.getTime());
-          // Re-query the database after attempting to fetch and store data
-          rawData = queryHistoricalDataFromDB(symbol, startTimestamp, endTimestamp, source_api, interval);
-          logger.info(`Data fetched from Binance and re-queried from DB. Found ${rawData.length} records for ${symbol}.`);
-        } catch (fetchError) {
-          logger.error(`Error fetching data from Binance for ${symbol} during on-demand fetch:`, fetchError);
-          // Proceed with potentially empty rawData, error is logged.
+        } else if (sourceApiLower === 'yahoofinance') {
+          logger.warn(`[DataService] On-demand ranged fetch for YahooFinance for ${symbol} needs review/implementation for full range. Attempting standard fetch which might not cover the full range.`);
+          // Current fetchYahooFinanceData fetches last ~7 days.
+          // To make it fetch the required range, fetchYahooFinanceData itself would need modification.
+          await fetchYahooFinanceData(symbol); // This will fetch recent, not necessarily the full requested range.
+        } else if (sourceApiLower === 'alphavantage') {
+            logger.warn(`[DataService] On-demand fetching for AlphaVantage for ${symbol} is not supported for backfill in this flow due to API limitations.`);
+        } else {
+          logger.warn(`[DataService] On-demand fetching for sourceApi '${source_api}' is not supported for arbitrary ranges or not implemented.`);
         }
-      } else if (sourceApiLower === 'yahoofinance') {
-        // TODO: Implement Yahoo Finance ranged fetch and integrate here
-        logger.warn(`On-demand fetching for YahooFinance for a specific range is not yet fully implemented in this flow. DB data (if any) will be used.`);
-      } else if (sourceApiLower === 'alphavantage') {
-        logger.warn(`On-demand fetching for AlphaVantage is not supported for backfill in this flow due to API limitations. DB data (if any) will be used.`);
-      } else {
-        logger.warn(`Unsupported sourceApi '${source_api}' for on-demand fetching. DB data (if any) will be used.`);
+
+        // Re-query after attempting fetch, only if a fetch was relevant for the source
+        if (sourceApiLower === 'binance' || sourceApiLower === 'yahoofinance') {
+            logger.info(`[DataService] Re-querying DB for ${symbol} (${source_api}/${interval}) after fetch attempt.`);
+            rawData = queryHistoricalDataFromDB(symbol, startTimestamp, endTimestamp, source_api, interval);
+            logger.info(`[DataService] Found ${rawData.length} records for ${symbol} after fetch and re-query.`);
+        }
+      } catch (fetchError) {
+        logger.error(`[DataService] Error during on-demand fetch for ${symbol} (${source_api}):`, fetchError);
+        // rawData remains as it was from the first query (potentially insufficient)
       }
+    } else if (isDataSufficient) {
+      logger.info(`[DataService] Existing data for ${symbol} (${source_api}/${interval}) from ${startDate.toISOString()} to ${endDate.toISOString()} is considered sufficient. Found ${rawData.length} records.`);
+    } else {
+      logger.info(`[DataService] Data for ${symbol} (${source_api}/${interval}) from ${startDate.toISOString()} to ${endDate.toISOString()} was not fetched on-demand (source_api or interval missing, or data was present but still insufficient without a fetch rule).`);
     }
 
     if (!rawData || rawData.length === 0) {
-      logger.info(`No historical data found in DB for ${symbol} with the given criteria after potential fetch attempt.`);
+      logger.warn(`[DataService] No historical data found in DB for ${symbol} (${source_api}/${interval}) for the range ${startDate.toISOString()} to ${endDate.toISOString()} after all attempts.`);
       return [];
     }
 
