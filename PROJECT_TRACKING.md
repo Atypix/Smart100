@@ -17,6 +17,7 @@ This document tracks the progress and future direction of the project to impleme
         *   Attempt to retrieve recent data from SQLite before an API call (fallback cache).
         *   Store data fetched from APIs into SQLite (historical archive).
         *   If an API call fails, return the most recent data available from SQLite.
+    *   Implemented on-demand fetching in `fetchHistoricalDataFromDB` for Binance if data is missing locally.
 
 4.  **Implement Data Retrieval for Backtesting:**
     *   Added `fetchHistoricalDataFromDB` in `dataService.ts` to allow the backtesting engine to read exclusively from the SQLite database based on symbol, date range, source, and interval.
@@ -25,6 +26,7 @@ This document tracks the progress and future direction of the project to impleme
     *   Implemented a core `runBacktest` function.
     *   Defined interfaces for strategies, portfolio management, trades, and backtest results.
     *   Included a `simpleThresholdStrategy` as an initial example strategy.
+    *   Enhanced logging for backtest completion, with specific messages for no-trade scenarios.
 
 6.  **Add Binance API Integration (Optional - Future Step):**
     *   (Skipped for now, can be revisited)
@@ -48,17 +50,6 @@ This document tracks the progress and future direction of the project to impleme
         *   Developed `ichimokuCloudStrategy` in `src/strategies/implementations/ichimokuStrategy.ts`, including manual calculation of Ichimoku components.
         *   Registered the strategy with the `StrategyManager`.
         *   Added unit tests for the `ichimokuCloudStrategy` logic.
-    *   **Implement JSON-based Backtest Configuration:**
-        *   Created `backtestConfig.json` in the project root to define multiple backtest scenarios.
-        *   Developed `src/executeBacktestFromJson.ts` script to read the JSON config, execute backtests, and log results.
-        *   Added an `npm run backtest:json` script to `package.json`.
-    *   **Develop Web UI for Strategy Configuration & Backtesting (React, Vite):**
-        *   Set up a new React + TypeScript frontend application in the `/frontend` directory using Vite.
-        *   Implemented core UI components (`StrategySelector`, `StrategyParameterForm`, `BacktestSettingsForm`, `ResultsDisplay`, `BacktestRunnerPage`).
-        *   Developed backend API endpoints (`GET /api/strategies`, `POST /api/backtest`) to support the UI.
-        *   Added basic CSS styling and UX improvements for the frontend.
-        *   Included unit/integration tests for the new API endpoints and key frontend components.
-
     *   **Implement JSON-based Backtest Configuration:**
         *   Created `backtestConfig.json` in the project root to define multiple backtest scenarios.
         *   Developed `src/executeBacktestFromJson.ts` script to read the JSON config, execute backtests, and log results.
@@ -114,8 +105,9 @@ This document tracks the progress and future direction of the project to impleme
 *   Updated this `PROJECT_TRACKING.md` file to reflect completed items and new future ideas.
 *   Added general guidance on deployment (including considerations for AWS) to `README.md`.
 *   Code review and backend routing refactor: Standardized all backend API endpoints under the `/api` prefix for consistency. Cleaned up minor frontend code issues. Updated `README.md` to reflect these changes and ensure accuracy of documented API endpoints and available strategies.
+*   Documented considerations for the on-demand data fetching feature in `docs/on_demand_fetching_considerations.txt`.
 
-## III. Future Development Ideas
+## III. Future Development Ideas & Recently Completed Phases
 
 *   **Advanced Strategies:** Develop and integrate more sophisticated trading strategies (e.g., RSI + Bollinger Bands, MACD-based).
 *   **Configuration Enhancements:**
@@ -136,11 +128,17 @@ This document tracks the progress and future direction of the project to impleme
 *   **Enhance `AISelectorStrategy`:** Improve with more sophisticated evaluation metrics (e.g., Sharpe ratio over lookback, risk-adjusted returns) or even lightweight machine learning models for selection if performance allows. Consider allowing the AI Selector to use non-default parameters for candidate strategies during its evaluation phase.
 *   **Smart Strategy Suggestion Feature:**
     *   **Goal:** Allow users to get an AI-powered suggestion for a trading strategy and capital-adjusted parameters (especially `tradeAmount`) based on a chosen symbol and their initial capital. Aim for a "2-click" style interaction to run a backtest with this suggestion.
-    *   **Core Components:**
-        *   Frontend: UI for inputting symbol/capital, displaying suggestions, and triggering a backtest with suggested settings.
-        *   Backend: A new API endpoint (e.g., `/api/ai/suggest-strategy`).
-        *   Backend: A new service that leverages the existing `AISelectorStrategy` for base strategy/parameter selection, then fetches the recent price of the symbol, and adjusts the `tradeAmount` parameter for affordability based on the user's capital.
-    *   **Status:** Planned
+    *   **Core Components (MVP):**
+        *   Frontend: UI for inputting symbol/capital, displaying suggestions, triggering a backtest with suggested settings (including "Apply & Run" and "Apply to Main Config" buttons).
+        *   Backend: A new API endpoint (`/api/ai/suggest-strategy`).
+        *   Backend: A new service (`aiSuggestionService.ts`) that leverages `AISelectorStrategy`, fetches recent price via `getMostRecentClosePrice`, and adjusts `tradeAmount`.
+    *   **Status:** Phase 1 (MVP) Completed.
+    *   **UX Enhancements (Phase 1):**
+        *   **Description:** Improved user experience for the strategy suggestion feature, including:
+            - An 'Appliquer aux Paramètres' (Apply to Main Config) button to load suggestions into the main form.
+            - Enhanced clarity in the suggestion display with more contextual information (e.g., capital adjustment explanation).
+            - Frontend UI text and backend messages for this feature localized to French.
+        *   **Status:** Completed.
 
 ## IV. Technical Debt / Issues
 
@@ -165,3 +163,21 @@ This document tracks the progress and future direction of the project to impleme
         *   Creating `src/types.ts` with necessary API data structures (`BacktestSettingsAPI`, `BacktestResultAPI`).
         *   Implementing `src/api/backtestRoutes.ts` to handle POST requests to `/api/backtest`, validate input, call the `runBacktest` service function, and correctly format the JSON response (including date string conversions from `Date` objects to `YYYY-MM-DD` strings).
         *   Mounting the new backtest routes in `src/api/index.ts`.
+    *   **Data Service Enhancements:**
+        *   Added `getMostRecentClosePrice` to `dataService.ts` for fetching the latest price, with DB fallback and API calls for Binance/Yahoo.
+        *   Enhanced `fetchHistoricalDataFromDB` in `dataService.ts` to support on-demand fetching from Binance if data is missing locally.
+    *   **Frontend Enhancements for Strategy Suggestion:**
+        *   Added `sourceApi` dropdown to `BacktestSettingsForm.tsx`.
+        *   Enhanced `BacktestRunnerPage.tsx` with UI and logic for "Smart Strategy Suggestion" (input capital, fetch suggestion, display results, "Apply & Run", "Apply to Params").
+        *   Localized suggestion feature UI and backend messages to French.
+    *   **Backend for Strategy Suggestion:**
+        *   Created `aiSuggestionService.ts` with logic to use `AISelectorStrategy`, fetch recent price, and adjust `tradeAmount`.
+        *   Added `/api/ai/suggest-strategy` POST endpoint in `aiRoutes.ts`.
+    *   **Logging & Documentation:**
+        *   Improved logging in `runBacktest` for no-trade scenarios.
+        *   Added `docs/on_demand_fetching_considerations.txt`.
+
+```
+**Structure Change in Section III**:
+I've also slightly restructured section "III. Future Development Ideas" to "III. Future Development Ideas & Recently Completed Phases" to better accommodate noting these phased completions without moving them entirely out of the "future ideas" context if more phases are planned. I also added a summary of other recent work under section V for better tracking.
+```

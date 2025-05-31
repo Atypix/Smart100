@@ -51,7 +51,7 @@ export async function getCapitalAwareStrategySuggestion(
         suggestedStrategyId: null,
         suggestedStrategyName: null,
         suggestedParameters: null,
-        message: `Insufficient historical data (${historicalDataForAI?.length} points) for ${symbol} to make a reliable suggestion (requires ${lookbackPeriod} evaluation points).`
+        message: `Données historiques insuffisantes (${historicalDataForAI?.length} points) pour ${symbol} pour faire une suggestion fiable (nécessite ${lookbackPeriod} points d'évaluation).`
       };
     }
     logger.info(`[AISuggestionService] Fetched ${historicalDataForAI.length} data points for AI evaluation of ${symbol}.`);
@@ -61,7 +61,7 @@ export async function getCapitalAwareStrategySuggestion(
         suggestedStrategyId: null,
         suggestedStrategyName: null,
         suggestedParameters: null,
-        message: "Error fetching historical data needed for generating suggestion."
+        message: "Erreur lors de la récupération des données historiques nécessaires à la suggestion."
     };
   }
 
@@ -97,7 +97,7 @@ export async function getCapitalAwareStrategySuggestion(
         suggestedStrategyId: null,
         suggestedStrategyName: null,
         suggestedParameters: null,
-        message: aiChoice?.message || "AI could not select a suitable strategy based on current market conditions."
+        message: aiChoice?.message || "L'IA n'a pas pu sélectionner de stratégie adaptée aux conditions actuelles du marché."
       };
     }
 
@@ -111,7 +111,7 @@ export async function getCapitalAwareStrategySuggestion(
             suggestedStrategyId: null,
             suggestedStrategyName: null,
             suggestedParameters: null,
-            message: `Internal error: Details for suggested strategy ID '${aiChoice.chosenStrategyId}' not found.`
+            message: `Erreur interne : Les détails pour l'ID de stratégie suggéré '${aiChoice.chosenStrategyId}' n'ont pas été trouvés.`
         };
     }
 
@@ -125,7 +125,7 @@ export async function getCapitalAwareStrategySuggestion(
         suggestedStrategyName: strategyDetails.name, // Use name from strategyDetails for consistency
         suggestedParameters,
         recentPriceUsed: null,
-        message: "Strategy suggested, but could not fetch recent price to adjust tradeAmount. Using default/optimized tradeAmount."
+        message: "Stratégie suggérée, mais impossible de récupérer le prix récent pour ajuster le 'tradeAmount'. Le 'tradeAmount' par défaut/optimisé est utilisé."
       };
     }
     logger.info(`[AISuggestionService] Recent price for ${symbol} is ${recentPrice}. Initial capital ${initialCapital}.`);
@@ -159,7 +159,7 @@ export async function getCapitalAwareStrategySuggestion(
                     suggestedStrategyName: strategyDetails.name,
                     suggestedParameters, // Return original/optimized params before adjustment
                     recentPriceUsed: recentPrice,
-                    message: `Capital ${initialCapital} is too low to trade even a minimum amount of ${symbol} at price ${recentPrice}. Original suggested parameters kept.`
+                    message: `Le capital de ${initialCapital}€ est trop bas pour échanger même une quantité minimale de ${symbol} au prix de ${recentPrice}. Les paramètres suggérés d'origine sont conservés.`
                 };
             }
         }
@@ -176,7 +176,7 @@ export async function getCapitalAwareStrategySuggestion(
                     suggestedStrategyName: strategyDetails.name,
                     suggestedParameters,
                     recentPriceUsed: recentPrice,
-                    message: `Capital ${initialCapital} is too low to trade even 1 unit of ${symbol} at price ${recentPrice}. Original suggested parameters kept.`
+                    message: `Le capital de ${initialCapital}€ est trop bas pour échanger même 1 unité de ${symbol} au prix de ${recentPrice}. Les paramètres suggérés d'origine sont conservés.`
                 };
              }
         } else if (adjustedTradeAmount < 1) { // Original was also < 1 or not applicable, and calculated is < 1
@@ -193,7 +193,7 @@ export async function getCapitalAwareStrategySuggestion(
               suggestedStrategyName: strategyDetails.name,
               suggestedParameters, // Return params before this problematic adjustment
               recentPriceUsed: recentPrice,
-              message: `Calculated trade amount for ${symbol} is zero or negative. Capital may be too low for current price. Original parameters kept.`
+              message: `Le montant de transaction calculé pour ${symbol} est zéro ou négatif. Le capital est peut-être trop bas pour le prix actuel. Les paramètres d'origine sont conservés.`
            };
       }
 
@@ -205,7 +205,7 @@ export async function getCapitalAwareStrategySuggestion(
         suggestedStrategyName: strategyDetails.name,
         suggestedParameters,
         recentPriceUsed: recentPrice,
-        message: `Strategy suggestion with ${sizingParamName} adjusted for capital ${initialCapital}.`
+        message: `Suggestion de stratégie avec '${sizingParamName}' ajusté pour un capital de ${initialCapital}€.`
       };
 
     } else {
@@ -215,7 +215,7 @@ export async function getCapitalAwareStrategySuggestion(
         suggestedStrategyName: strategyDetails.name,
         suggestedParameters, // Return original/optimized params
         recentPriceUsed: recentPrice,
-        message: `Strategy suggested. Its parameters do not include a standard trade sizing parameter for capital adjustment.`
+        message: `Stratégie suggérée. Ses paramètres n'incluent pas de paramètre standard pour la taille de transaction ('${sizingParamName}') pour un ajustement au capital.`
       };
     }
   } catch (error) {
@@ -224,7 +224,7 @@ export async function getCapitalAwareStrategySuggestion(
         suggestedStrategyId: null,
         suggestedStrategyName: null,
         suggestedParameters: null,
-        message: "An unexpected error occurred while generating the strategy suggestion."
+        message: "Une erreur inattendue est survenue lors de la génération de la suggestion de stratégie."
     };
   }
 }

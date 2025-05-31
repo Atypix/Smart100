@@ -50,7 +50,23 @@ const BacktestRunnerPage: React.FC = () => {
   const [initialCapitalForSuggestion, setInitialCapitalForSuggestion] = useState<number>(10000); // Default capital for suggestion
   const [suggestionResult, setSuggestionResult] = useState<SuggestionResponse | null>(null);
   const [isFetchingSuggestion, setIsFetchingSuggestion] = useState<boolean>(false);
-  const [suggestionError, setSuggestionError] = useState<string | null>(null);
+  const [suggestionError, setSuggestionError] = useState<string | null>(null); // For suggestion fetching errors
+
+  const [availableStrategies, setAvailableStrategies] = useState<TradingStrategy[]>([]);
+
+  // Fetch available strategies once on mount for the "Apply to Parameters" feature
+  useEffect(() => {
+    axios.get<TradingStrategy[]>('/api/strategies')
+      .then(response => {
+        setAvailableStrategies(response.data);
+        logger.info('[BacktestRunnerPage] Fetched available strategies for suggestion application:', response.data.length);
+      })
+      .catch(error => {
+        logger.error('[BacktestRunnerPage] Error fetching available strategies:', error);
+        // Optionally set an error state here if this list is critical for other features too
+        // For now, we'll assume StrategySelector handles its own error display for this list.
+      });
+  }, []);
 
 
   const handleStrategySelect = useCallback((strategy: TradingStrategy | null) => {
@@ -203,7 +219,7 @@ const BacktestRunnerPage: React.FC = () => {
   // Handler for "Apply & Run Backtest with Suggestion"
   const handleApplyAndRunSuggestion = async () => {
     if (!suggestionResult || !suggestionResult.suggestedStrategyId || !suggestionResult.suggestedParameters) {
-      setError("No valid suggestion to apply for backtest."); // Use main error state for this action
+      setError("Aucune suggestion valide à appliquer pour le backtest."); // French
       logger.warn('[ApplyAndRun] No valid suggestion to apply.');
       return;
     }
@@ -241,6 +257,42 @@ const BacktestRunnerPage: React.FC = () => {
     }
   };
 
+  // Handler for "Appliquer aux Paramètres"
+  const handleApplySuggestionToConfig = () => {
+    if (!suggestionResult || !suggestionResult.suggestedStrategyId || !suggestionResult.suggestedParameters) {
+      setSuggestionError("Aucune suggestion valide à appliquer."); // French
+      logger.warn('[ApplyToConfig] No valid suggestion to apply.');
+      return;
+    }
+
+    const strategyToApply = availableStrategies.find(s => s.id === suggestionResult.suggestedStrategyId);
+    if (!strategyToApply) {
+      logger.error(`[ApplyToConfig] Suggested strategy ID '${suggestionResult.suggestedStrategyId}' not found in available strategies list.`);
+      setSuggestionError("Erreur : La stratégie suggérée est introuvable dans la liste des stratégies disponibles."); // French
+      return;
+    }
+
+    // Update main form states
+    // Calling handleStrategySelect will also reset params to defaults, so call setCurrentStrategyParams after.
+    handleStrategySelect(strategyToApply); // This calls setSelectedStrategy and sets default params
+    setCurrentStrategyParams(suggestionResult.suggestedParameters); // Override with suggested params
+
+    setCurrentBacktestSettings(prevSettings => ({
+      ...prevSettings,
+      initialCash: initialCapitalForSuggestion, // Use capital from suggestion input
+      // Keep other settings like symbol, dates, interval, sourceApi from the main form
+    }));
+
+    // Clear previous backtest results and errors as settings have changed
+    setBacktestResult(null);
+    setError(null);
+    // Provide user feedback
+    // Consider a more subtle notification system for this in the future.
+    // For now, reusing suggestionError to display a success/info message.
+    setSuggestionError("Suggestion appliquée aux formulaires de configuration principaux. Veuillez vérifier et lancer le backtest manuellement."); // French
+    logger.info(`[ApplyToConfig] Applied suggestion: Strategy '${strategyToApply.name}', Params:`, suggestionResult.suggestedParameters, `InitialCash: ${initialCapitalForSuggestion}`);
+  };
+
 
   return (
     <div className="backtest-runner-page">
@@ -248,9 +300,9 @@ const BacktestRunnerPage: React.FC = () => {
 
       {/* Section for Smart Strategy Suggestion */}
       <div className="backtest-section suggestion-section">
-        <h4>Smart Strategy Suggestion</h4>
+        <h4>Suggestion de Stratégie Intelligente</h4>
         <div className="form-group">
-          <label htmlFor="initialCapitalForSuggestion">Initial Capital for Suggestion:</label>
+          <label htmlFor="initialCapitalForSuggestion">Capital Initial pour Suggestion :</label>
           <input
             type="number"
             id="initialCapitalForSuggestion"
@@ -261,21 +313,30 @@ const BacktestRunnerPage: React.FC = () => {
           />
         </div>
         <button onClick={handleGetSuggestion} disabled={isFetchingSuggestion || !currentBacktestSettings.symbol}>
-          {isFetchingSuggestion ? 'Fetching Suggestion...' : 'Get Strategy Suggestion'}
+          {isFetchingSuggestion ? 'Recherche de suggestion en cours...' : 'Obtenir une Suggestion de Stratégie'}
         </button>
 
-        {isFetchingSuggestion && <p>Loading suggestion...</p>}
-        {suggestionError && <p className="error-message" style={{ marginTop: '10px' }}>Error: {suggestionError}</p>}
+        {isFetchingSuggestion && <p>Recherche de suggestion en cours...</p>}
+        {suggestionError && <p className="error-message" style={{ marginTop: '10px' }}>Erreur de suggestion : {suggestionError}</p>}
         {suggestionResult && !isFetchingSuggestion && (
           <div className="suggestion-result info-box-styled" style={{ marginTop: '10px' }}>
-            <p><strong>Suggestion Details:</strong></p>
+            <p><strong>Détails de la Suggestion :</strong></p>
+            {/* Display backend message first, as it might explain why no strategy was chosen */}
             <p>{suggestionResult.message}</p>
-            {suggestionResult.suggestedStrategyName && (
+
+            {suggestionResult.suggestedStrategyId && suggestionResult.suggestedStrategyName && (
               <>
-                <p>Suggested Strategy: <strong>{suggestionResult.suggestedStrategyName}</strong> (ID: {suggestionResult.suggestedStrategyId})</p>
+                <p>Stratégie Suggérée : <strong>{suggestionResult.suggestedStrategyName}</strong> (ID: {suggestionResult.suggestedStrategyId})</p>
+
+                {suggestionResult.recentPriceUsed !== undefined && suggestionResult.recentPriceUsed !== null && (
+                  <p style={{ fontStyle: 'italic', fontSize: '0.9em' }}>
+                    Basé sur votre capital de {initialCapitalForSuggestion.toLocaleString()}€ et un prix récent de {suggestionResult.recentPriceUsed.toFixed(2)} pour {currentBacktestSettings.symbol}, le paramètre de taille de transaction (ex: 'tradeAmount') a été ajusté.
+                  </p>
+                )}
+
                 {suggestionResult.suggestedParameters && Object.keys(suggestionResult.suggestedParameters).length > 0 && (
                   <div>
-                    <p>Parameters:</p>
+                    <p>Paramètres Suggérés :</p>
                     <ul>
                       {Object.entries(suggestionResult.suggestedParameters).map(([key, value]) => (
                         <li key={key}><code>{key}</code>: {String(value)}</li>
@@ -283,9 +344,11 @@ const BacktestRunnerPage: React.FC = () => {
                     </ul>
                   </div>
                 )}
-                {suggestionResult.recentPriceUsed !== undefined && <p>Recent Price Used for Adjustment: {suggestionResult.recentPriceUsed}</p>}
                 <button onClick={handleApplyAndRunSuggestion} disabled={isLoading} style={{ marginTop: '10px' }}>
-                  Apply & Run Backtest with Suggestion
+                  Appliquer et Lancer le Backtest avec la Suggestion
+                </button>
+                <button onClick={handleApplySuggestionToConfig} disabled={!suggestionResult || !suggestionResult.suggestedStrategyId} style={{ marginTop: '10px', marginLeft: '10px' }}>
+                  Appliquer aux Paramètres
                 </button>
               </>
             )}
@@ -294,7 +357,10 @@ const BacktestRunnerPage: React.FC = () => {
       </div>
       
       <div className="backtest-section config-section">
-        <StrategySelector onStrategySelect={handleStrategySelect} />
+        <StrategySelector
+          strategies={availableStrategies} // Pass fetched strategies to selector
+          onStrategySelect={handleStrategySelect}
+        />
         <StrategyParameterForm 
           strategy={selectedStrategy} 
           onParamsChange={handleParamsChange}
