@@ -134,6 +134,13 @@ This document tracks the progress and future direction of the project to impleme
 *   **API for Backtester:** Further develop the API, potentially adding features like saving/loading configurations, retrieving past results, etc.
 *   **Indicator Library Integration:** Re-evaluate or explore more comprehensive TA libraries that might include Ichimoku and other complex indicators directly, or contribute to existing ones.
 *   **Enhance `AISelectorStrategy`:** Improve with more sophisticated evaluation metrics (e.g., Sharpe ratio over lookback, risk-adjusted returns) or even lightweight machine learning models for selection if performance allows. Consider allowing the AI Selector to use non-default parameters for candidate strategies during its evaluation phase.
+*   **Smart Strategy Suggestion Feature:**
+    *   **Goal:** Allow users to get an AI-powered suggestion for a trading strategy and capital-adjusted parameters (especially `tradeAmount`) based on a chosen symbol and their initial capital. Aim for a "2-click" style interaction to run a backtest with this suggestion.
+    *   **Core Components:**
+        *   Frontend: UI for inputting symbol/capital, displaying suggestions, and triggering a backtest with suggested settings.
+        *   Backend: A new API endpoint (e.g., `/api/ai/suggest-strategy`).
+        *   Backend: A new service that leverages the existing `AISelectorStrategy` for base strategy/parameter selection, then fetches the recent price of the symbol, and adjusts the `tradeAmount` parameter for affordability based on the user's capital.
+    *   **Status:** Planned
 
 ## IV. Technical Debt / Issues
 

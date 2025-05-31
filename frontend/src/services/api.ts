@@ -1,5 +1,5 @@
 // frontend/src/services/api.ts
-import type { ApiKey, ApiKeyFormData } from '../types';
+import type { ApiKey, ApiKeyFormData, SuggestionResponse } from '../types'; // Added SuggestionResponse
 
 const API_BASE_URL = '/api'; // Adjust if your API is hosted elsewhere
 
@@ -147,4 +147,30 @@ export const getAICurrentStrategy = async (symbol: string): Promise<AIChoiceResp
     },
   });
   return handleResponse<AIChoiceResponse>(response);
+};
+
+// --- AI Strategy Suggestion Service Functions ---
+
+export const fetchStrategySuggestion = async (
+  symbol: string,
+  initialCapital: number,
+  lookbackPeriod?: number,
+  evaluationMetric?: string,
+  optimizeParameters?: boolean
+): Promise<SuggestionResponse> => {
+  const requestBody: any = { symbol, initialCapital };
+  if (lookbackPeriod !== undefined) requestBody.lookbackPeriod = lookbackPeriod;
+  if (evaluationMetric !== undefined) requestBody.evaluationMetric = evaluationMetric;
+  if (optimizeParameters !== undefined) requestBody.optimizeParameters = optimizeParameters;
+
+  const response = await fetch(`${API_BASE_URL}/ai/suggest-strategy`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      // Add Authorization header if this endpoint becomes protected in the future
+      // 'Authorization': `Bearer ${getToken()}`,
+    },
+    body: JSON.stringify(requestBody),
+  });
+  return handleResponse<SuggestionResponse>(response);
 };
