@@ -233,7 +233,7 @@ export async function getCapitalAwareStrategySuggestion(
         recentPriceUsed: recentPrice,
         evaluationScore: aiChoice.evaluationScore,
         evaluationMetricUsed: aiChoice.evaluationMetricUsed,
-        message: `Stratégie suggérée. Ses paramètres n'incluent pas de paramètre standard pour la taille de transaction ('${sizingParamName}') pour un ajustement au capital.`
+        message: `Stratégie suggérée. Ses paramètres n'incluent pas de paramètre standard connu pour la taille de transaction (comme 'tradeAmount', 'sharesToTrade', ou 'contracts') pour un ajustement au capital.`
       };
     }
   } catch (error) {
