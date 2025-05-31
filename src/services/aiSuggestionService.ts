@@ -1,4 +1,5 @@
 // src/services/aiSuggestionService.ts
+import { logSafeError } from '../utils/safeLogger';
 import { fetchHistoricalDataFromDB } from './dataService';
 import { getMostRecentClosePrice } from './dataService';
 import { aiSelectorStrategy, getAISelectorActiveState } // Direct import
@@ -63,7 +64,7 @@ export async function getCapitalAwareStrategySuggestion(
     }
     logger.info(`[AISuggestionService] Fetched ${historicalDataForAI.length} data points for AI evaluation of ${symbol}.`);
   } catch (e) {
-    logger.error(`[AISuggestionService] Error fetching historical data for AI suggestion for ${symbol}:`, e);
+    logSafeError(logger, `[AISuggestionService] Error fetching historical data for AI suggestion for ${symbol}`, e);
     return {
         suggestedStrategyId: null,
         suggestedStrategyName: null,
@@ -237,7 +238,7 @@ export async function getCapitalAwareStrategySuggestion(
       };
     }
   } catch (error) {
-    logger.error(`[AISuggestionService] Error during AI strategy selection or parameter adjustment for ${symbol}:`, error);
+    logSafeError(logger, `[AISuggestionService] Error during AI strategy selection or parameter adjustment for ${symbol}`, error);
     return {
         suggestedStrategyId: null,
         suggestedStrategyName: null,

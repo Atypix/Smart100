@@ -1,5 +1,6 @@
 import axios from 'axios';
 import logger from '../utils/logger';
+import { logSafeError } from '../utils/safeLogger';
 import yahooFinance from 'yahoo-finance2';
 import { insertData, getRecentData, getFallbackData, FinancialData, queryHistoricalData as queryHistoricalDataFromDB } from '../database';
 
@@ -413,7 +414,7 @@ export async function fetchHistoricalDataFromDB(
     logger.info(`Successfully processed ${historicalData.length} historical data points from DB for ${symbol}.`);
     return historicalData;
   } catch (error) {
-    logger.error(`Error processing historical data from DB for ${symbol}:`, { error, symbol, startDate, endDate });
+    logSafeError(logger, `Error processing historical data from DB for ${symbol}`, error, { symbol, startDate: startDate.toISOString(), endDate: endDate.toISOString(), source_api, interval });
     throw error; 
   }
 }
