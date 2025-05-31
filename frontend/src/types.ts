@@ -121,5 +121,7 @@ export interface SuggestionResponse {
   suggestedStrategyName: string | null;
   suggestedParameters: Record<string, any> | null;
   recentPriceUsed?: number | null;
+  evaluationScore?: number | null; // Added
+  evaluationMetricUsed?: string | null; // Added
   message: string;
 }

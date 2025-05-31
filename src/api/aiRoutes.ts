@@ -59,7 +59,8 @@ router.post('/suggest-strategy', async (req: Request, res: Response, next: NextF
     initialCapital,
     lookbackPeriod, // optional
     evaluationMetric, // optional
-    optimizeParameters // optional
+    optimizeParameters, // optional
+    riskPercentage // optional
   } = req.body;
 
   if (!symbol || typeof symbol !== 'string' || symbol.trim() === "") {
@@ -86,7 +87,8 @@ router.post('/suggest-strategy', async (req: Request, res: Response, next: NextF
       initialCapital,
       lookbackPeriod,
       evaluationMetric,
-      optimizeParameters
+      optimizeParameters,
+      riskPercentage // Pass it to the service
     );
 
     // The service function SuggestionResponse always includes a message.

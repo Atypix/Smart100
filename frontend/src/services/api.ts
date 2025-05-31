@@ -156,12 +156,14 @@ export const fetchStrategySuggestion = async (
   initialCapital: number,
   lookbackPeriod?: number,
   evaluationMetric?: string,
-  optimizeParameters?: boolean
+  optimizeParameters?: boolean,
+  riskPercentage?: number // Added
 ): Promise<SuggestionResponse> => {
   const requestBody: any = { symbol, initialCapital };
   if (lookbackPeriod !== undefined) requestBody.lookbackPeriod = lookbackPeriod;
   if (evaluationMetric !== undefined) requestBody.evaluationMetric = evaluationMetric;
   if (optimizeParameters !== undefined) requestBody.optimizeParameters = optimizeParameters;
+  if (riskPercentage !== undefined) requestBody.riskPercentage = riskPercentage; // Added
 
   const response = await fetch(`${API_BASE_URL}/ai/suggest-strategy`, {
     method: 'POST',

@@ -12,6 +12,8 @@ export interface SuggestionResponse {
   suggestedStrategyName: string | null;
   suggestedParameters: Record<string, any> | null;
   recentPriceUsed?: number | null;
+  evaluationScore?: number | null; // Added
+  evaluationMetricUsed?: string | null; // Added
   message: string; // To provide context or warnings
 }
 
@@ -27,9 +29,14 @@ export async function getCapitalAwareStrategySuggestion(
   initialCapital: number,
   preferredLookback?: number,
   preferredMetric?: string,
-  preferredOptimizeParams?: boolean
+  preferredOptimizeParams?: boolean,
+  preferredRiskPercentage?: number // Added
 ): Promise<SuggestionResponse> {
-  logger.info(`[AISuggestionService] Request for ${symbol}, capital ${initialCapital}, lookback ${preferredLookback}, metric ${preferredMetric}, optimize ${preferredOptimizeParams}`);
+  const riskPercentage = (preferredRiskPercentage !== undefined && preferredRiskPercentage >= 1 && preferredRiskPercentage <= 100)
+    ? preferredRiskPercentage
+    : 20; // Default to 20% if not provided or invalid
+
+  logger.info(`[AISuggestionService] Request for ${symbol}, capital ${initialCapital}, lookback ${preferredLookback}, metric ${preferredMetric}, optimize ${preferredOptimizeParams}, risk % ${riskPercentage}`);
 
   const lookbackPeriod = preferredLookback || 30; // Default lookback for AI evaluation
   const bufferDaysForIndicators = 60; // Extra days to ensure indicators can be calculated for the lookback period
@@ -125,6 +132,8 @@ export async function getCapitalAwareStrategySuggestion(
         suggestedStrategyName: strategyDetails.name, // Use name from strategyDetails for consistency
         suggestedParameters,
         recentPriceUsed: null,
+        evaluationScore: aiChoice.evaluationScore, // Pass through
+        evaluationMetricUsed: aiChoice.evaluationMetricUsed, // Pass through
         message: "Stratégie suggérée, mais impossible de récupérer le prix récent pour ajuster le 'tradeAmount'. Le 'tradeAmount' par défaut/optimisé est utilisé."
       };
     }
@@ -136,9 +145,8 @@ export async function getCapitalAwareStrategySuggestion(
       const sizingParamName = sizingParamDef.name;
       const originalTradeAmount = Number(suggestedParameters[sizingParamName]);
 
-      // Determine target trade value, e.g., 10-50% of capital. Make this configurable later.
-      const targetTradeValueFraction = 0.20; // Use 20% of capital for a trade
-      const targetTradeValue = initialCapital * targetTradeValueFraction;
+      // Use riskPercentage to determine target trade value
+      const targetTradeValue = initialCapital * (riskPercentage / 100.0);
       let adjustedTradeAmount = targetTradeValue / recentPrice;
 
       // Apply asset-specific rounding or minimums if available from strategy or global config
@@ -159,7 +167,9 @@ export async function getCapitalAwareStrategySuggestion(
                     suggestedStrategyName: strategyDetails.name,
                     suggestedParameters, // Return original/optimized params before adjustment
                     recentPriceUsed: recentPrice,
-                    message: `Le capital de ${initialCapital}€ est trop bas pour échanger même une quantité minimale de ${symbol} au prix de ${recentPrice}. Les paramètres suggérés d'origine sont conservés.`
+                    evaluationScore: aiChoice.evaluationScore,
+                    evaluationMetricUsed: aiChoice.evaluationMetricUsed,
+                    message: `Le capital de ${initialCapital}€ (risque ${riskPercentage}%) est trop bas pour échanger même une quantité minimale de ${symbol} au prix de ${recentPrice}. Les paramètres suggérés d'origine sont conservés.`
                 };
             }
         }
@@ -176,7 +186,9 @@ export async function getCapitalAwareStrategySuggestion(
                     suggestedStrategyName: strategyDetails.name,
                     suggestedParameters,
                     recentPriceUsed: recentPrice,
-                    message: `Le capital de ${initialCapital}€ est trop bas pour échanger même 1 unité de ${symbol} au prix de ${recentPrice}. Les paramètres suggérés d'origine sont conservés.`
+                    evaluationScore: aiChoice.evaluationScore,
+                    evaluationMetricUsed: aiChoice.evaluationMetricUsed,
+                    message: `Le capital de ${initialCapital}€ (risque ${riskPercentage}%) est trop bas pour échanger même 1 unité de ${symbol} au prix de ${recentPrice}. Les paramètres suggérés d'origine sont conservés.`
                 };
              }
         } else if (adjustedTradeAmount < 1) { // Original was also < 1 or not applicable, and calculated is < 1
@@ -193,6 +205,8 @@ export async function getCapitalAwareStrategySuggestion(
               suggestedStrategyName: strategyDetails.name,
               suggestedParameters, // Return params before this problematic adjustment
               recentPriceUsed: recentPrice,
+              evaluationScore: aiChoice.evaluationScore,
+              evaluationMetricUsed: aiChoice.evaluationMetricUsed,
               message: `Le montant de transaction calculé pour ${symbol} est zéro ou négatif. Le capital est peut-être trop bas pour le prix actuel. Les paramètres d'origine sont conservés.`
            };
       }
@@ -205,7 +219,9 @@ export async function getCapitalAwareStrategySuggestion(
         suggestedStrategyName: strategyDetails.name,
         suggestedParameters,
         recentPriceUsed: recentPrice,
-        message: `Suggestion de stratégie avec '${sizingParamName}' ajusté pour un capital de ${initialCapital}€.`
+        evaluationScore: aiChoice.evaluationScore,
+        evaluationMetricUsed: aiChoice.evaluationMetricUsed,
+        message: `Suggestion de stratégie avec '${sizingParamName}' ajusté pour un capital de ${initialCapital}€ (risque ${riskPercentage}%).`
       };
 
     } else {
@@ -215,6 +231,8 @@ export async function getCapitalAwareStrategySuggestion(
         suggestedStrategyName: strategyDetails.name,
         suggestedParameters, // Return original/optimized params
         recentPriceUsed: recentPrice,
+        evaluationScore: aiChoice.evaluationScore,
+        evaluationMetricUsed: aiChoice.evaluationMetricUsed,
         message: `Stratégie suggérée. Ses paramètres n'incluent pas de paramètre standard pour la taille de transaction ('${sizingParamName}') pour un ajustement au capital.`
       };
     }

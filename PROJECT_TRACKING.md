@@ -139,6 +139,15 @@ This document tracks the progress and future direction of the project to impleme
             - Enhanced clarity in the suggestion display with more contextual information (e.g., capital adjustment explanation).
             - Frontend UI text and backend messages for this feature localized to French.
         *   **Status:** Completed.
+    *   **UX Enhancements (Phase 2):**
+        *   **Description:** Further improved the strategy suggestion UX by:
+            - Exposing AI evaluation details: The backend now provides the `evaluationScore` and `evaluationMetricUsed` from `AISelectorStrategy`.
+            - Displaying AI evaluation details: The frontend now shows these metrics (in French) to the user, offering more transparency into the suggestion.
+            - Adding a 'Risk Percentage per Transaction' input: Users can now specify what percentage of their capital should be considered for trade sizing.
+            - Backend logic updated to use this risk percentage for `tradeAmount` adjustment.
+            - Frontend passes this risk percentage to the API.
+            - Updated the French explanation message for capital adjustment to include the risk percentage.
+        *   **Status:** Completed.
 
 ## IV. Technical Debt / Issues
 
@@ -168,16 +177,16 @@ This document tracks the progress and future direction of the project to impleme
         *   Enhanced `fetchHistoricalDataFromDB` in `dataService.ts` to support on-demand fetching from Binance if data is missing locally.
     *   **Frontend Enhancements for Strategy Suggestion:**
         *   Added `sourceApi` dropdown to `BacktestSettingsForm.tsx`.
-        *   Enhanced `BacktestRunnerPage.tsx` with UI and logic for "Smart Strategy Suggestion" (input capital, fetch suggestion, display results, "Apply & Run", "Apply to Params").
+        *   Enhanced `BacktestRunnerPage.tsx` with UI and logic for "Smart Strategy Suggestion" (input capital, fetch suggestion, display results, "Apply & Run", "Apply to Params", risk percentage input, display of AI eval metrics).
         *   Localized suggestion feature UI and backend messages to French.
     *   **Backend for Strategy Suggestion:**
-        *   Created `aiSuggestionService.ts` with logic to use `AISelectorStrategy`, fetch recent price, and adjust `tradeAmount`.
-        *   Added `/api/ai/suggest-strategy` POST endpoint in `aiRoutes.ts`.
+        *   Created `aiSuggestionService.ts` with logic to use `AISelectorStrategy`, fetch recent price, and adjust `tradeAmount` based on capital and risk percentage.
+        *   Added `/api/ai/suggest-strategy` POST endpoint in `aiRoutes.ts` to accept risk percentage.
+        *   Enhanced `AISelectorStrategy` to store and expose evaluation metrics (score, metric used).
     *   **Logging & Documentation:**
         *   Improved logging in `runBacktest` for no-trade scenarios.
         *   Added `docs/on_demand_fetching_considerations.txt`.
 
 ```
-**Structure Change in Section III**:
-I've also slightly restructured section "III. Future Development Ideas" to "III. Future Development Ideas & Recently Completed Phases" to better accommodate noting these phased completions without moving them entirely out of the "future ideas" context if more phases are planned. I also added a summary of other recent work under section V for better tracking.
+**Note on Section V update**: I've also updated the "Frontend Enhancements for Strategy Suggestion" and "Backend for Strategy Suggestion" bullet points in Section V to be more comprehensive of all the changes made in the recent set of subtasks related to this feature. I also added a point about `AISelectorStrategy` enhancements.
 ```
