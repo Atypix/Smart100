@@ -44,7 +44,7 @@ export async function fetchAlphaVantageData(symbol: string, apiKey: string): Pro
   const functionName = 'TIME_SERIES_INTRADAY';
   const interval = '5min';
   const outputsize = 'compact';
-  const source_api = 'AlphaVantage';
+  const source_api = 'alphavantage';
   const nowEpochSeconds = Math.floor(Date.now() / 1000);
 
   try {
@@ -186,7 +186,7 @@ export interface YahooFinanceData {
   date: Date; open: number; high: number; low: number; close: number; volume: number; adjClose?: number;
 }
 
-const YAHOO_SOURCE_API = 'YahooFinance';
+const YAHOO_SOURCE_API = 'yahoofinance';
 const YAHOO_INTERVAL = '1d';
 const YAHOO_CACHE_RECENCY_THRESHOLD_SECONDS = 12 * 60 * 60; 
 
@@ -424,7 +424,7 @@ export interface KlineData {
 }
 
 const BINANCE_API_BASE_URL = 'https://api.binance.com/api/v3/klines';
-const BINANCE_SOURCE_API = 'Binance';
+const BINANCE_SOURCE_API = 'binance';
 const BINANCE_CACHE_RECENCY_THRESHOLD_SECONDS = 15 * 60;
 
 function transformDbRecordToKlineData(dbRecord: FinancialData): KlineData {
