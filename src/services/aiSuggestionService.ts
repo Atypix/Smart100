@@ -27,12 +27,13 @@ interface AISelectorStrategyParams {
 }
 
 export async function getCapitalAwareStrategySuggestion(
-  symbolInput: string, // Original symbol parameter, will be overridden by loop
+  symbolInput: string, // Will be ignored for symbol selection, but kept for API compatibility for now
   initialCapital: number,
   preferredLookback?: number,
-  preferredMetric?: string,
+  preferredMetricForSelector?: string, // Renamed for clarity
   preferredOptimizeParams?: boolean,
-  preferredRiskPercentage?: number
+  preferredRiskPercentage?: number,
+  overallSelectionMetricInput?: string // <-- New parameter
 ): Promise<SuggestionResponse> {
 
   const allSymbols = getAllUniqueSymbols();
@@ -56,10 +57,18 @@ export async function getCapitalAwareStrategySuggestion(
   const aiEvalSourceApi = 'binance';
   const aiEvalInterval = '1d';
 
-  const validMetrics = ['pnl', 'sharpe', 'winRate'];
-  const chosenEvaluationMetric = (preferredMetric && validMetrics.includes(preferredMetric)) ? preferredMetric : 'pnl'; // Default to 'pnl'
+  const validSelectorMetrics = ['pnl', 'sharpe', 'winRate'];
+  const chosenSelectorMetric = (preferredMetricForSelector && validSelectorMetrics.includes(preferredMetricForSelector.toLowerCase()))
+    ? preferredMetricForSelector.toLowerCase()
+    : 'pnl'; // Default AISelector's internal metric to 'pnl'
 
-  logger.info(`[AISuggestionService] Global settings: Capital ${initialCapital}, Lookback ${lookbackPeriod}, Metric ${chosenEvaluationMetric}, Optimize ${preferredOptimizeParams}, Risk % ${riskPercentage}`);
+  const validOverallMetrics = ['pnl', 'sharpe', 'winRate'];
+  const overallSelectionMetric: 'pnl' | 'sharpe' | 'winRate' =
+    (overallSelectionMetricInput && validOverallMetrics.includes(overallSelectionMetricInput.toLowerCase()))
+    ? overallSelectionMetricInput.toLowerCase() as 'pnl' | 'sharpe' | 'winRate'
+    : 'pnl'; // Default overall selection to 'pnl'
+
+  logger.info(`[AISuggestionService] Global settings: Capital ${initialCapital}, Lookback ${lookbackPeriod}, AISelector Metric ${chosenSelectorMetric}, Optimize ${preferredOptimizeParams}, Risk % ${riskPercentage}, Overall Selection Metric: ${overallSelectionMetric}`);
 
   const allSymbolResults = [];
 
@@ -86,7 +95,7 @@ export async function getCapitalAwareStrategySuggestion(
     const aiSelectorParams: AISelectorStrategyParams = {
       evaluationLookbackPeriod: lookbackPeriod,
       candidateStrategyIds: '',
-      evaluationMetric: chosenEvaluationMetric,
+      evaluationMetric: chosenSelectorMetric, // Use the determined metric for AISelector
       optimizeParameters: preferredOptimizeParams || false,
     };
 
@@ -109,14 +118,18 @@ export async function getCapitalAwareStrategySuggestion(
         if (strategyDetails) {
           allSymbolResults.push({
             symbol: currentSymbol,
-            strategyId: aiChoice.chosenStrategyId!, // We know chosenStrategyId is not null here
+            strategyId: aiChoice.chosenStrategyId!,
             strategyName: strategyDetails.name,
             parameters: aiChoice.parametersUsed || {},
-            evaluationScore: aiChoice.evaluationScore, // Score for the metric used by AISelector
-            evaluationMetric: aiChoice.evaluationMetricUsed, // The metric used by AISelector
-            simulatedPnl: aiChoice.simulatedPnl, // <-- Add this explicitly captured P&L
+            evaluationScore: aiChoice.evaluationScore,    // Primary score
+            evaluationMetric: aiChoice.evaluationMetricUsed, // Primary metric
+            simulatedPnl: aiChoice.simulatedPnl,
+            simulatedSharpe: aiChoice.simulatedSharpe,     // <-- Add/ensure this
+            simulatedWinRate: aiChoice.simulatedWinRate,   // <-- Add/ensure this
           });
-          logger.info(`[AISuggestionService] Best strategy for ${currentSymbol}: ${strategyDetails.name} (ID: ${aiChoice.chosenStrategyId}), Metric: ${aiChoice.evaluationMetricUsed}, Score: ${aiChoice.evaluationScore?.toFixed(4)}, P&L: ${aiChoice.simulatedPnl?.toFixed(2)}`);
+          logger.info(`[AISuggestionService] Best strategy for ${currentSymbol}: ${strategyDetails.name} (ID: ${aiChoice.chosenStrategyId}), ` +
+                      `Metric: ${aiChoice.evaluationMetricUsed}, Score: ${aiChoice.evaluationScore?.toFixed(4)}, ` +
+                      `P&L: ${aiChoice.simulatedPnl?.toFixed(2)}, Sharpe: ${aiChoice.simulatedSharpe?.toFixed(2)}, WinRate: ${(aiChoice.simulatedWinRate !== undefined && aiChoice.simulatedWinRate !== null ? (aiChoice.simulatedWinRate * 100).toFixed(1) + '%' : 'N/A')}`);
         } else {
           logger.warn(`[AISuggestionService] AI chose strategy ${aiChoice.chosenStrategyId} for ${currentSymbol}, but details not found in StrategyManager.`);
         }
@@ -138,33 +151,65 @@ export async function getCapitalAwareStrategySuggestion(
     };
   }
 
-  logger.info(`[AISuggestionService] Collected ${allSymbolResults.length} best-per-symbol results. Now determining overall best based on P&L.`);
+  logger.info(`[AISuggestionService] Collected ${allSymbolResults.length} best-per-symbol results. Now determining overall best based on metric: ${overallSelectionMetric}.`);
 
-  let overallBestResult: any = null; // Consider defining a type for elements in allSymbolResults
-  let maxPnl = -Infinity;
+  let overallBestResult: any = null;
+  let bestOverallScore: number = -Infinity;
 
-  for (const result of allSymbolResults) {
-    if (typeof result.simulatedPnl === 'number' && result.simulatedPnl > maxPnl) {
-      maxPnl = result.simulatedPnl;
-      overallBestResult = result;
+  // Initialize with the first valid result to ensure overallBestResult is not null if any valid score exists
+  if (allSymbolResults.length > 0) {
+    for (const firstValid of allSymbolResults) {
+        let initialScoreValue: number | null | undefined = null;
+        if (overallSelectionMetric === 'pnl') initialScoreValue = firstValid.simulatedPnl;
+        else if (overallSelectionMetric === 'sharpe') initialScoreValue = firstValid.simulatedSharpe;
+        else if (overallSelectionMetric === 'winRate') initialScoreValue = firstValid.simulatedWinRate;
+
+        if (typeof initialScoreValue === 'number' && isFinite(initialScoreValue)) {
+            overallBestResult = firstValid;
+            bestOverallScore = initialScoreValue;
+            break;
+        }
+    }
+  }
+
+  if (overallBestResult) { // If an initial candidate was found
+    for (const result of allSymbolResults) {
+        let currentScoreValue: number | null | undefined = null;
+        if (overallSelectionMetric === 'pnl') {
+            currentScoreValue = result.simulatedPnl;
+        } else if (overallSelectionMetric === 'sharpe') {
+            currentScoreValue = result.simulatedSharpe;
+        } else if (overallSelectionMetric === 'winRate') {
+            currentScoreValue = result.simulatedWinRate;
+        }
+
+        if (typeof currentScoreValue === 'number' && isFinite(currentScoreValue)) {
+            if (currentScoreValue > bestOverallScore) {
+                bestOverallScore = currentScoreValue;
+                overallBestResult = result;
+            }
+        }
     }
   }
 
   if (!overallBestResult) {
-    logger.warn("[AISuggestionService] No valid P&L scores found among per-symbol results to determine an overall best, or all P&Ls were negative/zero.");
+    logger.warn(`[AISuggestionService] No valid scores found for metric '${overallSelectionMetric}' among per-symbol results.`);
     return {
         suggestedStrategyId: null,
         suggestedStrategyName: null,
         suggestedParameters: null,
-        message: "Could not determine an overall best strategy based on P&L scores across all symbols."
+        message: `Could not determine an overall best strategy based on the selected metric: ${overallSelectionMetric}.`
     };
   }
 
-  logger.info(`[AISuggestionService] Overall best choice: Symbol ${overallBestResult.symbol}, Strategy ${overallBestResult.strategyName} (ID: ${overallBestResult.strategyId}) with P&L ${overallBestResult.simulatedPnl?.toFixed(2)} (Original metric: ${overallBestResult.evaluationMetric}, Score: ${overallBestResult.evaluationScore?.toFixed(4)})`);
+  // Log updated to reflect the metric used for selection and its score
+  logger.info(`[AISuggestionService] Overall best choice using metric '${overallSelectionMetric}': Symbol ${overallBestResult.symbol}, Strategy ${overallBestResult.strategyName} (ID: ${overallBestResult.strategyId}) with Score ${bestOverallScore.toFixed(4)}. ` +
+              `(P&L: ${overallBestResult.simulatedPnl?.toFixed(2)}, Sharpe: ${overallBestResult.simulatedSharpe?.toFixed(2)}, WinRate: ${(overallBestResult.simulatedWinRate !== undefined && overallBestResult.simulatedWinRate !== null ? (overallBestResult.simulatedWinRate * 100).toFixed(1) + '%' : 'N/A')})`);
 
   const symbolForAdjustment = overallBestResult.symbol;
   let parametersForAdjustment = { ...overallBestResult.parameters };
-  let finalMessage = `Overall best for ${symbolForAdjustment}: ${overallBestResult.strategyName} (P&L: ${overallBestResult.simulatedPnl?.toFixed(2)}).`;
+  // Update finalMessage to include all scores and the selection metric
+  let finalMessage = `Overall best for ${symbolForAdjustment} (selected by ${overallSelectionMetric}): ${overallBestResult.strategyName} (P&L: ${overallBestResult.simulatedPnl?.toFixed(2)}, Sharpe: ${overallBestResult.simulatedSharpe?.toFixed(2)}, WinRate: ${(overallBestResult.simulatedWinRate !== undefined && overallBestResult.simulatedWinRate !== null ? (overallBestResult.simulatedWinRate * 100).toFixed(1) + '%' : 'N/A')}). Score on ${overallSelectionMetric}: ${bestOverallScore.toFixed(4)}.`;
 
   const recentPrice = await getMostRecentClosePrice(symbolForAdjustment, aiEvalSourceApi, aiEvalInterval);
 
@@ -239,9 +284,12 @@ export async function getCapitalAwareStrategySuggestion(
     suggestedStrategyId: overallBestResult.strategyId,
     suggestedStrategyName: overallBestResult.strategyName,
     suggestedParameters: parametersForAdjustment,
-    evaluationScore: overallBestResult.evaluationScore,
-    evaluationMetricUsed: overallBestResult.evaluationMetric,
+    evaluationScore: overallBestResult.evaluationScore, // This is the score for evaluationMetric (e.g. PNL if that was chosen)
+    evaluationMetricUsed: overallBestResult.evaluationMetric, // The metric AISelector used for its primary decision
+    // Pass through all simulated scores to the response.
+    // The SuggestionResponse interface might need to be updated if we want to formally include these.
+    // For now, they are in the message. The key is that overallBestResult was chosen based on P&L.
     recentPriceUsed: recentPrice,
-    message: finalMessage
+    message: finalMessage // This message now includes P&L, Sharpe, WinRate of the overallBestResult
   };
 }
