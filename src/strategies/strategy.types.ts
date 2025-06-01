@@ -55,5 +55,6 @@ export interface AIDecision {
   parametersUsed: Record<string, any> | null;
   evaluationScore: number | null;
   evaluationMetricUsed: string | null;
+  simulatedPnl?: number | null; // <-- Add this
   // Optionally, add other details like P&L of all candidates, etc.
 }

@@ -63,10 +63,10 @@ router.post('/suggest-strategy', (async (req: Request, res: Response, next: Next
     riskPercentage // optional
   } = req.body;
 
-  if (!symbol || typeof symbol !== 'string' || symbol.trim() === "") {
-    res.status(400).json({ message: "Symbol parameter is required and must be a non-empty string." });
-    return;
-  }
+  // if (!symbol || typeof symbol !== 'string' || symbol.trim() === "") {
+  //   res.status(400).json({ message: "Symbol parameter is required and must be a non-empty string." });
+  //   return;
+  // }
   if (initialCapital === undefined || typeof initialCapital !== 'number' || initialCapital <= 0) {
     res.status(400).json({ message: "Initial capital parameter is required and must be a positive number." });
     return;
