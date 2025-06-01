@@ -128,12 +128,12 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
 
     // Fetch and filter candidate strategies
     let candidateStrategies = StrategyManagerModule.getAvailableStrategies().filter(
-      (s: any) => s.id !== this.id // Exclude self, typed s as any
+      (s: TradingStrategy) => s.id !== this.id // Exclude self
       // Potentially add a flag to strategies like `isMetaStrategy` to exclude them all
     );
 
     if (explicitCandidateIds.length > 0) {
-      candidateStrategies = candidateStrategies.filter((s: any) => explicitCandidateIds.includes(s.id)); // Typed s as any
+      candidateStrategies = candidateStrategies.filter((s: TradingStrategy) => explicitCandidateIds.includes(s.id));
     }
 
     if (candidateStrategies.length === 0) {
