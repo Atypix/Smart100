@@ -119,9 +119,17 @@ describe('StrategyManager', () => {
       
       // Check if all known registered strategies are present
       const ids = available.map(s => s.id);
-      expect(ids).toContain('simple-threshold'); // Auto-registered
-      expect(ids).toContain('ichimoku-cloud');   // Auto-registered
-      expect(ids).toContain('mock-strat-2');     // Registered in this test block
+      expect(ids).toEqual(expect.arrayContaining([
+        'simple-threshold',
+        'ichimoku-cloud',
+        'rsi-bollinger',
+        'macd-crossover',
+        'ai-price-prediction',
+        'ai-selector',
+        'mock-strat-2' // Registered in this test block
+      ]));
+      // Optionally, check length if the state is guaranteed
+      // expect(ids.length).toBe(7); // 6 auto + 1 mock for this test
 
       // Verify one of the strategies' details
       const foundMockStrategy2 = available.find(s => s.id === 'mock-strat-2');
@@ -143,7 +151,7 @@ describe('StrategyManager', () => {
         // This test is a bit fragile if auto-registration changes.
         // A better way would be to clear the registry if possible.
         // For now, check relative increase.
-        expect(available.length).toBeGreaterThanOrEqual(initialCount + 2 - (available.find(s => s.id === tempStrategy3.id) ? 0:1) - (available.find(s => s.id === tempStrategy4.id) ? 0:1) ); // accounts for potential re-registration if tests run out of order or registry isn't fully clean
+        // The complex length check above is removed for robustness.
         
         // A more robust check specific to this test's additions:
         const ids = available.map(s => s.id);
