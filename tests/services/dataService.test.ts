@@ -60,7 +60,7 @@ describe('Data Service Tests (Integration with In-Memory DB)', () => {
     const symbol = 'IBM';
     const apiKey = 'TEST_API_KEY';
     const interval = '5min'; // Default interval in fetchAlphaVantageData
-    const source_api = 'AlphaVantage'; // Default source_api in fetchAlphaVantageData
+    const source_api = 'alphavantage'; // Default source_api in fetchAlphaVantageData
 
     const mockApiTimeSeries = {
       '2023-10-27 16:00:00': { '1. open': '150.00', '2. high': '152.00', '3. low': '149.00', '4. close': '151.00', '5. volume': '10000' },
@@ -146,7 +146,7 @@ describe('Data Service Tests (Integration with In-Memory DB)', () => {
 
   describe('fetchYahooFinanceData', () => {
     const symbol = 'AAPL';
-    const source_api_yahoo = 'YahooFinance';
+    const source_api_yahoo = 'yahoofinance';
     const interval_yahoo = '1d'; // Default interval in fetchYahooFinanceData
 
     const mockApiOutput: YahooFinanceData[] = [
