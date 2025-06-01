@@ -12,8 +12,11 @@ let currentChoicesBySymbol = new Map<string, string>();
 let optimizedParamsForChoice = new Map<string, {
     strategyId: string,
     params: Record<string, any>,
-    evaluationScore?: number, // Added
-    evaluationMetric?: string  // Added
+    evaluationScore?: number,    // Score for the primary metric
+    evaluationMetric?: string,   // The primary metric used
+    simulatedPnl?: number | null;
+    simulatedSharpe?: number | null; // <-- Add this
+    simulatedWinRate?: number | null; // <-- Add this
 }>();
 let lastAIDecision: AIDecision | null = null;
 
@@ -163,6 +166,9 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
     logger.verbose(`AISelectorStrategy for ${symbol}: Evaluating ${candidateStrategies.length} candidates over ${evaluationData.length} periods using metric: ${metric}.`);
     let bestStrategyId: string | null = null;
     let currentBestMetricValue = -Infinity;
+    let pnlForOverallBestStrategy: number | null = null;
+    let sharpeForOverallBestStrategy: number | null = null; // Added
+    let winRateForOverallBestStrategy: number | null = null; // Added
 
     interface SimulatedPosition {
       entryPrice: number;
@@ -174,6 +180,9 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
     for (const candidateStrategy of candidateStrategies) {
       let bestParamsForCandidate: Record<string, any> | null = null;
       let bestMetricScoreForCandidate = -Infinity;
+      let pnlForWinningParamsOfCandidate: number | null = null; // Renamed for clarity
+      let sharpeForWinningParamsOfCandidate: number | null = null; // Added
+      let winRateForWinningParamsOfCandidate: number | null = null; // Added
       const paramSetsToSimulate: Array<Record<string, any>> = [];
 
       if (optimizeParameters) {
@@ -296,17 +305,24 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
 
         if (currentCombinationScore > bestMetricScoreForCandidate) {
           bestMetricScoreForCandidate = currentCombinationScore;
-          bestParamsForCandidate = { ...currentCandidateParams }; 
+          bestParamsForCandidate = { ...currentCandidateParams };
+          pnlForWinningParamsOfCandidate = pnlScore;
+          sharpeForWinningParamsOfCandidate = sharpeScore;
+          winRateForWinningParamsOfCandidate = winRateScore;
         }
       }
 
       const calculatedMetricValueForCandidate = bestMetricScoreForCandidate;
-      logger.verbose(`AISelectorStrategy for ${symbol}: Candidate ${candidateStrategy.id} best score using metric '${metric}': ${calculatedMetricValueForCandidate.toFixed(4)}. Optimized Params: ${optimizeParameters && bestParamsForCandidate ? JSON.stringify(bestParamsForCandidate) : "N/A"}`);
+      // Log all three scores for the best parameters of this candidate
+      logger.verbose(`AISelectorStrategy for ${symbol}: Candidate ${candidateStrategy.id} best params achieved - Metric (${metric}): ${calculatedMetricValueForCandidate.toFixed(4)}, P&L: ${pnlForWinningParamsOfCandidate?.toFixed(2)}, Sharpe: ${sharpeForWinningParamsOfCandidate?.toFixed(3)}, WinRate: ${winRateForWinningParamsOfCandidate !== null ? (winRateForWinningParamsOfCandidate * 100).toFixed(1) + '%' : 'N/A'}. Optimized Params: ${optimizeParameters && bestParamsForCandidate ? JSON.stringify(bestParamsForCandidate) : "N/A"}`);
       
       if (calculatedMetricValueForCandidate > currentBestMetricValue) {
         currentBestMetricValue = calculatedMetricValueForCandidate;
         bestStrategyId = candidateStrategy.id;
         bestOverallParams = bestParamsForCandidate;
+        pnlForOverallBestStrategy = pnlForWinningParamsOfCandidate;
+        sharpeForOverallBestStrategy = sharpeForWinningParamsOfCandidate;
+        winRateForOverallBestStrategy = winRateForWinningParamsOfCandidate;
       }
     }
 
@@ -321,6 +337,9 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
         parametersUsed: null,
         evaluationScore: null,
         evaluationMetricUsed: metric,
+        simulatedPnl: null,
+        simulatedSharpe: null, // <-- Add this
+        simulatedWinRate: null, // <-- Add this
       };
       return { action: 'HOLD' };
     }
@@ -337,6 +356,9 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
         parametersUsed: bestOverallParams,
         evaluationScore: currentBestMetricValue,
         evaluationMetricUsed: metric,
+        simulatedPnl: pnlForOverallBestStrategy,
+        simulatedSharpe: sharpeForOverallBestStrategy, // <-- Add this
+        simulatedWinRate: winRateForOverallBestStrategy, // <-- Add this
       };
       return { action: 'HOLD' };
     }
@@ -360,8 +382,11 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
     optimizedParamsForChoice.set(symbol, {
         strategyId: bestStrategyId,
         params: paramsToStoreAndExecuteWith,
-        evaluationScore: currentBestMetricValue, // Store score
-        evaluationMetric: metric // Store metric
+        evaluationScore: currentBestMetricValue, // Score for the primary metric
+        evaluationMetric: metric,                // The primary metric
+        simulatedPnl: pnlForOverallBestStrategy,
+        simulatedSharpe: sharpeForOverallBestStrategy, // <-- Add this
+        simulatedWinRate: winRateForOverallBestStrategy  // <-- Add this
     });
     
     const currentBarForDecision = context.historicalData[context.currentIndex];
@@ -371,8 +396,11 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
       chosenStrategyId: bestStrategyId,
       chosenStrategyName: finalSelectedStrategy.name,
       parametersUsed: paramsToStoreAndExecuteWith,
-      evaluationScore: currentBestMetricValue, // This is correctly set for lastAIDecision
-      evaluationMetricUsed: metric, // This is correctly set for lastAIDecision
+      evaluationScore: currentBestMetricValue,
+      evaluationMetricUsed: metric,
+      simulatedPnl: pnlForOverallBestStrategy,
+      simulatedSharpe: sharpeForOverallBestStrategy, // <-- Add this
+      simulatedWinRate: winRateForOverallBestStrategy  // <-- Add this
     };
 
     const strategyContextForExecution: StrategyContext<Record<string, any>> = {
@@ -390,8 +418,11 @@ export interface AISelectorChoiceState {
     chosenStrategyId: string | null;
     chosenStrategyName: string | null;
     parametersUsed: Record<string, any> | null;
-    evaluationScore?: number | null; // Added
-    evaluationMetricUsed?: string | null; // Added
+    evaluationScore?: number | null;
+    evaluationMetricUsed?: string | null;
+    simulatedPnl?: number | null;
+    simulatedSharpe?: number | null; // <-- Add this
+    simulatedWinRate?: number | null; // <-- Add this
     message?: string;
 }
 
@@ -404,9 +435,12 @@ export function getAISelectorActiveState(symbol: string): AISelectorChoiceState 
             chosenStrategyId: choiceData.strategyId,
             chosenStrategyName: strategyDetails ? strategyDetails.name : "Unknown Strategy",
             parametersUsed: choiceData.params,
-            evaluationScore: choiceData.evaluationScore, // Retrieve score
-            evaluationMetricUsed: choiceData.evaluationMetric, // Retrieve metric
-            message: `Strategy chosen based on ${choiceData.evaluationMetric || 'metric'} with score ${choiceData.evaluationScore?.toFixed(4) || 'N/A'}.`
+            evaluationScore: choiceData.evaluationScore,
+            evaluationMetricUsed: choiceData.evaluationMetric,
+            simulatedPnl: choiceData.simulatedPnl,
+            simulatedSharpe: choiceData.simulatedSharpe, // <-- Add this
+            simulatedWinRate: choiceData.simulatedWinRate, // <-- Add this
+            message: `Strategy chosen based on ${choiceData.evaluationMetric || 'metric'} with score ${choiceData.evaluationScore?.toFixed(4) || 'N/A'}. P&L: ${choiceData.simulatedPnl?.toFixed(2) || 'N/A'}, Sharpe: ${choiceData.simulatedSharpe?.toFixed(2) || 'N/A'}, WinRate: ${(choiceData.simulatedWinRate !== undefined && choiceData.simulatedWinRate !== null ? (choiceData.simulatedWinRate * 100).toFixed(1) + '%' : 'N/A')}.`
         };
     }
     
@@ -424,8 +458,11 @@ export function getAISelectorActiveState(symbol: string): AISelectorChoiceState 
             chosenStrategyId: chosenStrategyIdFromCurrent,
             chosenStrategyName: strategyDetails ? strategyDetails.name : "Unknown Strategy",
             parametersUsed: params, // These would be default params
-            evaluationScore: null, // Not available in this simpler map
-            evaluationMetricUsed: null, // Not available in this simpler map
+            evaluationScore: null,
+            evaluationMetricUsed: null,
+            simulatedPnl: null,
+            simulatedSharpe: null, // <-- Add this
+            simulatedWinRate: null, // <-- Add this
             message: "Strategy choice retrieved (default params); detailed evaluation metrics for this specific state might not be available."
         };
     }
@@ -436,6 +473,9 @@ export function getAISelectorActiveState(symbol: string): AISelectorChoiceState 
         parametersUsed: null,
         evaluationScore: null,
         evaluationMetricUsed: null,
+        simulatedPnl: null,
+        simulatedSharpe: null, // <-- Add this
+        simulatedWinRate: null, // <-- Add this
         message: "No strategy choice has been made for this symbol yet, or previous choice data is incomplete."
     };
 }

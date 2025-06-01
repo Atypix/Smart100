@@ -230,5 +230,22 @@ function queryHistoricalData(
   }
 }
 
+// Function to get all unique symbols from financial_data
+export function getAllUniqueSymbols(): string[] {
+  if (!db) {
+    console.error('[DATABASE CRITICAL] getAllUniqueSymbols called but db instance is not available!');
+    throw new Error('[DATABASE CRITICAL] db instance is not available in getAllUniqueSymbols.');
+  }
+  try {
+    const stmt = db.prepare('SELECT DISTINCT symbol FROM financial_data');
+    const rows = stmt.all() as { symbol: string }[]; // Cast rows to expected shape
+    return rows.map(row => row.symbol);
+  } catch (error) {
+    console.error('Error fetching all unique symbols from financial_data:', error);
+    // Depending on desired error handling, you might throw or return empty
+    throw error; // Or return [];
+  }
+}
+
 // Export the database instance, schema creation function, and new helper functions
-export { db, initializeSchema, insertData, getRecentData, getFallbackData, queryHistoricalData };
+export { db, initializeSchema, insertData, getRecentData, getFallbackData, queryHistoricalData, getAllUniqueSymbols };

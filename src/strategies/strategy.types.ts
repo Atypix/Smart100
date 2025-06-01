@@ -53,7 +53,9 @@ export interface AIDecision {
   chosenStrategyId: string | null;
   chosenStrategyName: string | null;
   parametersUsed: Record<string, any> | null;
-  evaluationScore: number | null;
+  evaluationScore: number | null; // Score for the primary evaluationMetricUsed
   evaluationMetricUsed: string | null;
-  // Optionally, add other details like P&L of all candidates, etc.
+  simulatedPnl?: number | null;
+  simulatedSharpe?: number | null; // <-- Add this
+  simulatedWinRate?: number | null; // <-- Add this
 }

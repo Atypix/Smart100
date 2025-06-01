@@ -60,13 +60,14 @@ router.post('/suggest-strategy', (async (req: Request, res: Response, next: Next
     lookbackPeriod, // optional
     evaluationMetric, // optional
     optimizeParameters, // optional
-    riskPercentage // optional
+    riskPercentage, // optional
+    overallSelectionMetric // <-- New field from request
   } = req.body;
 
-  if (!symbol || typeof symbol !== 'string' || symbol.trim() === "") {
-    res.status(400).json({ message: "Symbol parameter is required and must be a non-empty string." });
-    return;
-  }
+  // if (!symbol || typeof symbol !== 'string' || symbol.trim() === "") {
+  //   res.status(400).json({ message: "Symbol parameter is required and must be a non-empty string." });
+  //   return;
+  // }
   if (initialCapital === undefined || typeof initialCapital !== 'number' || initialCapital <= 0) {
     res.status(400).json({ message: "Initial capital parameter is required and must be a positive number." });
     return;
@@ -85,15 +86,30 @@ router.post('/suggest-strategy', (async (req: Request, res: Response, next: Next
     return;
   }
 
+  let parsedOverallSelectionMetric: string | undefined = undefined;
+  if (overallSelectionMetric !== undefined) {
+    if (typeof overallSelectionMetric !== 'string') {
+       res.status(400).json({ message: "Optional parameter 'overallSelectionMetric' must be a string." });
+       return;
+    }
+    const lowerOverallSelectionMetric = overallSelectionMetric.toLowerCase();
+    if (!['pnl', 'sharpe', 'winrate'].includes(lowerOverallSelectionMetric)) { // Accept 'winrate'
+       res.status(400).json({ message: "Optional parameter 'overallSelectionMetric' must be one of 'pnl', 'sharpe', 'winrate'." });
+       return;
+    }
+    parsedOverallSelectionMetric = lowerOverallSelectionMetric === 'winrate' ? 'winRate' : lowerOverallSelectionMetric; // Standardize to 'winRate'
+  }
+
   try {
-    logger.info(`[API /suggest-strategy] Received request for symbol ${symbol}, capital ${initialCapital}`);
+    logger.info(`[API /suggest-strategy] Received request. Symbol: ${symbol}, Capital: ${initialCapital}, AISelectorMetric: ${evaluationMetric}, OverallSelectionMetric: ${overallSelectionMetric || 'default (pnl)'}`);
     const suggestion: SuggestionResponse = await getCapitalAwareStrategySuggestion(
-      symbol,
+      symbol, // Input symbol, service will ignore for selection pool
       initialCapital,
       lookbackPeriod,
-      evaluationMetric,
+      evaluationMetric, // This is for AISelector's internal evaluation (now preferredMetricForSelector in service)
       optimizeParameters,
-      riskPercentage // Pass it to the service
+      riskPercentage,
+      parsedOverallSelectionMetric // <-- Pass the new, validated, and standardized metric
     );
 
     // The service function SuggestionResponse always includes a message.
