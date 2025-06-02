@@ -102,7 +102,8 @@ router.post('/suggest-strategy', (async (req: Request, res: Response, next: Next
 
   try {
     logger.info(`[API /suggest-strategy] Received request. Symbol: ${symbol}, Capital: ${initialCapital}, AISelectorMetric: ${evaluationMetric}, OverallSelectionMetric: ${overallSelectionMetric || 'default (pnl)'}`);
-    const suggestion: SuggestionResponse = await getCapitalAwareStrategySuggestion(
+    // Expect an array of suggestions from the service
+    const suggestions: SuggestionResponse[] = await getCapitalAwareStrategySuggestion(
       symbol, // Input symbol, service will ignore for selection pool
       initialCapital,
       lookbackPeriod,
@@ -112,10 +113,11 @@ router.post('/suggest-strategy', (async (req: Request, res: Response, next: Next
       parsedOverallSelectionMetric // <-- Pass the new, validated, and standardized metric
     );
 
-    // The service function SuggestionResponse always includes a message.
-    // If suggestedStrategyId is null, it means no active suggestion could be made,
-    // but the operation itself didn't fail.
-    res.status(200).json(suggestion);
+    if (suggestions.length === 0) {
+      res.status(200).json({ suggestions: [], message: "No suitable strategy suggestions found at this time." });
+    } else {
+      res.status(200).json({ suggestions: suggestions, message: "Successfully retrieved strategy suggestions." });
+    }
     return;
 
   } catch (error: any) {

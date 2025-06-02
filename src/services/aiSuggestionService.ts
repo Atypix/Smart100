@@ -34,17 +34,13 @@ export async function getCapitalAwareStrategySuggestion(
   preferredOptimizeParams?: boolean,
   preferredRiskPercentage?: number,
   overallSelectionMetricInput?: string // <-- New parameter
-): Promise<SuggestionResponse> {
+): Promise<SuggestionResponse[]> {
 
   const allSymbols = getAllUniqueSymbols();
   logger.info(`[AISuggestionService] Found ${allSymbols.length} unique symbols in the database for analysis.`);
   if (allSymbols.length === 0) {
-    return {
-      suggestedStrategyId: null,
-      suggestedStrategyName: null,
-      suggestedParameters: null,
-      message: "Aucun symbole disponible dans la base de données pour l'analyse."
-    };
+    // Return an empty array if no symbols are available
+    return [];
   }
 
   const riskPercentage = (preferredRiskPercentage !== undefined && preferredRiskPercentage >= 1 && preferredRiskPercentage <= 100)
@@ -143,153 +139,145 @@ export async function getCapitalAwareStrategySuggestion(
   } // End of for...of allSymbols loop
 
   if (allSymbolResults.length === 0) {
-    return {
-      suggestedStrategyId: null,
-      suggestedStrategyName: null,
-      suggestedParameters: null,
-      message: "No suitable strategy could be determined for any symbol after full analysis."
-    };
+    // Return an empty array if no suitable strategy could be determined
+    logger.info("[AISuggestionService] No suitable strategy could be determined for any symbol after full analysis.");
+    return [];
   }
 
-  logger.info(`[AISuggestionService] Collected ${allSymbolResults.length} best-per-symbol results. Now determining overall best based on metric: ${overallSelectionMetric}.`);
+  logger.info(`[AISuggestionService] Collected ${allSymbolResults.length} best-per-symbol results. Now sorting and selecting top N based on metric: ${overallSelectionMetric}.`);
 
-  let overallBestResult: any = null;
-  let bestOverallScore: number = -Infinity;
+  // Sorting logic
+  allSymbolResults.sort((a, b) => {
+    let scoreA: number | null | undefined;
+    let scoreB: number | null | undefined;
 
-  // Initialize with the first valid result to ensure overallBestResult is not null if any valid score exists
-  if (allSymbolResults.length > 0) {
-    for (const firstValid of allSymbolResults) {
-        let initialScoreValue: number | null | undefined = null;
-        if (overallSelectionMetric === 'pnl') initialScoreValue = firstValid.simulatedPnl;
-        else if (overallSelectionMetric === 'sharpe') initialScoreValue = firstValid.simulatedSharpe;
-        else if (overallSelectionMetric === 'winRate') initialScoreValue = firstValid.simulatedWinRate;
-
-        if (typeof initialScoreValue === 'number' && isFinite(initialScoreValue)) {
-            overallBestResult = firstValid;
-            bestOverallScore = initialScoreValue;
-            break;
-        }
+    if (overallSelectionMetric === 'pnl') {
+      scoreA = a.simulatedPnl;
+      scoreB = b.simulatedPnl;
+    } else if (overallSelectionMetric === 'sharpe') {
+      scoreA = a.simulatedSharpe;
+      scoreB = b.simulatedSharpe;
+    } else { // winRate
+      scoreA = a.simulatedWinRate;
+      scoreB = b.simulatedWinRate;
     }
+
+    // Handle null/undefined: sort them to the bottom
+    if (scoreA == null || !isFinite(scoreA)) return 1; // a is worse
+    if (scoreB == null || !isFinite(scoreB)) return -1; // b is worse
+
+    return scoreB - scoreA; // Descending order
+  });
+
+  const topNValue = 3; // Define N for Top N
+  const topNResults = allSymbolResults.slice(0, topNValue);
+
+  if (topNResults.length === 0) {
+    logger.warn(`[AISuggestionService] No valid results after sorting for metric '${overallSelectionMetric}'.`);
+    return [];
   }
 
-  if (overallBestResult) { // If an initial candidate was found
-    for (const result of allSymbolResults) {
-        let currentScoreValue: number | null | undefined = null;
-        if (overallSelectionMetric === 'pnl') {
-            currentScoreValue = result.simulatedPnl;
-        } else if (overallSelectionMetric === 'sharpe') {
-            currentScoreValue = result.simulatedSharpe;
-        } else if (overallSelectionMetric === 'winRate') {
-            currentScoreValue = result.simulatedWinRate;
-        }
+  logger.info(`[AISuggestionService] Top ${topNResults.length} results selected:`);
+  topNResults.forEach((result, index) => {
+    logger.info(`  ${index + 1}. Symbol: ${result.symbol}, Strategy: ${result.strategyName}, Metric (${overallSelectionMetric}): ${
+      overallSelectionMetric === 'pnl' ? result.simulatedPnl?.toFixed(2) :
+      overallSelectionMetric === 'sharpe' ? result.simulatedSharpe?.toFixed(2) :
+      (result.simulatedWinRate !== undefined && result.simulatedWinRate !== null ? (result.simulatedWinRate * 100).toFixed(1) + '%' : 'N/A')
+    }, P&L: ${result.simulatedPnl?.toFixed(2)}, Sharpe: ${result.simulatedSharpe?.toFixed(2)}, WinRate: ${(result.simulatedWinRate !== undefined && result.simulatedWinRate !== null ? (result.simulatedWinRate * 100).toFixed(1) + '%' : 'N/A')}`);
+  });
 
-        if (typeof currentScoreValue === 'number' && isFinite(currentScoreValue)) {
-            if (currentScoreValue > bestOverallScore) {
-                bestOverallScore = currentScoreValue;
-                overallBestResult = result;
-            }
-        }
-    }
-  }
+  const finalSuggestions: SuggestionResponse[] = [];
 
-  if (!overallBestResult) {
-    logger.warn(`[AISuggestionService] No valid scores found for metric '${overallSelectionMetric}' among per-symbol results.`);
-    return {
-        suggestedStrategyId: null,
-        suggestedStrategyName: null,
-        suggestedParameters: null,
-        message: `Could not determine an overall best strategy based on the selected metric: ${overallSelectionMetric}.`
-    };
-  }
+  for (const result of topNResults) {
+    const symbolForAdjustment = result.symbol;
+    let parametersForAdjustment = { ...result.parameters };
+    let currentOverallScore: number | undefined | null;
+    if (overallSelectionMetric === 'pnl') currentOverallScore = result.simulatedPnl;
+    else if (overallSelectionMetric === 'sharpe') currentOverallScore = result.simulatedSharpe;
+    else currentOverallScore = result.simulatedWinRate;
 
-  // Log updated to reflect the metric used for selection and its score
-  logger.info(`[AISuggestionService] Overall best choice using metric '${overallSelectionMetric}': Symbol ${overallBestResult.symbol}, Strategy ${overallBestResult.strategyName} (ID: ${overallBestResult.strategyId}) with Score ${bestOverallScore.toFixed(4)}. ` +
-              `(P&L: ${overallBestResult.simulatedPnl?.toFixed(2)}, Sharpe: ${overallBestResult.simulatedSharpe?.toFixed(2)}, WinRate: ${(overallBestResult.simulatedWinRate !== undefined && overallBestResult.simulatedWinRate !== null ? (overallBestResult.simulatedWinRate * 100).toFixed(1) + '%' : 'N/A')})`);
 
-  const symbolForAdjustment = overallBestResult.symbol;
-  let parametersForAdjustment = { ...overallBestResult.parameters };
-  // Update finalMessage to include all scores and the selection metric
-  let finalMessage = `Overall best for ${symbolForAdjustment} (selected by ${overallSelectionMetric}): ${overallBestResult.strategyName} (P&L: ${overallBestResult.simulatedPnl?.toFixed(2)}, Sharpe: ${overallBestResult.simulatedSharpe?.toFixed(2)}, WinRate: ${(overallBestResult.simulatedWinRate !== undefined && overallBestResult.simulatedWinRate !== null ? (overallBestResult.simulatedWinRate * 100).toFixed(1) + '%' : 'N/A')}). Score on ${overallSelectionMetric}: ${bestOverallScore.toFixed(4)}.`;
+    let message = `Suggestion for ${symbolForAdjustment} (selected by ${overallSelectionMetric}): ${result.strategyName}. ` +
+                  `Score on ${overallSelectionMetric}: ${(typeof currentOverallScore === 'number' ? currentOverallScore.toFixed(4) : 'N/A')}. ` +
+                  `P&L: ${result.simulatedPnl?.toFixed(2)}, Sharpe: ${result.simulatedSharpe?.toFixed(2)}, WinRate: ${(result.simulatedWinRate !== undefined && result.simulatedWinRate !== null ? (result.simulatedWinRate * 100).toFixed(1) + '%' : 'N/A')}.`;
 
-  const recentPrice = await getMostRecentClosePrice(symbolForAdjustment, aiEvalSourceApi, aiEvalInterval);
+    const recentPrice = await getMostRecentClosePrice(symbolForAdjustment, aiEvalSourceApi, aiEvalInterval);
 
-  if (recentPrice === null) {
-    logger.warn(`[AISuggestionService] Could not fetch recent price for selected symbol ${symbolForAdjustment} (source: ${aiEvalSourceApi}, interval: ${aiEvalInterval}). Cannot adjust tradeAmount.`);
-    finalMessage += " Failed to fetch recent price; tradeAmount not adjusted.";
-  } else {
-    logger.info(`[AISuggestionService] Recent price for ${symbolForAdjustment} is ${recentPrice}. Initial capital ${initialCapital}. Adjusting tradeAmount.`);
-    const strategyDetails = StrategyManagerModule.getStrategy(overallBestResult.strategyId);
-
-    if (!strategyDetails) {
-      logger.error(`[AISuggestionService] Critical: Strategy details for ${overallBestResult.strategyId} not found. Cannot perform capital adjustment.`);
-      finalMessage += " Internal error: Strategy details not found; tradeAmount not adjusted.";
+    if (recentPrice === null) {
+      logger.warn(`[AISuggestionService] Could not fetch recent price for ${symbolForAdjustment} (source: ${aiEvalSourceApi}, interval: ${aiEvalInterval}). Cannot adjust tradeAmount.`);
+      message += " Failed to fetch recent price; tradeAmount not adjusted.";
     } else {
-      const sizingParamDef = strategyDetails.parameters.find(p => p.name === 'tradeAmount' || p.name === 'sharesToTrade' || p.name === 'contracts');
-      if (sizingParamDef && parametersForAdjustment.hasOwnProperty(sizingParamDef.name)) {
-        const sizingParamName = sizingParamDef.name;
-        const originalTradeAmount = Number(parametersForAdjustment[sizingParamName]);
-        const targetTradeValue = initialCapital * (riskPercentage / 100.0);
-        let adjustedTradeAmount = targetTradeValue / recentPrice;
+      logger.info(`[AISuggestionService] Recent price for ${symbolForAdjustment} is ${recentPrice}. Initial capital ${initialCapital}. Adjusting tradeAmount for this suggestion.`);
+      const strategyDetails = StrategyManagerModule.getStrategy(result.strategyId);
 
-        if (symbolForAdjustment.toUpperCase().includes('BTC')) {
-          adjustedTradeAmount = parseFloat(adjustedTradeAmount.toFixed(5));
-          const minTradeableBTC = 0.0001; // Example minimum
-          if (adjustedTradeAmount < minTradeableBTC) {
-            if (initialCapital >= minTradeableBTC * recentPrice) {
-              logger.info(`[AISuggestionService] Adjusted ${sizingParamName} ${adjustedTradeAmount} for ${symbolForAdjustment} is below minimum ${minTradeableBTC}, setting to minimum as capital allows.`);
-              adjustedTradeAmount = minTradeableBTC;
-            } else {
-              logger.warn(`[AISuggestionService] Capital ${initialCapital} too low for even minimum ${sizingParamName} ${minTradeableBTC} of ${symbolForAdjustment} at price ${recentPrice}. Using original param value.`);
-              // Keep originalTradeAmount, don't change parametersForAdjustment[sizingParamName]
-              finalMessage += ` Capital too low for min trade of ${minTradeableBTC} ${symbolForAdjustment}; ${sizingParamName} not adjusted from ${originalTradeAmount}.`;
-              adjustedTradeAmount = originalTradeAmount; // Revert to original if cannot meet min
+      if (!strategyDetails) {
+        logger.error(`[AISuggestionService] Critical: Strategy details for ${result.strategyId} not found for symbol ${symbolForAdjustment}. Cannot perform capital adjustment.`);
+        message += " Internal error: Strategy details not found; tradeAmount not adjusted.";
+      } else {
+        const sizingParamDef = strategyDetails.parameters.find(p => p.name === 'tradeAmount' || p.name === 'sharesToTrade' || p.name === 'contracts');
+        if (sizingParamDef && parametersForAdjustment.hasOwnProperty(sizingParamDef.name)) {
+          const sizingParamName = sizingParamDef.name;
+          const originalTradeAmount = Number(parametersForAdjustment[sizingParamName]);
+          const targetTradeValue = initialCapital * (riskPercentage / 100.0);
+          let adjustedTradeAmount = targetTradeValue / recentPrice;
+
+          if (symbolForAdjustment.toUpperCase().includes('BTC')) {
+            adjustedTradeAmount = parseFloat(adjustedTradeAmount.toFixed(5));
+            const minTradeableBTC = 0.0001; // Example minimum
+            if (adjustedTradeAmount < minTradeableBTC) {
+              if (initialCapital >= minTradeableBTC * recentPrice) {
+                logger.info(`[AISuggestionService] Adjusted ${sizingParamName} ${adjustedTradeAmount} for ${symbolForAdjustment} is below minimum ${minTradeableBTC}, setting to minimum as capital allows.`);
+                adjustedTradeAmount = minTradeableBTC;
+              } else {
+                logger.warn(`[AISuggestionService] Capital ${initialCapital} too low for even minimum ${sizingParamName} ${minTradeableBTC} of ${symbolForAdjustment} at price ${recentPrice}. Using original param value ${originalTradeAmount}.`);
+                message += ` Capital too low for min trade of ${minTradeableBTC} ${symbolForAdjustment}; ${sizingParamName} not adjusted from ${originalTradeAmount}.`;
+                adjustedTradeAmount = originalTradeAmount; // Revert
+              }
+            }
+          } else { // Default for other assets
+            adjustedTradeAmount = Math.floor(adjustedTradeAmount);
+            if (adjustedTradeAmount < 1) {
+              if (initialCapital >= 1 * recentPrice) { // Can afford at least 1 unit
+                logger.info(`[AISuggestionService] Adjusted ${sizingParamName} ${adjustedTradeAmount} for ${symbolForAdjustment} is less than 1, setting to 1 as capital allows.`);
+                adjustedTradeAmount = 1;
+              } else {
+                logger.warn(`[AISuggestionService] Capital ${initialCapital} too low for even 1 unit of ${symbolForAdjustment} at price ${recentPrice}. Using original param value ${originalTradeAmount}.`);
+                message += ` Capital too low for 1 unit of ${symbolForAdjustment}; ${sizingParamName} not adjusted from ${originalTradeAmount}.`;
+                adjustedTradeAmount = originalTradeAmount; // Revert
+              }
             }
           }
-        } else { // Default for other assets (e.g., stocks - round to whole shares)
-          adjustedTradeAmount = Math.floor(adjustedTradeAmount);
-          if (adjustedTradeAmount < 1) {
-            if (initialCapital >= 1 * recentPrice) { // Can afford at least 1 unit
-              logger.info(`[AISuggestionService] Adjusted ${sizingParamName} ${adjustedTradeAmount} for ${symbolForAdjustment} is less than 1, setting to 1 as capital allows.`);
-              adjustedTradeAmount = 1;
-            } else {
-              logger.warn(`[AISuggestionService] Capital ${initialCapital} too low for even 1 unit of ${symbolForAdjustment} at price ${recentPrice}. Using original param value.`);
-              finalMessage += ` Capital too low for 1 unit of ${symbolForAdjustment}; ${sizingParamName} not adjusted from ${originalTradeAmount}.`;
-              adjustedTradeAmount = originalTradeAmount; // Revert
-            }
-          }
-        }
 
-        if (adjustedTradeAmount <= 0 && originalTradeAmount > 0) { // Check if adjustment made it non-positive
+          if (adjustedTradeAmount <= 0 && originalTradeAmount > 0) {
             logger.warn(`[AISuggestionService] Adjusted ${sizingParamName} for ${symbolForAdjustment} is ${adjustedTradeAmount}. Capital might be too low. Reverting to original parameter value ${originalTradeAmount}.`);
-            parametersForAdjustment[sizingParamName] = originalTradeAmount; // Revert to original
-            finalMessage += ` Calculated ${sizingParamName} was ${adjustedTradeAmount}; reverted to original ${originalTradeAmount}.`;
-        } else if (adjustedTradeAmount > 0) {
+            parametersForAdjustment[sizingParamName] = originalTradeAmount;
+            message += ` Calculated ${sizingParamName} was ${adjustedTradeAmount}; reverted to original ${originalTradeAmount}.`;
+          } else if (adjustedTradeAmount > 0) {
             logger.info(`[AISuggestionService] For ${symbolForAdjustment} (capital ${initialCapital}, price ${recentPrice}): Original ${sizingParamName}: ${originalTradeAmount}, Capital-Aware Adjusted ${sizingParamName}: ${adjustedTradeAmount}`);
             parametersForAdjustment[sizingParamName] = adjustedTradeAmount;
-            finalMessage += ` ${sizingParamName} adjusted to ${adjustedTradeAmount} for capital ${initialCapital}€, risk ${riskPercentage}%.`;
-        } else {
-             // If originalTradeAmount was already 0 or less, and adjusted is also 0 or less.
-            logger.info(`[AISuggestionService] Original and Adjusted ${sizingParamName} for ${symbolForAdjustment} are non-positive (${originalTradeAmount} -> ${adjustedTradeAmount}). No adjustment made.`);
-            finalMessage += ` ${sizingParamName} remains ${originalTradeAmount} (non-positive).`;
-        }
+            message += ` ${sizingParamName} adjusted to ${adjustedTradeAmount} for capital ${initialCapital}€, risk ${riskPercentage}%.`;
+          } else {
+            logger.info(`[AISuggestionService] Original and Adjusted ${sizingParamName} for ${symbolForAdjustment} are non-positive (${originalTradeAmount} -> ${adjustedTradeAmount}). No change to ${sizingParamName}.`);
+            message += ` ${sizingParamName} remains ${originalTradeAmount} (non-positive).`;
+          }
 
-      } else {
-        logger.warn(`[AISuggestionService] Chosen strategy ${strategyDetails.name} (ID: ${overallBestResult.strategyId}) does not have a standard sizing parameter or it's missing from current params. Capital adjustment not applied.`);
-        finalMessage += " No standard trade sizing parameter found; tradeAmount not adjusted.";
+        } else {
+          logger.warn(`[AISuggestionService] Chosen strategy ${strategyDetails.name} (ID: ${result.strategyId}) for ${symbolForAdjustment} does not have a standard sizing parameter or it's missing. Capital adjustment not applied.`);
+          message += " No standard trade sizing parameter found; tradeAmount not adjusted.";
+        }
       }
     }
+
+    finalSuggestions.push({
+      suggestedStrategyId: result.strategyId,
+      suggestedStrategyName: result.strategyName,
+      suggestedParameters: parametersForAdjustment,
+      evaluationScore: (typeof currentOverallScore === 'number' ? parseFloat(currentOverallScore.toFixed(4)) : null),
+      evaluationMetricUsed: overallSelectionMetric,
+      recentPriceUsed: recentPrice,
+      message: message
+    });
   }
 
-  return {
-    suggestedStrategyId: overallBestResult.strategyId,
-    suggestedStrategyName: overallBestResult.strategyName,
-    suggestedParameters: parametersForAdjustment,
-    evaluationScore: overallBestResult.evaluationScore, // This is the score for evaluationMetric (e.g. PNL if that was chosen)
-    evaluationMetricUsed: overallBestResult.evaluationMetric, // The metric AISelector used for its primary decision
-    // Pass through all simulated scores to the response.
-    // The SuggestionResponse interface might need to be updated if we want to formally include these.
-    // For now, they are in the message. The key is that overallBestResult was chosen based on P&L.
-    recentPriceUsed: recentPrice,
-    message: finalMessage // This message now includes P&L, Sharpe, WinRate of the overallBestResult
-  };
+  return finalSuggestions;
 }
