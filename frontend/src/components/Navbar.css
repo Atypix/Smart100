@@ -1,0 +1,36 @@
+/* frontend/src/components/Navbar.css */
+.navbar {
+  background-color: #f0f0f0; /* Light grey background */
+  padding: 10px 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.navbar-nav {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: row;
+}
+
+.nav-item {
+  margin-right: 20px;
+}
+
+.nav-item:last-child {
+  margin-right: 0;
+}
+
+.nav-link {
+  text-decoration: none;
+  color: #333; /* Dark grey text */
+  font-weight: 500;
+  padding: 5px 10px;
+  border-radius: 4px;
+  transition: background-color 0.3s ease;
+}
+
+.nav-link:hover,
+.nav-link.active { /* Basic active style, react-router's NavLink can handle 'active' class */
+  background-color: #ddd; /* Slightly darker grey on hover/active */
+}

@@ -1,0 +1,10 @@
+/* frontend/src/pages/ApiKeysPage.css */
+.api-keys-page-container {
+  padding: 20px;
+}
+.api-keys-page-container h2 {
+  margin-bottom: 10px;
+}
+.api-keys-page-container p {
+  margin-bottom: 20px;
+}
