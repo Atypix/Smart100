@@ -117,11 +117,17 @@ export interface ApiKeyFormData {
 
 // --- AI Strategy Suggestion Service Types ---
 export interface SuggestionResponse {
+  symbol?: string; // Added to match backend
   suggestedStrategyId: string | null;
   suggestedStrategyName: string | null;
   suggestedParameters: Record<string, any> | null;
   recentPriceUsed?: number | null;
   evaluationScore?: number | null; // Added
   evaluationMetricUsed?: string | null; // Added
+  message: string;
+}
+
+export interface MultipleSuggestionsApiResponse {
+  suggestions: SuggestionResponse[];
   message: string;
 }

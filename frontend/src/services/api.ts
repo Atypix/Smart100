@@ -1,5 +1,5 @@
 // frontend/src/services/api.ts
-import type { ApiKey, ApiKeyFormData, SuggestionResponse } from '../types'; // Added SuggestionResponse
+import type { ApiKey, ApiKeyFormData, SuggestionResponse, MultipleSuggestionsApiResponse } from '../types'; // Added SuggestionResponse
 
 const API_BASE_URL = '/api'; // Adjust if your API is hosted elsewhere
 
@@ -157,13 +157,15 @@ export const fetchStrategySuggestion = async (
   lookbackPeriod?: number,
   evaluationMetric?: string,
   optimizeParameters?: boolean,
-  riskPercentage?: number // Added
-): Promise<SuggestionResponse> => {
+  riskPercentage?: number, // Existing
+  overallSelectionMetric?: string // Added for consistency with backend
+): Promise<MultipleSuggestionsApiResponse> => {
   const requestBody: any = { symbol, initialCapital };
   if (lookbackPeriod !== undefined) requestBody.lookbackPeriod = lookbackPeriod;
   if (evaluationMetric !== undefined) requestBody.evaluationMetric = evaluationMetric;
   if (optimizeParameters !== undefined) requestBody.optimizeParameters = optimizeParameters;
-  if (riskPercentage !== undefined) requestBody.riskPercentage = riskPercentage; // Added
+  if (riskPercentage !== undefined) requestBody.riskPercentage = riskPercentage;
+  if (overallSelectionMetric !== undefined) requestBody.overallSelectionMetric = overallSelectionMetric; // Added
 
   const response = await fetch(`${API_BASE_URL}/ai/suggest-strategy`, {
     method: 'POST',
@@ -174,5 +176,5 @@ export const fetchStrategySuggestion = async (
     },
     body: JSON.stringify(requestBody),
   });
-  return handleResponse<SuggestionResponse>(response);
+  return handleResponse<MultipleSuggestionsApiResponse>(response);
 };

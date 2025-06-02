@@ -10,7 +10,8 @@ import type {
   ApiError,
   HistoricalDataPoint as FrontendHistoricalDataPoint, // Keep alias for clarity if needed
   Trade, // Use the Trade type from types.ts
-  SuggestionResponse, // Import the new type
+  // SuggestionResponse, // Import the new type // Replaced by MultipleSuggestionsApiResponse
+  MultipleSuggestionsApiResponse 
 } from '../types';
 import { fetchStrategySuggestion } from '../services/api'; // Import the new API function
 import StrategySelector from './StrategySelector';
@@ -49,9 +50,10 @@ const BacktestRunnerPage: React.FC = () => {
   // State for Smart Strategy Suggestion Feature
   const [initialCapitalForSuggestion, setInitialCapitalForSuggestion] = useState<number>(10000); // Default capital for suggestion
   const [riskPercentageForSuggestion, setRiskPercentageForSuggestion] = useState<number>(20); // Default to 20%
-  const [suggestionResult, setSuggestionResult] = useState<SuggestionResponse | null>(null);
+  const [suggestionResult, setSuggestionResult] = useState<MultipleSuggestionsApiResponse | null>(null);
   const [isFetchingSuggestion, setIsFetchingSuggestion] = useState<boolean>(false);
   const [suggestionError, setSuggestionError] = useState<string | null>(null); // For suggestion fetching errors
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState<number | null>(null); // State for selected suggestion
 
   const [availableStrategies, setAvailableStrategies] = useState<TradingStrategy[]>([]);
 
@@ -192,6 +194,7 @@ const BacktestRunnerPage: React.FC = () => {
     setIsFetchingSuggestion(true);
     setSuggestionResult(null);
     setSuggestionError(null);
+    setSelectedSuggestionIndex(null); // Reset selection when fetching new suggestions
     logger.info(`[GetSuggestion] Fetching suggestion for ${currentBacktestSettings.symbol} with capital ${initialCapitalForSuggestion}`);
 
     try {
@@ -201,14 +204,18 @@ const BacktestRunnerPage: React.FC = () => {
         undefined, // lookbackPeriod - placeholder for future UI
         undefined, // evaluationMetric - placeholder for future UI
         undefined, // optimizeParameters - placeholder for future UI
-        riskPercentageForSuggestion // Pass the new state value
+        riskPercentageForSuggestion, // Pass the new state value
+        undefined // overallSelectionMetric - placeholder for future UI
       );
       setSuggestionResult(result);
-      if (!result.suggestedStrategyId) {
-        logger.info(`[BacktestRunnerPage] Suggestion API returned successfully but no specific strategy chosen: ${result.message}`);
-        // Optional: setSuggestionError(result.message); // Or let the display handle the message from result
+      // Updated logging for multiple suggestions
+      if (result.suggestions && result.suggestions.length === 0) {
+        logger.info(`[BacktestRunnerPage] Suggestion API returned successfully with an empty suggestions list: ${result.message}`);
+      } else if (result.suggestions && result.suggestions.length > 0) {
+        logger.info('[BacktestRunnerPage] Suggestions received:', result.suggestions);
       } else {
-        logger.info('[GetSuggestion] Suggestion received:', result);
+        // Fallback for unexpected structure, though API should ensure suggestions array is present
+        logger.warn('[BacktestRunnerPage] Suggestion API response structure might be unexpected:', result);
       }
     } catch (err: any) {
       const errorMessage = err.message || 'Failed to fetch strategy suggestion.';
@@ -221,9 +228,13 @@ const BacktestRunnerPage: React.FC = () => {
 
   // Handler for "Apply & Run Backtest with Suggestion"
   const handleApplyAndRunSuggestion = async () => {
-    if (!suggestionResult || !suggestionResult.suggestedStrategyId || !suggestionResult.suggestedParameters) {
-      setError("Aucune suggestion valide à appliquer pour le backtest."); // French
-      logger.warn('[ApplyAndRun] No valid suggestion to apply.');
+    const activeSuggestion = selectedSuggestionIndex !== null && suggestionResult?.suggestions 
+      ? suggestionResult.suggestions[selectedSuggestionIndex] 
+      : null;
+
+    if (!activeSuggestion || !activeSuggestion.suggestedStrategyId || !activeSuggestion.suggestedParameters) {
+      setError("Veuillez sélectionner une suggestion valide à appliquer."); // French
+      logger.warn('[ApplyAndRun] No valid suggestion selected to apply.');
       return;
     }
 
@@ -231,9 +242,9 @@ const BacktestRunnerPage: React.FC = () => {
     const startDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // Default 90 days ago
 
     const requestBody = {
-      strategyId: suggestionResult.suggestedStrategyId,
-      strategyParams: suggestionResult.suggestedParameters,
-      symbol: currentBacktestSettings.symbol, // From existing form state
+      strategyId: activeSuggestion.suggestedStrategyId,
+      strategyParams: activeSuggestion.suggestedParameters,
+      symbol: activeSuggestion.symbol || currentBacktestSettings.symbol, // Prefer symbol from suggestion
       startDate: startDate,
       endDate: endDate,
       initialCash: initialCapitalForSuggestion, // Use the capital from the suggestion input
@@ -262,38 +273,37 @@ const BacktestRunnerPage: React.FC = () => {
 
   // Handler for "Appliquer aux Paramètres"
   const handleApplySuggestionToConfig = () => {
-    if (!suggestionResult || !suggestionResult.suggestedStrategyId || !suggestionResult.suggestedParameters) {
-      setSuggestionError("Aucune suggestion valide à appliquer."); // French
-      logger.warn('[ApplyToConfig] No valid suggestion to apply.');
+    const activeSuggestion = selectedSuggestionIndex !== null && suggestionResult?.suggestions
+      ? suggestionResult.suggestions[selectedSuggestionIndex]
+      : null;
+
+    if (!activeSuggestion || !activeSuggestion.suggestedStrategyId || !activeSuggestion.suggestedParameters) {
+      setSuggestionError("Veuillez sélectionner une suggestion valide à appliquer."); // French
+      logger.warn('[ApplyToConfig] No valid suggestion selected to apply.');
       return;
     }
 
-    const strategyToApply = availableStrategies.find(s => s.id === suggestionResult.suggestedStrategyId);
+    const strategyToApply = availableStrategies.find(s => s.id === activeSuggestion.suggestedStrategyId);
     if (!strategyToApply) {
-      logger.error(`[ApplyToConfig] Suggested strategy ID '${suggestionResult.suggestedStrategyId}' not found in available strategies list.`);
+      logger.error(`[ApplyToConfig] Suggested strategy ID '${activeSuggestion.suggestedStrategyId}' not found in available strategies list.`);
       setSuggestionError("Erreur : La stratégie suggérée est introuvable dans la liste des stratégies disponibles."); // French
       return;
     }
 
     // Update main form states
-    // Calling handleStrategySelect will also reset params to defaults, so call setCurrentStrategyParams after.
-    handleStrategySelect(strategyToApply); // This calls setSelectedStrategy and sets default params
-    setCurrentStrategyParams(suggestionResult.suggestedParameters); // Override with suggested params
+    handleStrategySelect(strategyToApply); 
+    setCurrentStrategyParams(activeSuggestion.suggestedParameters); 
 
     setCurrentBacktestSettings(prevSettings => ({
       ...prevSettings,
-      initialCash: initialCapitalForSuggestion, // Use capital from suggestion input
-      // Keep other settings like symbol, dates, interval, sourceApi from the main form
+      symbol: activeSuggestion.symbol || prevSettings.symbol, // Update symbol from suggestion if available
+      initialCash: initialCapitalForSuggestion, 
     }));
 
-    // Clear previous backtest results and errors as settings have changed
     setBacktestResult(null);
     setError(null);
-    // Provide user feedback
-    // Consider a more subtle notification system for this in the future.
-    // For now, reusing suggestionError to display a success/info message.
-    setSuggestionError("Suggestion appliquée aux formulaires de configuration principaux. Veuillez vérifier et lancer le backtest manuellement."); // French
-    logger.info(`[ApplyToConfig] Applied suggestion: Strategy '${strategyToApply.name}', Params:`, suggestionResult.suggestedParameters, `InitialCash: ${initialCapitalForSuggestion}`);
+    setSuggestionError("Suggestion sélectionnée appliquée aux formulaires. Vérifiez et lancez le backtest."); // French
+    logger.info(`[ApplyToConfig] Applied selected suggestion: Strategy '${strategyToApply.name}', Params:`, activeSuggestion.suggestedParameters, `InitialCash: ${initialCapitalForSuggestion}`);
   };
 
 
@@ -344,51 +354,68 @@ const BacktestRunnerPage: React.FC = () => {
         {suggestionError && <p className="error-message" style={{ marginTop: '10px' }}>Erreur de suggestion : {suggestionError}</p>}
         {suggestionResult && !isFetchingSuggestion && (
           <div className="suggestion-result info-box-styled" style={{ marginTop: '10px' }}>
-            <p><strong>Détails de la Suggestion :</strong></p>
-            {/* Display backend message first, as it might explain why no strategy was chosen */}
-            <p>{suggestionResult.message}</p>
+            <h4>Résultats des Suggestions</h4>
+            <p><em>{suggestionResult.message}</em></p> {/* Display overall message */}
 
-            {suggestionResult.suggestedStrategyId && suggestionResult.suggestedStrategyName && (
-              <>
-                <p>Stratégie Suggérée : <strong>{suggestionResult.suggestedStrategyName}</strong> (ID: {suggestionResult.suggestedStrategyId})</p>
+            {suggestionResult.suggestions && suggestionResult.suggestions.length > 0 ? (
+              <ul className="suggestion-list" style={{ listStyle: 'none', paddingLeft: 0 }}>
+                {suggestionResult.suggestions.map((suggestion, index) => (
+                  <li 
+                    key={`${suggestion.suggestedStrategyId}-${suggestion.symbol || 'nosymbol'}-${index}`} 
+                    className={`suggestion-item ${index === selectedSuggestionIndex ? 'selected-suggestion' : ''}`} 
+                    style={{ 
+                      border: '1px solid #ddd', 
+                      padding: '15px', 
+                      marginBottom: '15px', 
+                      borderRadius: '5px',
+                      backgroundColor: index === selectedSuggestionIndex ? '#e0f7fa' : 'transparent', // Example highlight
+                      cursor: 'pointer'
+                    }}
+                    onClick={() => setSelectedSuggestionIndex(index)}
+                  >
+                    <h5>Suggestion {index + 1}: {suggestion.suggestedStrategyName} {suggestion.symbol && `(${suggestion.symbol})`}</h5>
+                    <p><strong>ID de la Stratégie :</strong> {suggestion.suggestedStrategyId}</p>
+                    
+                    {suggestion.evaluationMetricUsed && typeof suggestion.evaluationScore === 'number' && (
+                      <p><strong>Évaluation :</strong> {suggestion.evaluationMetricUsed}: {suggestion.evaluationScore.toFixed(4)}</p>
+                    )}
+                    
+                    {suggestion.suggestedParameters && Object.keys(suggestion.suggestedParameters).length > 0 && (
+                      <div>
+                        <strong>Paramètres Suggérés :</strong>
+                        <ul style={{ listStyleType: 'disc', paddingLeft: '20px', fontSize: '0.9em' }}>
+                          {Object.entries(suggestion.suggestedParameters).map(([key, value]) => (
+                            <li key={key}><code>{key}</code>: {String(value)}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    <p style={{ marginTop: '10px', fontStyle: 'italic', fontSize: '0.95em' }}>{suggestion.message}</p> {/* Per-suggestion message */}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>Aucune suggestion spécifique disponible.</p> 
+            )}
 
-                {suggestionResult.evaluationMetricUsed && (
-                  <p>
-                    <strong>Métrique d'Évaluation Utilisée :</strong> {suggestionResult.evaluationMetricUsed}
-                  </p>
-                )}
-                {typeof suggestionResult.evaluationScore === 'number' && (
-                  <p>
-                    <strong>Score d'Évaluation :</strong> {suggestionResult.evaluationScore.toFixed(4)}
-                  </p>
-                )}
-
-                {suggestionResult.suggestedStrategyId && typeof suggestionResult.recentPriceUsed === 'number' && (
-                  <p style={{ fontStyle: 'italic', fontSize: '0.9em' }}>
-                    Basé sur votre capital de {initialCapitalForSuggestion.toLocaleString()}€,
-                    un pourcentage de risque par transaction de {riskPercentageForSuggestion}%,
-                    et un prix récent de {suggestionResult.recentPriceUsed.toFixed(2)} pour {currentBacktestSettings.symbol},
-                    le paramètre de taille de transaction (ex: 'tradeAmount') a été ajusté.
-                  </p>
-                )}
-
-                {suggestionResult.suggestedParameters && Object.keys(suggestionResult.suggestedParameters).length > 0 && (
-                  <div>
-                    <p>Paramètres Suggérés :</p>
-                    <ul>
-                      {Object.entries(suggestionResult.suggestedParameters).map(([key, value]) => (
-                        <li key={key}><code>{key}</code>: {String(value)}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                <button onClick={handleApplyAndRunSuggestion} disabled={isLoading} style={{ marginTop: '10px' }}>
-                  Appliquer et Lancer le Backtest avec la Suggestion
+            {/* Buttons to apply the SELECTED suggestion */}
+            {suggestionResult.suggestions && suggestionResult.suggestions.length > 0 && (
+              <div style={{ marginTop: '20px', paddingTop: '10px', borderTop: '1px solid #eee' }}>
+                <p style={{ fontWeight: 'bold' }}>Actions pour la suggestion sélectionnée :</p>
+                <button 
+                  onClick={handleApplyAndRunSuggestion} 
+                  disabled={isLoading || selectedSuggestionIndex === null || !suggestionResult?.suggestions?.length} 
+                  style={{ marginRight: '10px' }}
+                >
+                  Appliquer et Lancer Backtest
                 </button>
-                <button onClick={handleApplySuggestionToConfig} disabled={!suggestionResult || !suggestionResult.suggestedStrategyId} style={{ marginTop: '10px', marginLeft: '10px' }}>
+                <button 
+                  onClick={handleApplySuggestionToConfig} 
+                  disabled={selectedSuggestionIndex === null || !suggestionResult?.suggestions?.length}
+                >
                   Appliquer aux Paramètres
                 </button>
-              </>
+              </div>
             )}
           </div>
         )}
