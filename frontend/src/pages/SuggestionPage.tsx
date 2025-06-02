@@ -8,12 +8,12 @@ import type {
     SuggestionResponse, 
     BacktestResult, 
     ApiError,
-    HistoricalDataPoint, // For TradesOnPriceChart
-    Trade             // For TradesOnPriceChart
+    HistoricalDataPoint, 
+    Trade             
 } from '../types'; 
 import './SuggestionPage.css';
-import EquityChart from '../components/EquityChart'; // Import EquityChart
-import TradesOnPriceChart from '../components/TradesOnPriceChart'; // Import TradesOnPriceChart
+import EquityChart from '../components/EquityChart'; 
+import TradesOnPriceChart from '../components/TradesOnPriceChart'; 
 
 // Mappings for Thematic Names and Strategy Types
 const G_THEMATIC_SUGGESTION_NAMES: string[] = ["L'Écureuil Prudent 🐿️", "Le Hérisson Équilibré 🦔", "Le Faucon Audacieux 🦅"];
@@ -174,18 +174,52 @@ const SuggestionPage: React.FC = () => {
 
               return (
                 <div key={index} className="suggestion-card">
-                  <h4>{thematicName} {suggestion.symbol && `- ${suggestion.symbol}`}</h4>
+                  <h4>
+                    {thematicName} {suggestion.symbol && `- ${suggestion.symbol}`}
+                    <span className="tooltip-trigger"> ℹ️
+                      <span className="tooltip-text">
+                        {index === 0 ? "Cette approche de trading vise des gains potentiellement plus modestes mais avec une prise de risque généralement considérée comme plus faible. Idéal pour une croissance régulière." :
+                         index === 1 ? "Une stratégie cherchant un équilibre entre risque et rendement, visant une performance solide sans exposition excessive." :
+                         "Approche plus dynamique visant des rendements potentiellement plus élevés, ce qui peut impliquer une prise de risque plus conséquente."}
+                      </span>
+                    </span>
+                  </h4>
                   <p>
-                    <strong>Type de Stratégie:</strong> {strategyDisplayName} 
+                    <strong>Type de Stratégie:</strong> {strategyDisplayName}
+                    <span className="tooltip-trigger"> ℹ️
+                      <span className="tooltip-text">
+                        {suggestion.suggestedStrategyId === 'ichimoku-cloud' ? "Stratégie de suivi de tendance qui utilise plusieurs lignes et un 'nuage' (Kumo) pour identifier la direction du marché, les niveaux de support/résistance et générer des signaux." :
+                         suggestion.suggestedStrategyId === 'simple-threshold' ? "Achète lorsque le prix dépasse un seuil haut et vend lorsqu'il passe sous un seuil bas." :
+                         suggestion.suggestedStrategyId === 'rsi-bollinger' ? "Combine l'indicateur de momentum RSI (pour surachat/survente) avec les Bandes de Bollinger (volatilité et niveaux de prix relatifs)." :
+                         suggestion.suggestedStrategyId === 'macd-crossover' ? "Utilise les croisements de la ligne MACD et de sa ligne de signal pour indiquer des changements potentiels de momentum et de tendance." :
+                         suggestion.suggestedStrategyId === 'ai-price-prediction' ? "Stratégie expérimentale utilisant un modèle d'apprentissage machine pour tenter de prédire les mouvements de prix futurs." :
+                         "Description non disponible."}
+                      </span>
+                    </span>
                     {suggestion.suggestedStrategyId && <small> (ID: {suggestion.suggestedStrategyId})</small>}
                   </p>
                   <p>
                     <strong>Performance Estimée ({suggestion.evaluationMetricUsed || 'N/A'}):</strong> 
                     {typeof suggestion.evaluationScore === 'number' ? suggestion.evaluationScore.toFixed(2) : 'N/A'}
-                    <small style={{display: 'block'}}> (Note: Score basé sur l'évaluation IA, pas un ROI direct.)</small>
+                    <span className="tooltip-trigger"> ℹ️
+                      <span className="tooltip-text">
+                        {suggestion.evaluationMetricUsed === 'pnl' ? "Profit et Perte (P&L) net simulé par la stratégie sur la période d'évaluation interne de l'IA. Un score plus élevé indique une meilleure performance brute." :
+                         suggestion.evaluationMetricUsed === 'sharpe' ? "Ratio de Sharpe simulé sur la période d'évaluation interne de l'IA. Mesure le rendement ajusté au risque (un ratio > 1 est généralement bon)." :
+                         suggestion.evaluationMetricUsed === 'winRate' ? "Pourcentage de trades gagnants simulé sur la période d'évaluation interne de l'IA." :
+                         "Cette métrique indique la performance de la stratégie lors de son évaluation par l'IA."}
+                      </span>
+                    </span>
+                    <small style={{display: 'block', fontSize: '0.8em', fontStyle: 'italic'}}>(Note: Score basé sur l'évaluation IA, pas un ROI direct.)</small>
                   </p>
                   <p><strong>Nombre de trades simulés:</strong> N/A (donnée non disponible)</p>
-                  <p><strong>Risque max / trade:</strong> {riskMaxPerTrade} €</p>
+                  <p>
+                    <strong>Risque max / trade:</strong> {riskMaxPerTrade} €
+                    <span className="tooltip-trigger"> ℹ️
+                      <span className="tooltip-text">
+                        Montant maximum en euros que cette configuration de stratégie risquerait sur une seule transaction, calculé sur la base de votre 'Capital Initial' et du 'Pourcentage du capital par transaction' que vous avez fournis.
+                      </span>
+                    </span>
+                  </p>
                   
                   {suggestion.suggestedParameters && Object.keys(suggestion.suggestedParameters).length > 0 && (
                     <div>
@@ -226,14 +260,54 @@ const SuggestionPage: React.FC = () => {
           <>
             <div className="kpi-grid">
               <p><span className="kpi-label">Valeur Initiale du Portefeuille:</span> {backtestRunResult.initialPortfolioValue?.toFixed(2)} €</p>
-              <p><span className="kpi-label">Valeur Finale du Portefeuille:</span> {backtestRunResult.finalPortfolioValue?.toFixed(2)} €</p>
-              <p><span className="kpi-label">Profit/Perte Total:</span> {backtestRunResult.totalProfitOrLoss?.toFixed(2)} €</p>
-              <p><span className="kpi-label">Pourcentage Profit/Perte:</span> {backtestRunResult.profitOrLossPercentage?.toFixed(2)} %</p>
-              <p><span className="kpi-label">Nombre Total de Trades:</span> {backtestRunResult.totalTrades}</p>
-              <p><span className="kpi-label">Ratio de Sharpe:</span> {(backtestRunResult.sharpeRatio !== undefined ? backtestRunResult.sharpeRatio.toFixed(3) : 'N/A')}</p>
-              <p><span className="kpi-label">Max Drawdown:</span> {(backtestRunResult.maxDrawdown !== undefined ? (backtestRunResult.maxDrawdown * 100).toFixed(2) + ' %' : 'N/A')}</p>
-              <p><span className="kpi-label">CAGR (annualisé):</span> {(backtestRunResult.CAGR !== undefined ? backtestRunResult.CAGR.toFixed(2) + ' %' : 'N/A')}</p>
-              <p><span className="kpi-label">Pourcentage de Trades Gagnants:</span> {(backtestRunResult.winningTradesPercentage !== undefined ? backtestRunResult.winningTradesPercentage.toFixed(2) + ' %' : 'N/A')}</p>
+              <p>
+                <span className="kpi-label">Valeur Finale du Portefeuille:</span> {backtestRunResult.finalPortfolioValue?.toFixed(2)} €
+                <span className="tooltip-trigger"> ℹ️
+                  <span className="tooltip-text">La valeur totale de votre portefeuille (capital + profits/pertes latents et réalisés) à la fin de la période de simulation du backtest.</span>
+                </span>
+              </p>
+              <p>
+                <span className="kpi-label">Profit/Perte Total:</span> {backtestRunResult.totalProfitOrLoss?.toFixed(2)} €
+                <span className="tooltip-trigger"> ℹ️
+                  <span className="tooltip-text">Le gain ou la perte net(te) en euros réalisé(e) par la stratégie sur l'ensemble de la période de backtest, par rapport à votre capital initial.</span>
+                </span>
+              </p>
+              <p>
+                <span className="kpi-label">Pourcentage Profit/Perte:</span> {backtestRunResult.profitOrLossPercentage?.toFixed(2)} %
+                <span className="tooltip-trigger"> ℹ️
+                  <span className="tooltip-text">Le gain ou la perte total(e) exprimé(e) en pourcentage de votre capital initial.</span>
+                </span>
+              </p>
+              <p>
+                <span className="kpi-label">Nombre Total de Trades:</span> {backtestRunResult.totalTrades}
+                <span className="tooltip-trigger"> ℹ️
+                  <span className="tooltip-text">Le nombre total de transactions (achats ou ventes pour ouvrir/clôturer une position) exécutées par la stratégie pendant la période de backtest.</span>
+                </span>
+              </p>
+              <p>
+                <span className="kpi-label">Ratio de Sharpe:</span> {(backtestRunResult.sharpeRatio !== undefined ? backtestRunResult.sharpeRatio.toFixed(3) : 'N/A')}
+                <span className="tooltip-trigger"> ℹ️
+                  <span className="tooltip-text">Mesure la performance d'un investissement par rapport à un actif sans risque, après ajustement pour son risque. Un ratio plus élevé indique une meilleure performance pour la quantité de risque prise (généralement > 1 est considéré comme bon, > 2 très bon).</span>
+                </span>
+              </p>
+              <p>
+                <span className="kpi-label">Max Drawdown:</span> {(backtestRunResult.maxDrawdown !== undefined ? (backtestRunResult.maxDrawdown * 100).toFixed(2) + ' %' : 'N/A')}
+                <span className="tooltip-trigger"> ℹ️
+                  <span className="tooltip-text">La plus grande perte en pourcentage enregistrée depuis un pic de valeur du portefeuille jusqu'à un creux subséquent, avant qu'un nouveau pic ne soit atteint. Indique le risque de perte maximal sur la période.</span>
+                </span>
+              </p>
+              <p>
+                <span className="kpi-label">CAGR (annualisé):</span> {(backtestRunResult.CAGR !== undefined ? backtestRunResult.CAGR.toFixed(2) + ' %' : 'N/A')}
+                <span className="tooltip-trigger"> ℹ️
+                  <span className="tooltip-text">Taux de Croissance Annuel Composé (Compound Annual Growth Rate). C'est le taux de rendement annuel moyen géométrique sur la période de simulation, si elle durait un an. (Actuellement N/A si non fourni par le backend).</span>
+                </span>
+              </p>
+              <p>
+                <span className="kpi-label">Pourcentage de Trades Gagnants:</span> {(backtestRunResult.winningTradesPercentage !== undefined ? backtestRunResult.winningTradesPercentage.toFixed(2) + ' %' : 'N/A')}
+                <span className="tooltip-trigger"> ℹ️
+                  <span className="tooltip-text">Le pourcentage de toutes les transactions effectuées qui ont été clôturées avec un profit. (Actuellement N/A si non fourni par le backend).</span>
+                </span>
+              </p>
             </div>
 
             <div className="charts-section">
@@ -259,7 +333,7 @@ const SuggestionPage: React.FC = () => {
         )}
 
         {!isBacktestLoading && ( 
-          <div style={{marginTop: '20px'}}> {/* Wrapper for buttons to ensure margin applies correctly */}
+          <div style={{marginTop: '20px'}}> 
             <button onClick={() => setCurrentStep('suggestions')}>Retour aux Suggestions</button>
             <button onClick={() => { 
                 setCurrentStep('form'); 

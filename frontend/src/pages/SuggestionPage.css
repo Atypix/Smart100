@@ -221,3 +221,74 @@
   text-align: center;
   color: #333;
 }
+
+/* === Tooltip Styles === */
+.tooltip-trigger {
+  position: relative; /* Establishes a positioning context for the tooltip text */
+  display: inline-block; /* Or 'inline' if preferred, but 'inline-block' can be easier to manage */
+  cursor: help; /* Indicates to the user that help is available */
+  margin-left: 4px; /* Small space between the text and the tooltip icon */
+  color: #007bff; /* Bootstrap blue, or a thematic info color */
+  font-weight: bold;
+  font-size: 0.9em; /* Slightly smaller if using text like (i) */
+}
+
+.tooltip-trigger .tooltip-text {
+  visibility: hidden; /* Hidden by default */
+  width: 220px; /* Adjust width as needed */
+  background-color: #333; /* Dark background for contrast */
+  color: #fff; /* White text */
+  text-align: left; /* Align text to the left for readability */
+  border-radius: 6px;
+  padding: 10px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+
+  /* Positioning */
+  position: absolute;
+  z-index: 10; /* Ensure it's above other elements */
+  bottom: 135%; /* Position above the trigger element */
+  left: 50%;
+  transform: translateX(-50%); /* Center the tooltip */
+
+  /* Fade-in effect */
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out;
+
+  font-size: 0.85em; /* Slightly smaller font for tooltip content */
+  line-height: 1.5; /* Improved readability */
+}
+
+/* Arrow for the tooltip */
+.tooltip-trigger .tooltip-text::after {
+  content: "";
+  position: absolute;
+  top: 100%; /* At the bottom of the tooltip box */
+  left: 50%;
+  margin-left: -6px; /* Half of the arrow's width */
+  border-width: 6px;
+  border-style: solid;
+  border-color: #333 transparent transparent transparent; /* Arrow points down */
+}
+
+/* Show the tooltip text when the trigger is hovered or focused */
+.tooltip-trigger:hover .tooltip-text,
+.tooltip-trigger:focus .tooltip-text, /* Added for keyboard accessibility */
+.tooltip-trigger:focus-within .tooltip-text { /* If icon itself can contain focusable elements */
+  visibility: visible;
+  opacity: 1;
+}
+
+/* Optional: Style for an info icon if using a specific character or SVG later */
+.info-icon { 
+  /* font-family: 'Times New Roman', Times, serif; /* Or a specific icon font */
+  /* font-style: italic; */
+  border: 1px solid #007bff;
+  border-radius: 50%;
+  width: 16px; /* Adjust size */
+  height: 16px; /* Adjust size */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px; /* Size of 'i' or symbol */
+  line-height: 1;
+}
