@@ -1,12 +1,13 @@
 // frontend/src/pages/SuggestionPage.tsx
-import React, { useState, useCallback } from 'react';
-import axios, { AxiosError } from 'axios'; // Added axios, AxiosError
+import React, { useState } from 'react'; // Removed useCallback
+import axios from 'axios'; // Keep axios for runtime
+import type { AxiosError } from 'axios'; // Type-only import for AxiosError
 import { fetchStrategySuggestion } from '../services/api'; 
-import { 
+import type { 
     MultipleSuggestionsApiResponse, 
     SuggestionResponse, 
-    BacktestResult, // Added BacktestResult
-    ApiError      // Added ApiError
+    BacktestResult, 
+    ApiError      
 } from '../types'; 
 import './SuggestionPage.css';
 

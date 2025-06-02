@@ -423,7 +423,7 @@ const BacktestRunnerPage: React.FC = () => {
       
       <div className="backtest-section config-section">
         <StrategySelector
-          strategies={availableStrategies} // Pass fetched strategies to selector
+          // strategies={availableStrategies} // StrategySelector fetches its own strategies
           onStrategySelect={handleStrategySelect}
         />
         <StrategyParameterForm 

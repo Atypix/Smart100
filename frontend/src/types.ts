@@ -73,6 +73,8 @@ export interface BacktestResult {
   historicalDataUsed?: HistoricalDataPoint[];
   portfolioHistory?: { timestamp: number; value: number }[];
   aiDecisionLog?: AIDecision[]; // New field
+  sharpeRatio?: number; // Added optional field
+  maxDrawdown?: number; // Added optional field
 }
 
 // --- AI Decision Log Type ---

@@ -1,5 +1,5 @@
 // frontend/src/services/api.ts
-import type { ApiKey, ApiKeyFormData, SuggestionResponse, MultipleSuggestionsApiResponse } from '../types'; // Added SuggestionResponse
+import type { ApiKey, ApiKeyFormData, MultipleSuggestionsApiResponse } from '../types'; // Removed SuggestionResponse
 
 const API_BASE_URL = '/api'; // Adjust if your API is hosted elsewhere
 
