@@ -315,7 +315,7 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
           winRateForWinningParamsOfCandidate = winRateScore;
         }
       }
-
+      
       // Log the bestMetricScoreForCandidate for the current candidateStrategy
       logger.info(`AISelectorStrategy for ${symbol}: Candidate ${candidateStrategy.id} - Best score achieved: ${bestMetricScoreForCandidate.toFixed(4)} using metric ${metric}`);
 

@@ -10,6 +10,7 @@ import { StrategyContext, TradingStrategy } from '../strategies/strategy.types';
 import logger from '../utils/logger';
 
 export interface SuggestionResponse {
+  symbol: string; // Added field for the symbol
   suggestedStrategyId: string | null;
   suggestedStrategyName: string | null;
   suggestedParameters: Record<string, any> | null;
@@ -274,6 +275,7 @@ export async function getCapitalAwareStrategySuggestion(
     }
 
     finalSuggestions.push({
+      symbol: result.symbol, // Added symbol to the response object
       suggestedStrategyId: result.strategyId,
       suggestedStrategyName: result.strategyName,
       suggestedParameters: parametersForAdjustment,
