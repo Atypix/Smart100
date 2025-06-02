@@ -109,6 +109,11 @@ export async function getCapitalAwareStrategySuggestion(
       await aiSelectorStrategy.execute(aiContext);
       const aiChoice = getAISelectorActiveState(currentSymbol);
 
+      // Add conditional log for when AISelectorStrategy doesn't yield a chosen strategy
+      if (!aiChoice || !aiChoice.chosenStrategyId) {
+        logger.warn(`[AISuggestionService] For symbol ${currentSymbol}, AISelectorStrategy did not yield a chosen strategy. Raw aiChoice object: ${JSON.stringify(aiChoice)}`);
+      }
+
       if (aiChoice && aiChoice.chosenStrategyId) {
         const strategyDetails = StrategyManagerModule.getStrategy(aiChoice.chosenStrategyId);
         if (strategyDetails) {

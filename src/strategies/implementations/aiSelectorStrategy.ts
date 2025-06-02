@@ -116,6 +116,9 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
         optimizeParameters
     } = context.parameters;
     const symbol = context.symbol;
+
+    // Log current index and evaluationLookbackPeriod
+    logger.info(`AISelectorStrategy for ${symbol}: Current index ${context.currentIndex}, AI's own evaluationLookbackPeriod: ${evaluationLookbackPeriod}`);
     
     // Ensure evaluationMetric is valid, default to 'pnl'
     const validMetrics = ['pnl', 'sharpe', 'winRate'];
@@ -140,11 +143,12 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
     }
 
     if (candidateStrategies.length === 0) {
-      logger.warn(`AISelectorStrategy for ${symbol}: No candidate strategies found. Holding.`);
+      logger.warn(`AISelectorStrategy for ${symbol}: No candidate strategies available after filtering. Holding.`);
       return { action: 'HOLD' };
     }
 
     // Ensure context.currentIndex is sufficient for lookback
+    // Log for current index vs lookback period already added above.
     if (context.currentIndex < evaluationLookbackPeriod) {
       logger.info(`AISelectorStrategy for ${symbol}: Not enough historical data for evaluation (currentIndex ${context.currentIndex} < lookback ${evaluationLookbackPeriod}). Holding.`);
       // Optionally, execute a default strategy here if defined
@@ -159,7 +163,7 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
     );
 
     if (evaluationData.length < evaluationLookbackPeriod) {
-      logger.warn(`AISelectorStrategy for ${symbol}: Insufficient evaluation data length (${evaluationData.length} < ${evaluationLookbackPeriod}). Holding.`);
+      logger.warn(`AISelectorStrategy for ${symbol}: Evaluation data length (${evaluationData.length}) is less than AI's own lookback period (${evaluationLookbackPeriod}). Holding.`);
       return { action: 'HOLD' };
     }
 
@@ -312,9 +316,12 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
         }
       }
 
+      // Log the bestMetricScoreForCandidate for the current candidateStrategy
+      logger.info(`AISelectorStrategy for ${symbol}: Candidate ${candidateStrategy.id} - Best score achieved: ${bestMetricScoreForCandidate.toFixed(4)} using metric ${metric}`);
+
       const calculatedMetricValueForCandidate = bestMetricScoreForCandidate;
-      // Log all three scores for the best parameters of this candidate
-      logger.verbose(`AISelectorStrategy for ${symbol}: Candidate ${candidateStrategy.id} best params achieved - Metric (${metric}): ${calculatedMetricValueForCandidate.toFixed(4)}, P&L: ${pnlForWinningParamsOfCandidate?.toFixed(2)}, Sharpe: ${sharpeForWinningParamsOfCandidate?.toFixed(3)}, WinRate: ${winRateForWinningParamsOfCandidate !== null ? (winRateForWinningParamsOfCandidate * 100).toFixed(1) + '%' : 'N/A'}. Optimized Params: ${optimizeParameters && bestParamsForCandidate ? JSON.stringify(bestParamsForCandidate) : "N/A"}`);
+      // Log all three scores for the best parameters of this candidate (existing verbose log, can be kept for more detail if needed)
+      logger.verbose(`AISelectorStrategy for ${symbol}: Candidate ${candidateStrategy.id} (details) - Metric (${metric}): ${calculatedMetricValueForCandidate.toFixed(4)}, P&L: ${pnlForWinningParamsOfCandidate?.toFixed(2)}, Sharpe: ${sharpeForWinningParamsOfCandidate?.toFixed(3)}, WinRate: ${winRateForWinningParamsOfCandidate !== null ? (winRateForWinningParamsOfCandidate * 100).toFixed(1) + '%' : 'N/A'}. Optimized Params: ${optimizeParameters && bestParamsForCandidate ? JSON.stringify(bestParamsForCandidate) : "N/A"}`);
       
       if (calculatedMetricValueForCandidate > currentBestMetricValue) {
         currentBestMetricValue = calculatedMetricValueForCandidate;
@@ -327,7 +334,7 @@ export const aiSelectorStrategy: TradingStrategy<AISelectorStrategyParams> = {
     }
 
     if (!bestStrategyId) {
-      logger.warn(`AISelectorStrategy for ${symbol}: No suitable strategy found after evaluation (metric: ${metric}, best value: ${currentBestMetricValue}). Holding.`);
+      logger.warn(`AISelectorStrategy for ${symbol}: Could not determine a best strategy after evaluating all candidates. Best overall metric score was ${currentBestMetricValue}. Holding.`);
       const currentBarForDecision = context.historicalData[context.currentIndex];
       lastAIDecision = {
         timestamp: currentBarForDecision.timestamp,
