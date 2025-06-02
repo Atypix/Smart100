@@ -1,7 +1,17 @@
 /* frontend/src/pages/SuggestionPage.css */
 .suggestion-page-container {
   padding: 20px;
+  background-color: #ffffff; /* White background for the main content area on the page */
+  border-radius: 8px; 
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05); 
 }
+
+.suggestion-page-container h2 { /* Main page title */
+  color: #2c3e50; /* Darker, but not black */
+  text-align: center;
+  margin-bottom: 25px;
+}
+
 .suggestion-form-container div {
   margin-bottom: 15px;
 }
@@ -9,29 +19,38 @@
   display: block;
   margin-bottom: 5px;
   font-weight: bold;
+  /* color: var(--heading-color); /* Uses global var from index.css */
 }
 .suggestion-form-container input[type="number"] {
   width: 100%;
   padding: 8px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--border-color-lm, #ccc); /* Use var from index.css */
   border-radius: 4px;
   box-sizing: border-box;
+  /* background-color: var(--input-bg-lm); */ /* Use var */
+  /* color: var(--text-color-lm); */ /* Use var */
 }
 .suggestion-form-container button {
   padding: 10px 15px;
-  background-color: #007bff;
+  background-color: #5c6bc0; /* Softer Indigo/Blue */
   color: white;
   border: none;
   border-radius: 4px;
   cursor: pointer;
   font-size: 1em;
+  transition: background-color 0.2s ease; /* Added transition */
+}
+.suggestion-form-container button:hover {
+  background-color: #3f51b5; /* Darker on hover */
 }
 .suggestion-form-container button:disabled {
-  background-color: #aaa;
+  background-color: #c5cae9; /* Lighter disabled state */
+  cursor: not-allowed; /* Explicitly set cursor for disabled */
 }
-.error-message {
-  color: red;
+.error-message { /* General error messages in the form */
+  color: #c0392b; /* Softer red */
   margin-top: 10px;
+  font-size: 0.9em;
 }
 
 /* Styles for suggestions list and cards */
@@ -39,82 +58,166 @@
   margin-top: 20px;
 }
 
+@keyframes slideInFromRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 .suggestion-card {
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-color-lm, #ddd); /* Use var */
   border-radius: 8px;
   padding: 15px;
   margin-bottom: 15px;
-  background-color: #f9f9f9;
+  background-color: var(--section-bg-lm, #f9f9f9); /* Use var */
+  animation: slideInFromRight 0.5s ease-out forwards;
+  opacity: 0; 
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out; 
 }
 
-.suggestion-card h4 { /* For Thematic Name */
+.suggestion-card:nth-child(1) { animation-delay: 0.1s; }
+.suggestion-card:nth-child(2) { animation-delay: 0.25s; }
+.suggestion-card:nth-child(3) { animation-delay: 0.4s; }
+
+
+.suggestion-card:hover {
+  transform: scale(1.03);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.suggestion-card h4 { 
   margin-top: 0;
-  color: #007bff;
+  color: #5c6bc0; /* Match form button for thematic color */
 }
 
 .suggestion-card p {
-  margin: 8px 0; /* Adjusted for slightly more spacing */
+  margin: 8px 0; 
+  font-size: 0.95em; /* Slightly smaller for card content */
+  line-height: 1.5; /* Improved readability */
 }
 
 .suggestion-card button {
   margin-top: 10px;
   padding: 8px 12px;
-  background-color: #28a745; /* Green */
+  background-color: #66bb6a; /* Softer Green */
   color: white;
   border: none;
   border-radius: 4px;
   cursor: pointer;
+  transition: background-color 0.2s ease; /* Added transition */
 }
 
 .suggestion-card button:hover {
-  background-color: #218838;
+  background-color: #4caf50; /* Darker green on hover */
 }
 
 /* Button for returning to form or other general navigation */
 .suggestions-display-container > button, 
-.backtest-result-container > button { /* Updated class name */
+.backtest-result-container > button { 
   margin-top: 20px;
   padding: 10px 15px;
-  background-color: #6c757d; /* Grey */
+  background-color: #868e96; /* Softer Grey, was #6c757d */
   color: white;
   border: none;
   border-radius: 4px;
-  cursor: pointer; /* Added cursor */
+  cursor: pointer; 
+  transition: background-color 0.2s ease; /* Added transition */
 }
 
 .suggestions-display-container > button:hover,
-.backtest-result-container > button:hover { /* Updated class name */
-    background-color: #5a6268; /* Darker Grey */
+.backtest-result-container > button:hover { 
+    background-color: #5a6268; 
 }
 
 /* Styles for Backtest Result Display */
-.backtest-result-container { /* Matched class name from JSX */
+.backtest-result-container { 
   margin-top: 20px;
-  padding: 15px;
-  border: 1px solid #ccc;
+  padding: 20px; /* Increased padding */
+  border: 1px solid var(--border-color-lm, #ccc); /* Use var */
   border-radius: 8px;
-  background-color: #e9ecef;
+  background-color: var(--section-bg-lm, #e9ecef); /* Use var */
+  animation: fadeIn 0.7s ease-in forwards;
+  opacity: 0; 
 }
-.backtest-result-container h3 {
+.backtest-result-container h3 { /* Title for backtest results section */
   margin-top: 0;
-  color: #17a2b8; /* Info color for title */
+  color: #4a69bb; /* Example: A deeper, calm blue for results title */
+  margin-bottom: 20px; /* Increased margin */
+  text-align: center; /* Center title of this section */
 }
-.backtest-result-container p {
-  margin: 8px 0;
-  font-size: 0.95em;
+.backtest-result-container p { /* General paragraphs within results */
+  margin: 5px 0; /* Tighter default for list-like KPIs */
+  font-size: 1em; /* Standardized font size */
 }
 .backtest-result-container .kpi-label {
-  font-weight: bold;
+  font-weight: 500; /* Slightly less bold than default 'bold' */
+  margin-right: 8px; 
+  color: #495057; /* Dark grey for labels */
 }
-.backtest-result-container .error-message { /* For backtest specific errors */
-  color: #dc3545; /* Bootstrap danger color */
-  font-weight: bold;
+.backtest-result-container .error-message { 
+  color: #c0392b; /* Softer red */
+  font-weight: 500;
+  background-color: #fdd; /* Light red background for error messages */
+  padding: 10px;
+  border-radius: 4px;
 }
 
-/* General navigation buttons within backtest result, if different from others */
 .backtest-result-container button {
-    margin-right: 10px; /* Space out multiple buttons */
+    margin-right: 10px; 
 }
 .backtest-result-container button:last-child {
     margin-right: 0;
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* Wider items */
+  gap: 12px; /* Slightly more gap */
+  margin-bottom: 20px;
+}
+
+.kpi-grid p { /* Styling for each KPI item box */
+  background-color: #ffffff; 
+  padding: 12px 15px; /* More padding */
+  border-radius: 6px; /* Softer radius */
+  margin: 0; 
+  border: 1px solid #e0e0e0; /* Lighter border for KPI boxes */
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03); /* Very subtle shadow */
+}
+
+/* Styles for Chart Containers */
+.charts-section {
+  margin-top: 30px;
+  display: flex;
+  flex-direction: column; 
+  gap: 30px;
+}
+
+.chart-container {
+  border: 1px solid var(--border-color-lm, #e0e0e0); /* Use var */
+  padding: 20px; /* Increased padding */
+  border-radius: 8px;
+  background-color: #fff;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05); /* Subtle shadow for charts */
+}
+
+.chart-container h4 { 
+  margin-top: 0;
+  margin-bottom: 15px;
+  text-align: center;
+  color: #333;
 }
