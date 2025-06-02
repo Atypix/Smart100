@@ -231,7 +231,7 @@ function queryHistoricalData(
 }
 
 // Function to get all unique symbols from financial_data
-export function getAllUniqueSymbols(): string[] {
+function getAllUniqueSymbols(): string[] {
   if (!db) {
     console.error('[DATABASE CRITICAL] getAllUniqueSymbols called but db instance is not available!');
     throw new Error('[DATABASE CRITICAL] db instance is not available in getAllUniqueSymbols.');
