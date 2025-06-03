@@ -71,8 +71,13 @@ export interface BacktestResult {
   totalTrades: number;
   dataPointsProcessed: number;
   historicalDataUsed?: HistoricalDataPoint[];
-  portfolioHistory?: { timestamp: number; value: number }[];
-  aiDecisionLog?: AIDecision[]; // New field
+  portfolioHistory?: { timestamp: number; value: number; date?: string }[]; // Added date to portfolioHistory items
+  aiDecisionLog?: AIDecision[]; 
+  sharpeRatio?: number; 
+  maxDrawdown?: number; 
+  // New optional KPIs
+  CAGR?: number;
+  winningTradesPercentage?: number;
 }
 
 // --- AI Decision Log Type ---

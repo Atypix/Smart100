@@ -40,38 +40,54 @@ This document tracks the major development phases, features, and future roadmap 
 *   **Styling:**
     - Basic CSS was added for the new navigation elements and page layouts for initial usability.
 
-**Next Steps (Phase 2):** Focus on UI/UX refinements for the Suggestion Page, including thematic suggestion names, improved metrics display, animations, and integrating detailed charts for backtest results.
+**Next Steps (Phase 2):** Focus on UI/UX refinements for the Suggestion Page, including thematic suggestion names, improved metrics display, animations, and integrating detailed charts for backtest results. 
+*(Self-correction: This "Next Steps" should now point to Phase 3)*
 
 ---
 
-## Phase 2: UI/UX Refinements for Suggestion Page (Planned)
+## Phase 2: UI/UX Refinements for Suggestion Page (Completed)
 
-*   **Suggestion Display:**
-    - Implement thematic names for suggestions (e.g., “Écureuil prudent”, “Hérisson équilibré”, “Faucon audacieux”).
-    - Display more meaningful "Type de stratégie" (e.g., map "ichimoku-cloud" to "Ichimoku").
-    - Refine display of ROI and other metrics (requires backend to possibly provide more direct ROI estimates or simulated trade counts).
-*   **Animations & Transitions:**
-    - Input field animations.
-    - Loading animation for suggestion fetching.
-    - "Confettis" or "card morphing" animation before displaying suggestions.
-    - Suggestions appear with "glissement depuis la droite".
-    - Hover scale effect on suggestion cards.
-    - Animated icons (SVG/emojis) for suggestions.
-    - Fluid "fade in + slide" for backtest result display.
-    - Pulsing/popping "Simulation terminée" badge.
-*   **Backtest Result Display:**
-    - Integrate `EquityChart` and `TradesOnPriceChart` components (or similar) into the Suggestion Page's result view.
-    - Clearly display KPIs: CAGR, Drawdown max, Ratio de Sharpe, % de trades gagnants.
-*   **Styling:**
-    - Implement a clear/pastel theme (or dark mode).
-    - Use modern typography (Inter, Poppins).
+**Date Completed:** YYYY-MM-DD (Current Date)
+
+**Key Accomplishments:**
+
+*   **Refined Suggestion Display:**
+    - Implemented thematic names (e.g., "L'Écureuil Prudent 🐿️") and icons for suggestions on `SuggestionPage.tsx`.
+    - Mapped strategy IDs to user-friendly names (e.g., "Ichimoku Cloud") for better readability.
+    - Clarified presentation of performance metrics from AI evaluation, adding explanatory notes.
+*   **Enhanced Backtest Result Display (Textual KPIs):**
+    - Structured Key Performance Indicators (KPIs) in a grid layout on `SuggestionPage.tsx`.
+    - Improved labels and formatting for existing KPIs.
+    - Updated the `BacktestResult` TypeScript type to include optional `CAGR` and `winningTradesPercentage` fields, which are now displayed as "N/A" pending backend support providing these values.
+*   **Chart Integration for Backtest Results:**
+    - Integrated `EquityChart` and `TradesOnPriceChart` components into the `SuggestionPage.tsx`'s backtest result view, providing visual representation of portfolio evolution and trade placements.
+*   **Basic Animations & Transitions:**
+    - Added slide-in effect for suggestion cards (staggered for multiple cards).
+    - Implemented hover effects (scale/shadow) on suggestion cards.
+    - Added fade-in effect for the backtest result section when it appears.
+*   **Styling and Theme (Initial Pass):**
+    - Applied "Inter" font application-wide via `index.css`.
+    - Adjusted colors, spacing, and button styles on `SuggestionPage.tsx` and in global CSS (`index.css`) to align with a cleaner, light/pastel theme.
+*   **Frontend Build Issue Resolution:**
+    - Addressed and fixed various TypeScript errors and import issues that were preventing the frontend from building successfully. This included correcting prop types, handling type-only imports, removing unused code, and ensuring `react-router-dom` was correctly installed and configured.
+
+**Next Steps (Phase 3):** Focus on advanced features, further polish, and more complex interactions.
+
+---
 
 ## Phase 3: Advanced Features & Polish (Planned)
 
-*   Advanced micro-interactions and animations.
-*   Tooltips with pedagogical explanations for suggestions.
+*   **Tooltips with Pedagogical Explanations (Completed):**
+    - Implemented CSS-based tooltips on the `SuggestionPage.tsx`.
+    - Info icons (ℹ️) trigger tooltips on hover/focus, enhancing user understanding.
+    - **Suggestion Cards:** Tooltips provide explanations for Thematic Names (risk/reward profile), Strategy Types (brief strategy logic), Performance Metrics (contextual explanation of P&L, Sharpe, Win Rate from AI eval), and Max Risk per Trade (calculation basis).
+    - **Backtest Result KPIs:** Tooltips explain each displayed KPI, including Valeur Finale du Portefeuille, Profit/Perte Total (€ et %), Ratio de Sharpe, Max Drawdown (%), CAGR (annualisé) (%), Pourcentage de Trades Gagnants (%), and Nombre Total de Trades.
+    - All tooltip content is in French, aiming to provide educational value and clarity on financial/trading terms.
+*   Advanced micro-interactions and animations (e.g., loading spinners, "confetti" on success).
 *   Option “Envoyer la stratégie par email” (requires SendGrid backend setup).
 *   Subtle sound effects (optional/toggleable).
+*   Further refinement of UI/UX based on user feedback.
+*   Address any outstanding TODOs or minor bugs.
 
 ---
 *(Previous project status and details from README.md can be appended here or kept separate if README is the primary source for older history)*
