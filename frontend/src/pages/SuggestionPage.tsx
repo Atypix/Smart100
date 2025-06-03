@@ -287,7 +287,7 @@ const SuggestionPage: React.FC = () => {
               <p>
                 <span className="kpi-label">Ratio de Sharpe:</span> {(backtestRunResult.sharpeRatio !== undefined ? backtestRunResult.sharpeRatio.toFixed(3) : 'N/A')}
                 <span className="tooltip-trigger"> ℹ️
-                  <span className="tooltip-text">Mesure la performance d'un investissement par rapport à un actif sans risque, après ajustement pour son risque. Un ratio plus élevé indique une meilleure performance pour la quantité de risque prise (généralement > 1 est considéré comme bon, > 2 très bon).</span>
+                  <span className="tooltip-text">Mesure la performance d'un investissement par rapport à un actif sans risque, après ajustement pour son risque. Un ratio plus élevé indique une meilleure performance pour la quantité de risque prise (généralement &gt; 1 est considéré comme bon, &gt; 2 très bon).</span>
                 </span>
               </p>
               <p>
